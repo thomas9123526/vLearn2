@@ -20,6 +20,10 @@
 | active_theme | VARCHAR(20) | default 'apricot' | apricot/sage/iris/obsidian |
 | onboarding_done | BOOLEAN | default false | |
 | role | VARCHAR(20) | NOT NULL, default 'user' | `user` / `admin` / `superadmin` — drives access to `/admin/*` (see [12](12_admin_visibility.md)) |
+| status | VARCHAR(20) | NOT NULL, default 'active' | `active` / `suspended` / `deleted` — see [13 §13.4.4](13_admin_content_and_users.md) |
+| suspended_until | TIMESTAMPTZ | nullable | NULL means indefinite when status=suspended |
+| suspended_reason | TEXT | nullable | shown to user on sign-in failure |
+| leaderboard_opt_in | BOOLEAN | default true | reserved for future public leaderboard; admin endpoints ignore |
 | created_at | TIMESTAMPTZ | default now() | |
 | updated_at | TIMESTAMPTZ | default now() | |
 
@@ -64,8 +68,15 @@
 | estimated_minutes | SMALLINT | default 5 | |
 | xp_reward | SMALLINT | default 50 | |
 | order_index | SMALLINT | default 0 | |
-| is_active | BOOLEAN | default true | |
+| image_url | VARCHAR(500) | nullable | hero image URL (admin-uploaded; see [13 §13.2.1](13_admin_content_and_users.md)) |
+| image_storage_key | VARCHAR(255) | nullable | internal storage pointer used for deletion |
+| image_alt_text | VARCHAR(500) | nullable | accessibility text |
+| author_id | UUID | FK → users.id, nullable | admin who created (null for seeded scenarios) |
+| status | VARCHAR(20) | NOT NULL, default 'published' | `draft` / `published` / `archived` — replaces is_active |
+| published_at | TIMESTAMPTZ | nullable | set when status flips to published |
 | created_at | TIMESTAMPTZ | default now() | |
+
+Migration note: `is_active=false` rows migrate to `status='archived'`; column then dropped.
 
 ### Table: courses
 | Column | Type | Constraints |
@@ -230,18 +241,39 @@ Layout visibility flags + remote-config knobs read by the Flutter app and writte
 | updated_at | TIMESTAMPTZ | default now() | |
 | updated_by | UUID | FK → users.id, nullable | last admin who edited; null on initial seed |
 
-### Table: config_audit_log
-Append-only history of every admin-side config change. See [12_admin_visibility.md §12.4](12_admin_visibility.md).
+### Table: admin_audit_log
+Unified append-only audit log capturing every admin write across all domains (config changes, scenario edits, user edits, transcript views, image uploads, etc). See [13_admin_content_and_users.md §13.8.2](13_admin_content_and_users.md). Replaces the originally-planned `config_audit_log` from [12](12_admin_visibility.md).
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | UUID | PK |
-| config_key | VARCHAR(100) | NOT NULL |
-| old_value | JSONB | nullable (null on initial insert) |
-| new_value | JSONB | NOT NULL |
-| operation | VARCHAR(20) | NOT NULL (`create` / `update` / `reset`) |
-| user_id | UUID | FK → users.id |
-| created_at | TIMESTAMPTZ | default now() |
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| user_id | UUID | FK → users.id, ON DELETE SET NULL | admin who acted |
+| action | VARCHAR(50) | NOT NULL | dot-namespaced: `config.update` / `scenario.create` / `user.suspend` / `transcript.view` / etc |
+| target_type | VARCHAR(20) | NOT NULL | `config` / `scenario` / `course` / `achievement` / `persona` / `user` / `session` / `wordlist` / `image` |
+| target_id | VARCHAR(100) | NOT NULL | UUID for entities, key string for config |
+| old_value | JSONB | nullable | redacted to avoid PII spillage |
+| new_value | JSONB | nullable | redacted |
+| metadata | JSONB | nullable | extra context: reason, ip_address, user_agent |
+| created_at | TIMESTAMPTZ | default now() | |
+
+### Table: uploaded_files
+Tracks every admin-uploaded asset (scenario images, persona portraits, etc) regardless of storage backend. Drives SHA-256 dedup and reference-counted garbage collection. See [13 §13.3](13_admin_content_and_users.md).
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| storage_key | VARCHAR(255) | UNIQUE NOT NULL | provider's blob identifier |
+| original_filename | VARCHAR(500) | | for audit trail |
+| mime_type | VARCHAR(50) | NOT NULL | post-processing (typically image/webp) |
+| size_bytes | INTEGER | NOT NULL | post-processing |
+| width | INTEGER | nullable | |
+| height | INTEGER | nullable | |
+| content_hash | VARCHAR(64) | NOT NULL | SHA-256 hex |
+| reference_count | INTEGER | NOT NULL, default 1 | GC trigger when reaches 0 |
+| uploader_id | UUID | FK → users.id, ON DELETE SET NULL | |
+| folder | VARCHAR(50) | NOT NULL | `scenarios` / `personas` / etc |
+| storage_provider | VARCHAR(20) | NOT NULL | `local` / `s3` |
+| created_at | TIMESTAMPTZ | default now() | |
 
 ### Indexes
 ```sql
@@ -254,8 +286,15 @@ CREATE INDEX idx_scenarios_category ON scenarios(category);
 CREATE INDEX idx_guard_violations_user_id ON guard_violations(user_id, created_at DESC);
 CREATE INDEX idx_guard_violations_severity ON guard_violations(severity, created_at DESC);
 CREATE INDEX idx_app_config_category ON app_config(category);
-CREATE INDEX idx_config_audit_log_key_time ON config_audit_log(config_key, created_at DESC);
-CREATE INDEX idx_config_audit_log_user_time ON config_audit_log(user_id, created_at DESC);
+CREATE INDEX idx_admin_audit_log_user_time ON admin_audit_log(user_id, created_at DESC);
+CREATE INDEX idx_admin_audit_log_target ON admin_audit_log(target_type, target_id, created_at DESC);
+CREATE INDEX idx_admin_audit_log_action_time ON admin_audit_log(action, created_at DESC);
+CREATE INDEX idx_uploaded_files_hash ON uploaded_files(content_hash);
+CREATE INDEX idx_uploaded_files_uploader ON uploaded_files(uploader_id, created_at DESC);
+CREATE INDEX idx_scenarios_status ON scenarios(status);
+CREATE INDEX idx_users_status ON users(status) WHERE status != 'active';
+CREATE INDEX idx_users_xp_total ON users(xp_total DESC);
+CREATE INDEX idx_users_streak_days ON users(streak_days DESC);
 ```
 
 ---

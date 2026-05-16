@@ -3,8 +3,9 @@
 **Cross-cutting concerns spec'd in separate files** (modules / interceptors / endpoints documented there are still implemented inside `backend/src/`):
 - Content guard + gzip compression — [11_security_and_performance.md](11_security_and_performance.md)
 - Layout visibility + admin-config endpoints — [12_admin_visibility.md](12_admin_visibility.md) (adds `AppConfigModule` with `/app-config` and `/admin/config/*`)
+- Admin content + user management — [13_admin_content_and_users.md](13_admin_content_and_users.md) (adds `AdminScenariosModule`, `AdminCoursesModule`, `AdminAchievementsModule`, `AdminPersonasModule`, `AdminUsersModule`, `AdminLeaderboardModule`, `AdminStatsModule`, `AdminAuditModule`, `StorageProvider`, `ImageProcessor`)
 
-The JWT payload extends to include `role` (see [12 §12.4](12_admin_visibility.md)). All `/admin/*` endpoints are guarded by `AdminGuard` which checks `user.role IN ('admin','superadmin')`.
+The JWT payload extends to include `role` (see [12 §12.4](12_admin_visibility.md)). All `/admin/*` endpoints are guarded by `AdminGuard` which checks `user.role IN ('admin','superadmin')`. The most privacy-sensitive endpoints (transcript view, full guard-violation content) require `superadmin` and are audited per [13 §13.8](13_admin_content_and_users.md).
 
 ## 3.1 Auth Module (`/auth`)
 

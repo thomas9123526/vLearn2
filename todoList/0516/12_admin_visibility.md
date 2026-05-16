@@ -133,7 +133,7 @@ Returns all app-visible config in one shot. App polls this on launch + every 30 
 - [ ] **12.4.5** `AdminGuard` extends `JwtAuthGuard`; checks `user.role` claim in JWT
 - [ ] **12.4.6** JWT payload extended with `role` — issued on signin, refreshed on `/auth/refresh`
 - [ ] **12.4.7** Validation: PATCH body's `value` must match the row's `value_type` (`boolean` keys reject non-bool)
-- [ ] **12.4.8** Audit log: every admin write inserts into a `config_audit_log` table (key, old_value, new_value, user_id, timestamp)
+- [ ] **12.4.8** Audit log: every admin write inserts into the unified `admin_audit_log` table with `action='config.update'|'config.reset'`, `target_type='config'`, `target_id=<key>`, `old_value`, `new_value`, `user_id`. Schema defined in [13_admin_content_and_users.md §13.8.2](13_admin_content_and_users.md)
 - [ ] **12.4.9** CORS rule allows the admin-panel origin (separate from Flutter app origin)
 
 ### Bootstrap seed
@@ -387,6 +387,6 @@ These are the concrete tasks the Flutter dev does NOW, before the admin panel ex
 - [ ] **12.10.3** Implement `AppConfigModule` with `AppConfigService`, `AppConfigController` (`GET /app-config`), `AdminConfigController` (`/admin/config/*`)
 - [ ] **12.10.4** `AdminGuard` extending `JwtAuthGuard` with role check
 - [ ] **12.10.5** Extend JWT payload to include `role`
-- [ ] **12.10.6** `config_audit_log` table + write on every admin mutation
+- [ ] **12.10.6** Write to the unified `admin_audit_log` table on every admin mutation (table defined in [13 §13.8.2](13_admin_content_and_users.md); no separate `config_audit_log`)
 - [ ] **12.10.7** Seed file with the full §12.6 catalog
 - [ ] **12.10.8** Deploy-time reconciler: insert any missing catalog keys (additive only — never deletes admin overrides)
