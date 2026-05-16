@@ -5,13 +5,19 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
 import { HealthController } from './health.controller';
 import { typeormConfigFactory } from './database/typeorm-config.factory';
+import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { UsersModule } from './users/users.module';
+import { PersonasModule } from './personas/personas.module';
+import { ScenariosModule } from './scenarios/scenarios.module';
+import { CoursesModule } from './courses/courses.module';
+import { ConversationsModule } from './conversations/conversations.module';
+import { ProgressModule } from './progress/progress.module';
+import { AchievementsModule } from './achievements/achievements.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      cache: true,
-    }),
+    ConfigModule.forRoot({ isGlobal: true, cache: true }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: typeormConfigFactory,
@@ -27,17 +33,22 @@ import { typeormConfigFactory } from './database/typeorm-config.factory';
         ],
       }),
     }),
-    // Feature modules land here in subsequent commits:
-    //   AuthModule, UsersModule, PersonasModule, ScenariosModule,
-    //   ConversationsModule, ProgressModule, AiModule, GuardModule,
-    //   AppConfigModule, StorageModule, AdminAdminsModule, ...
+    // Feature modules
+    AuthModule,
+    UsersModule,
+    PersonasModule,
+    ScenariosModule,
+    CoursesModule,
+    ConversationsModule,
+    ProgressModule,
+    AchievementsModule,
   ],
   controllers: [HealthController],
   providers: [
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
+    // Global JWT auth — endpoints opt out via @Public()
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Throttler runs after auth
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

@@ -1,0 +1,82 @@
+import { Module, Controller, Get, Post, Body, Param, UseGuards, Query } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { JwtPayload } from '../auth/strategies/jwt.strategy';
+import {
+  ConversationSessionEntity,
+  ConversationMessageEntity,
+} from '../database/entities/conversation.entity';
+import { ScenarioEntity } from '../database/entities/scenario.entity';
+import { PersonaEntity } from '../database/entities/persona.entity';
+import { ConversationsService } from './conversations.service';
+import {
+  StartSessionDto,
+  SendMessageDto,
+  EndSessionDto,
+} from './dto/conversation.dto';
+
+@ApiTags('Conversations')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('conversations')
+class ConversationsController {
+  constructor(private readonly svc: ConversationsService) {}
+
+  @Post('sessions')
+  @ApiOperation({ summary: 'Start a new conversation session' })
+  start(@CurrentUser() user: JwtPayload, @Body() dto: StartSessionDto) {
+    return this.svc.start(user.sub, dto);
+  }
+
+  @Get('sessions')
+  @ApiOperation({ summary: 'List my sessions (most recent first)' })
+  list(
+    @CurrentUser() user: JwtPayload,
+    @Query('limit') limit?: string,
+  ) {
+    return this.svc.listForUser(user.sub, limit ? parseInt(limit, 10) : 50);
+  }
+
+  @Get('sessions/:id')
+  @ApiOperation({ summary: 'Get a session with all its messages' })
+  get(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.svc.getSession(user.sub, id);
+  }
+
+  @Post('sessions/:id/messages')
+  @ApiOperation({ summary: 'Send a user message and get the tutor reply' })
+  send(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: SendMessageDto,
+  ) {
+    return this.svc.sendMessage(user.sub, id, dto);
+  }
+
+  @Post('sessions/:id/end')
+  @ApiOperation({ summary: 'End the session and compute final XP' })
+  end(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: EndSessionDto,
+  ) {
+    return this.svc.endSession(user.sub, id, dto);
+  }
+}
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      ConversationSessionEntity,
+      ConversationMessageEntity,
+      ScenarioEntity,
+      PersonaEntity,
+    ]),
+  ],
+  providers: [ConversationsService],
+  controllers: [ConversationsController],
+  exports: [ConversationsService],
+})
+export class ConversationsModule {}
