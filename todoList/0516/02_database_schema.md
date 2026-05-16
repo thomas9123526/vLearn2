@@ -19,6 +19,7 @@
 | active_persona_id | UUID | FK → personas.id | selected tutor |
 | active_theme | VARCHAR(20) | default 'apricot' | apricot/sage/iris/obsidian |
 | onboarding_done | BOOLEAN | default false | |
+| role | VARCHAR(20) | NOT NULL, default 'user' | `user` / `admin` / `superadmin` — drives access to `/admin/*` (see [12](12_admin_visibility.md)) |
 | created_at | TIMESTAMPTZ | default now() | |
 | updated_at | TIMESTAMPTZ | default now() | |
 
@@ -214,6 +215,34 @@ Records content-guard rejections and warnings for moderation review. See [11_sec
 | user_acknowledged_warn | BOOLEAN | default false | only true when severity=warn AND user clicked "Continue anyway" |
 | created_at | TIMESTAMPTZ | default now() | |
 
+### Table: app_config
+Layout visibility flags + remote-config knobs read by the Flutter app and written by the future Next.js admin panel. See [12_admin_visibility.md](12_admin_visibility.md).
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| key | VARCHAR(100) | PK | dot-namespaced, e.g. `evaluation.radar.skills.pronunciation` |
+| value | JSONB | NOT NULL | current value (boolean for visibility flags; other types allowed) |
+| value_type | VARCHAR(20) | NOT NULL | `boolean` / `string` / `number` / `object` / `array` — UI hint for admin panel |
+| category | VARCHAR(50) | NOT NULL | grouping: `home` / `evaluation` / `progress` / `conversation` / `scenarios` / `settings` / `system` |
+| description | TEXT | NOT NULL | human-readable purpose, shown in admin panel |
+| default_value | JSONB | NOT NULL | the app-baked default — lets admin reset and panel show "differs from default" |
+| is_visible_to_app | BOOLEAN | default true | when false, key is admin-only and not returned by `GET /app-config` |
+| updated_at | TIMESTAMPTZ | default now() | |
+| updated_by | UUID | FK → users.id, nullable | last admin who edited; null on initial seed |
+
+### Table: config_audit_log
+Append-only history of every admin-side config change. See [12_admin_visibility.md §12.4](12_admin_visibility.md).
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| config_key | VARCHAR(100) | NOT NULL |
+| old_value | JSONB | nullable (null on initial insert) |
+| new_value | JSONB | NOT NULL |
+| operation | VARCHAR(20) | NOT NULL (`create` / `update` / `reset`) |
+| user_id | UUID | FK → users.id |
+| created_at | TIMESTAMPTZ | default now() |
+
 ### Indexes
 ```sql
 CREATE INDEX idx_sessions_user_id ON conversation_sessions(user_id);
@@ -224,6 +253,9 @@ CREATE INDEX idx_scenarios_difficulty ON scenarios(difficulty);
 CREATE INDEX idx_scenarios_category ON scenarios(category);
 CREATE INDEX idx_guard_violations_user_id ON guard_violations(user_id, created_at DESC);
 CREATE INDEX idx_guard_violations_severity ON guard_violations(severity, created_at DESC);
+CREATE INDEX idx_app_config_category ON app_config(category);
+CREATE INDEX idx_config_audit_log_key_time ON config_audit_log(config_key, created_at DESC);
+CREATE INDEX idx_config_audit_log_user_time ON config_audit_log(user_id, created_at DESC);
 ```
 
 ---
@@ -329,6 +361,25 @@ class AppSettings extends Table {
   TextColumn get value => text()();
   @override
   Set<Column> get primaryKey => {key};
+}
+
+// layout_config_cache table — caches GET /app-config response (see 12_admin_visibility.md)
+class LayoutConfigCache extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();        // JSON-encoded
+  TextColumn get valueType => text()();
+  DateTimeColumn get fetchedAt => dateTime()();
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
+// layout_config_meta — single-row table holding the last server config version (for If-Modified-Since)
+class LayoutConfigMeta extends Table {
+  IntColumn get id => integer().withDefault(const Constant(1))();   // always 1
+  TextColumn get serverVersion => text().nullable()();              // ISO timestamp from GET /app-config
+  DateTimeColumn get lastSyncAt => dateTime().nullable()();
+  @override
+  Set<Column> get primaryKey => {id};
 }
 ```
 

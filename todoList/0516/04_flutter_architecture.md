@@ -1,5 +1,10 @@
 # 04 – Flutter App Architecture
 
+**Cross-cutting concerns spec'd in separate files** (still live under `lib/core/`):
+- Content guard (client-side wordlist check) — [11 §11.1](11_security_and_performance.md) — `lib/core/guard/`
+- Compression interceptor (Dio `Accept-Encoding` toggle) — [11 §11.2](11_security_and_performance.md) — `lib/core/api/interceptors/`
+- **Layout visibility + remote-config** — [12](12_admin_visibility.md) — `lib/core/config/layout_config_provider.dart` + `lib/shared/widgets/layout_visibility.dart`. Every screen section listed in §12.6 wraps its content with `LayoutVisibility` so the admin panel can toggle it remotely without an APK rebuild.
+
 ## 4.1 Folder Structure
 
 ```

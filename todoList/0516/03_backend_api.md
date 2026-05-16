@@ -1,5 +1,11 @@
 # 03 – Backend API (NestJS)
 
+**Cross-cutting concerns spec'd in separate files** (modules / interceptors / endpoints documented there are still implemented inside `backend/src/`):
+- Content guard + gzip compression — [11_security_and_performance.md](11_security_and_performance.md)
+- Layout visibility + admin-config endpoints — [12_admin_visibility.md](12_admin_visibility.md) (adds `AppConfigModule` with `/app-config` and `/admin/config/*`)
+
+The JWT payload extends to include `role` (see [12 §12.4](12_admin_visibility.md)). All `/admin/*` endpoints are guarded by `AdminGuard` which checks `user.role IN ('admin','superadmin')`.
+
 ## 3.1 Auth Module (`/auth`)
 
 ### Endpoints
