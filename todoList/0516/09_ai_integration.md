@@ -637,7 +637,7 @@ Wraps `package:sherpa_onnx` ASR models. Recommended model choices:
 | **Paraformer (zh)** | zh | ~70 MB | ~200 ms streaming | If Chinese is primary user base |
 
 - [ ] **9.14.4.1** Add `sherpa_onnx: ^<version>` to pubspec.yaml when implementing
-- [ ] **9.14.4.2** Download model on first launch (not bundled) — show progress UI; store to **external storage** per §9.15.6 (Android: `getExternalFilesDir(null)/models/stt/`; Windows: `%APPDATA%\vLearn2\models\stt\`)
+- [ ] **9.14.4.2** **Load** model from the **pre-placed** external storage path per §9.15.6 (Android: `getExternalFilesDir(null)/models/stt/`; Windows: `%APPDATA%\vLearn2\models\stt\`). No download path — admin pre-places via ADB / SAF / MDM
 - [ ] **9.14.4.3** Verify ONNX runtime DLLs ship correctly on Windows MSIX bundle (known gotcha)
 - [ ] **9.14.4.4** Streaming pipeline: mic → 16 kHz PCM chunks → `OnlineRecognizer` → partial results → UI captions
 - [ ] **9.14.4.5** Map sherpa-onnx errors → unified `SttError`
@@ -666,7 +666,7 @@ Wraps `package:sherpa_onnx` TTS models. Recommended voice strategy:
 
 (Exact voice IDs depend on what's available in the sherpa-onnx model zoo at implementation time. Custom-trained voices are an option later.)
 
-- [ ] **9.14.5.1** Download persona voice models on first launch (one bundle per language) — show progress UI; store to **external storage** per §9.15.6 (`<external>/models/tts/<voice-id>/`)
+- [ ] **9.14.5.1** Persona voice models are **pre-placed** by the admin in `<external>/models/tts/<voice-id>/` per §9.15.6. App enumerates installed voices at boot via `manifest.json`
 - [ ] **9.14.5.2** Cache audio: synthesize once per (text, voiceId) pair, store in `<external>/cache/tts/` for replay
 - [ ] **9.14.5.3** Streaming synthesis where supported — start playback before full generation completes
 - [ ] **9.14.5.4** Coordinate with [Rive animation](07_animation.md): `speak()` → set Rive `isSpeaking = true` → unset when audio ends
@@ -917,16 +917,16 @@ The simple 0-100 columns (`pronunciation_score`, `fluency_score`, etc.) stay as-
 
 **Distribution model:** standalone APK (not on Google Play). Hosted at: project website / GitHub releases / F-Droid mirror. Windows: MSIX or plain installer.
 
-**Storage philosophy:** the APK is small (~50 MB) — only code, UI assets, the CEFR-J wordlist (1 MB), and Flutter runtime. **All ONNX models and voice packs live on external storage**, downloaded on first launch (or pre-placed by an admin for kiosk deployments).
+**Storage philosophy:** the APK is small (~50 MB) — only code, UI assets, the CEFR-J wordlist (1 MB), and Flutter runtime. **All ONNX models and voice packs are pre-placed on external storage by an admin before users get the device.** The app never downloads models. On first launch it detects the pre-placed bundle, verifies integrity, and boots straight into the experience. No CDN, no network requirement, no in-app downloader.
 
-#### Storage layout
+#### Storage layout (the "model root")
 
-**Android:** `getExternalFilesDir(null)` → `/sdcard/Android/data/<package>/files/`
+**Android primary location:** `getExternalFilesDir(null)` → `/sdcard/Android/data/<package>/files/`
 
 ```
 /sdcard/Android/data/com.vlearn2/files/
 ├── models/
-│   ├── manifest.json                              ← lists installed model versions
+│   ├── manifest.json                              ← packing list signed by admin (SHA-256 per file + version)
 │   ├── stt/
 │   │   ├── whisper-tiny-multilingual-q8/           (50 MB)
 │   │   │   ├── encoder.onnx
@@ -949,55 +949,134 @@ The simple 0-100 columns (`pronunciation_score`, `fluency_score`, etc.) stay as-
     └── tts/                                        ← cached synthesized audio per (text, voice)
 ```
 
-**Windows:** `getApplicationSupportDirectory()` → `%APPDATA%\vLearn2\` (same subdirectory layout under that root).
+**Windows primary location:** `getApplicationSupportDirectory()` → `%APPDATA%\vLearn2\` (same subdirectory layout under that root).
 
-**Optional advanced mode (Android):** users with the **MANAGE_EXTERNAL_STORAGE** workflow (since we're not on Play, restricted-Play policy doesn't apply) OR via **SAF folder picker** can opt into `/sdcard/vLearn2/models/` — this path **survives uninstall**, allowing model re-use across reinstalls or device wipes. Not the default.
+**Optional fallback (Android): user-visible folder via SAF.** If the admin can't push to the app-specific path (e.g. end-user copies a model bundle from a USB stick via file manager into `/sdcard/vLearn2-models/`), the app exposes a "Locate models" SAF folder picker on first launch. The picked URI is persisted; subsequent launches read from there without re-prompting. This path also **survives uninstall**.
 
-#### Model delivery — two modes supported
+#### Pre-placement methods (admin-facing)
 
-**Mode A (default): Download on first launch**
-- On first sign-in, app fetches `manifest.json` from CDN (e.g. `https://cdn.vlearn2.com/models/v1/manifest.json`)
-- Manifest lists model bundles per language with hash + size + URL
-- User picks UI language → app downloads only the matching ASR + TTS + grammar bundle
-- Progress UI: per-bundle progress bar, retry on failure, resumable via HTTP Range
-- Hash-verify after download (SHA-256)
+Pick any one — the app checks both locations and accepts whichever has a valid `manifest.json`.
 
-**Mode B (advanced / kiosk): Pre-placed models**
-- Admin places models directory on the device's external storage **before** first launch
-- App detects `manifest.json` already present at the storage path → skips download, just verifies hashes
-- Useful for: enterprise deployments, classroom kiosks, no-internet first-launch, offline beta testing
+**Method 1 — ADB push (recommended for development + small kiosk fleets):**
+```bash
+# Per device, with USB debugging enabled:
+adb push ./models /sdcard/Android/data/com.vlearn2/files/models
+```
+- Works without root, without app permissions
+- Easy to script across a fleet
+- Wiped if app is uninstalled (this is fine — re-push to redeploy)
 
-#### Settings UI
+**Method 2 — File manager copy + SAF picker (recommended for end-users without ADB):**
+1. Admin distributes a `vlearn2-models.zip` (~420 MB single-lang) via USB stick, email, SMB share, etc.
+2. User extracts to `/sdcard/vLearn2-models/` using any Android file manager
+3. On first launch, app shows: "Where are your models?" → user picks the folder via SAF → done
+- App remembers the SAF URI permanently; subsequent launches skip the picker
+- Works on Android 11+ without `MANAGE_EXTERNAL_STORAGE` permission
+- Survives app uninstall
 
-- [ ] **9.15.6.1** Settings → "Storage" section shows:
-  - Total model storage used + free space available on the storage volume
-  - Per-language pack list with size + delete button
-  - "Download more languages" button
-  - "Re-verify integrity" button (hash-check all installed models)
-- [ ] **9.15.6.2** Models stored under `<external>/models/` — never inside internal app storage
-- [ ] **9.15.6.3** Cache directory under `<external>/cache/` cleanable by user without breaking models
+**Method 3 — MDM / EMM (enterprise fleets):**
+- Mobile Device Management agent pushes the model folder to the app's external dir during provisioning
+- Same target path as Method 1
+- Works at scale across hundreds of managed devices
 
-#### In-app updates (replaces Play auto-update)
+**Method 4 — Windows manual copy:**
+- Admin places model folder at `%APPDATA%\vLearn2\models\` before first launch
+- Or ships an installer script (`.bat` / `.ps1`) that creates the path and extracts a zip
+- App checks the path on first launch — boots if present
 
-- [ ] **9.15.6.4** On app start, ping `https://cdn.vlearn2.com/version.json` once/day
-- [ ] **9.15.6.5** If newer version available, show non-blocking banner: "v1.4.2 available — tap to update"
-- [ ] **9.15.6.6** Tap → download new APK to `<external>/Download/vLearn2-1.4.2.apk` and launch installer intent
-- [ ] **9.15.6.7** Model manifest updates checked separately (more frequent, no APK update needed for model swaps)
+**Method 5 — "Companion installer APK" (optional, future):**
+- A separate tiny APK whose only job is to copy bundled models into the main app's external dir, then exit
+- Useful when only the APK channel is available for distribution (no separate model zip)
+- Out of scope for v1; documented as a future option
+
+#### First-launch detection flow
+
+```
+App starts
+  ↓
+Check primary path: /sdcard/Android/data/<pkg>/files/models/manifest.json
+  ↓                                                   ↓
+  exists                                              missing
+  ↓                                                   ↓
+verify SHA-256 of each file in manifest         Check SAF URI (if previously set)
+  ↓                       ↓                           ↓                    ↓
+  all match               mismatch found              valid models found   nothing
+  ↓                       ↓                           ↓                    ↓
+  boot to home            show "Models corrupt"       boot to home          show "Models not installed" screen
+                          with admin instructions                           with SAF picker + admin help text
+```
+
+#### "Models not installed" screen (when manifest absent on first launch)
+
+- [ ] **9.15.6.1** Friendly message: "This device hasn't been set up with English-learning models yet. Please contact your administrator, or use the button below to locate a model folder you've already copied to this device."
+- [ ] **9.15.6.2** Primary action: **"Locate models folder"** → opens SAF folder picker (Android) / file dialog (Windows)
+- [ ] **9.15.6.3** Secondary link: **"Setup help"** → opens in-app help page with admin instructions + the expected manifest format
+- [ ] **9.15.6.4** No "Retry" or "Download" button — there is no download path
+- [ ] **9.15.6.5** Allows continuing to the app in **text-only mode** (no STT/TTS/pronunciation/listening evaluation; only vocabulary + engagement + Claude grammar work)
+
+#### Settings → Storage (changed from "downloader" to "status & verifier")
+
+- [ ] **9.15.6.6** Shows the resolved model root path (so admin can confirm where to push)
+- [ ] **9.15.6.7** Per-bundle list: name, version, size on disk, integrity status (✅ ok / ⚠️ hash mismatch / ❌ missing)
+- [ ] **9.15.6.8** **"Re-verify all"** button — recomputes SHA-256 across the tree, updates statuses
+- [ ] **9.15.6.9** **"Locate models folder"** button — opens SAF picker to switch storage root
+- [ ] **9.15.6.10** **"Export manifest"** button — copies `manifest.json` to clipboard / saves to user-visible storage, so users can send it to support
+- [ ] **9.15.6.11** **No download / delete buttons** — model lifecycle is owned by the admin, not the app
+
+#### In-app APK update checker (still useful, but model updates are admin-driven)
+
+- [ ] **9.15.6.12** On app start (once/day), check `https://cdn.vlearn2.com/version.json` for newer **APK** version (the only thing the app distributes for itself)
+- [ ] **9.15.6.13** If newer APK available, show non-blocking banner: "v1.4.2 available — tap to update"
+- [ ] **9.15.6.14** Tap → fetch APK to `<external>/Download/vLearn2-1.4.2.apk` and launch installer intent
+- [ ] **9.15.6.15** Model bundle updates are NOT checked over network — admin re-deploys when needed
 
 #### Implementation checklist
 
-- [ ] **9.15.6.8** `lib/core/storage/model_storage.dart` — resolves the platform-specific external root via `path_provider`
-- [ ] **9.15.6.9** `lib/core/storage/model_downloader.dart` — fetches manifest, downloads bundles, hash-verifies, supports resume
-- [ ] **9.15.6.10** `lib/core/storage/model_registry.dart` — tracks installed model versions in `manifest.json`; exposes "is this model present?" queries to the speech/grammar services
-- [ ] **9.15.6.11** Boot flow: after sign-in, check `model_registry.requiredModelsPresent(uiLanguage)` → if false, navigate to download screen → on completion, return to home
-- [ ] **9.15.6.12** Graceful degradation: if a required model is missing mid-session (e.g. user deleted the language pack), feature returns a "model not available" error and UI prompts re-download — does NOT crash
-- [ ] **9.15.6.13** Document the pre-placement workflow in `docs/kiosk-deployment.md` for advanced users
+- [ ] **9.15.6.16** `lib/core/storage/model_storage.dart` — resolves the platform-specific external root via `path_provider`; falls back to SAF URI if persisted
+- [ ] **9.15.6.17** `lib/core/storage/model_registry.dart` — reads `manifest.json`, runs SHA-256 verification, exposes `isBundlePresent(BundleId)` queries to speech/grammar services
+- [ ] **9.15.6.18** ~~`model_downloader.dart`~~ — **NOT NEEDED**; the only "download" path is the APK update checker, which is a separate tiny utility
+- [ ] **9.15.6.19** Boot flow: after sign-in, run `modelRegistry.boot()` → if manifest present and verified, proceed; if missing, navigate to "Models not installed" screen
+- [ ] **9.15.6.20** Graceful mid-session degradation: if a model file is renamed/deleted by the admin while the app runs (rare), surface a clear error and prompt the user to ask the admin to redeploy — no crash
+- [ ] **9.15.6.21** `docs/admin-deployment.md` is a real deliverable, written before v1 release. Contains: manifest format spec, all 4 pre-placement methods with copy-pasteable commands, troubleshooting, hash generation script
+
+#### Manifest format (`models/manifest.json`)
+
+The admin generates this once per bundle; the app verifies against it on every launch.
+
+```json
+{
+  "manifest_version": 1,
+  "bundle_version": "2026.05.20",
+  "languages": ["en", "ko", "zh"],
+  "files": [
+    {
+      "path": "stt/whisper-tiny-multilingual-q8/encoder.onnx",
+      "sha256": "9f8a...",
+      "size_bytes": 31457280
+    },
+    {
+      "path": "tts/vits-piper-en_US-amy/model.onnx",
+      "sha256": "7b2c...",
+      "size_bytes": 62914560
+    }
+  ],
+  "required_bundles": {
+    "en": ["stt/whisper-tiny-multilingual-q8", "tts/vits-piper-en_US-amy", "grammar/flan-t5-small-grammar-q8", "semantic/all-MiniLM-L6-v2-q8", "pronunciation/gop-multilingual"],
+    "ko": ["...same minus the en TTS, plus the ko TTS..."],
+    "zh": ["..."]
+  }
+}
+```
+
+- [ ] **9.15.6.22** Provide a `tools/build-manifest.sh` shell script + Node/Python equivalent that walks a models directory and emits this JSON
+- [ ] **9.15.6.23** App treats a missing-file or sha-mismatch as a hard failure → goes to "Models corrupt" screen with re-verify button
 
 #### Trade-offs accepted by this design
 
 | Trade-off | Why this is OK |
 |-----------|----------------|
-| First launch requires network (Mode A) | Almost universal in 2026; Mode B available for offline first-launch |
-| Models lost on uninstall (default path) | Re-download is straightforward; users opting for SAF persistent path keeps them |
-| Larger app data dir than typical (~150–600 MB depending on languages) | User has full visibility + control via Settings → Storage |
-| Need to host the model CDN ourselves | One-time setup; could mirror on GitHub releases or HuggingFace as backup |
+| No model auto-updates | Admin redeploys when ready — gives full control over which version users run |
+| First launch requires manual setup if SAF picker is needed | Counterbalanced by zero network requirement, full offline operation from second launch onward |
+| User cannot install new languages by themselves | Matches the intended use case — managed deployment / curated experience |
+| Models lost on app uninstall (Method 1) | ADB re-push is trivial; SAF (Method 2) sidesteps this |
+| No CDN to maintain | This is a win — zero infrastructure cost, zero per-user bandwidth cost |

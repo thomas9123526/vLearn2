@@ -148,15 +148,17 @@
 | **Windows installer** | **< 80 MB** |
 
 ### Post-STT/TTS (sherpa-onnx + offline evaluation models)
-**Distribution: standalone APK.** Models are downloaded on first launch (default) or pre-placed by an admin (Mode B). All models live on **external storage**, not internal app storage. See [todoList/09 §9.15.6](09_ai_integration.md).
+**Distribution: standalone APK; models are admin-pre-placed (Mode B only — no CDN, no in-app downloader).** All models live on **external storage**, not internal app storage. See [todoList/09 §9.15.6](09_ai_integration.md).
 
 | Metric | Target | Notes |
 |--------|--------|-------|
 | APK size | < 50 MB | Code + UI + CEFR-J wordlist only; no models bundled |
 | Windows installer | < 80 MB | Same rationale — models live on external storage |
-| First-launch model download (1 lang, full stack) | < 5 min on 20 Mbps | STT (~50 MB) + TTS (~60 MB) + GOP (~80 MB) + grammar (~150 MB) + MiniLM (~80 MB) ≈ 420 MB |
-| External storage after full setup (1 lang) | ~420 MB | Under `/sdcard/Android/data/<pkg>/files/models/` |
-| External storage after full setup (3 langs en/ko/zh) | ~620 MB | Shared STT/grammar/MiniLM models + 3 TTS voice packs |
+| First-launch model verification time (1 lang, full stack) | < 6s on mid-range Android | SHA-256 verify ~420 MB of files; runs in isolate so UI shows progress |
+| First-launch model verification time (3 langs en/ko/zh) | < 10s | ~620 MB of files |
+| Subsequent launches (manifest mtime unchanged) | < 200 ms | Skip hash verify if manifest mtime + size match cached state |
+| External storage footprint (1 lang) | ~420 MB | Under `/sdcard/Android/data/<pkg>/files/models/` |
+| External storage footprint (3 langs en/ko/zh) | ~620 MB | Shared STT/grammar/MiniLM models + 3 TTS voice packs |
 | STT latency (transcribe 5s clip) | < 1.5s on mid-range Android | Whisper-tiny int8 |
 | STT streaming partial latency | < 300ms | Zipformer streaming |
 | TTS first-audio latency | < 800ms | VITS-medium |
@@ -164,18 +166,22 @@
 | Grammar inference (single sentence) | < 600ms | flan-T5-small int8 |
 | Semantic similarity (MiniLM) | < 200ms | for listening comprehension scoring |
 
-### Storage & distribution strategy
-- [ ] **10.5.1** Models hosted on CDN (project domain) with HuggingFace + GitHub-releases mirrors as fallback
-- [ ] **10.5.2** First-launch download screen: per-bundle progress bar, retry on failure, HTTP Range resume, SHA-256 verification
-- [ ] **10.5.3** Models stored on external storage under `<external>/models/<category>/<bundle>/` and versioned via `manifest.json` — old versions purged on upgrade
-- [ ] **10.5.4** Settings → Storage section: total used, per-language pack list with delete, re-verify integrity button
-- [ ] **10.5.5** Graceful degradation: if a model is missing, feature returns "model not available" error; UI prompts re-download — never crash
-- [ ] **10.5.6** Mode B (pre-placed models): if `manifest.json` exists on external storage at app start, skip download phase entirely
-- [ ] **10.5.7** In-app update checker: daily ping to `version.json`, non-blocking banner when update available (replaces Play auto-update)
+### Deployment & verification strategy
+- [ ] **10.5.1** Admin pre-places models via one of 4 methods (ADB push / SAF folder pick / MDM / Windows manual copy) — see §9.15.6
+- [ ] **10.5.2** `manifest.json` is the source of truth: lists every file + SHA-256 + size; app verifies on every launch (cached fast-path after first verify)
+- [ ] **10.5.3** "Models not installed" boot screen: friendly admin-help message, SAF picker, allows continuing in text-only mode
+- [ ] **10.5.4** Settings → Storage section: shows model root path, per-bundle integrity status, "Re-verify all" button, "Locate models folder" button, "Export manifest" button — **no download / delete buttons**
+- [ ] **10.5.5** Graceful degradation: missing or corrupt model file → feature returns "model not available" error, never crashes; user shown admin-help text
+- [ ] **10.5.6** `docs/admin-deployment.md` shipped with v1: manifest format, all 4 deployment methods with copy-paste commands, troubleshooting, hash-generation script
+- [ ] **10.5.7** `tools/build-manifest.sh` (+ Node/Python equivalent) included in repo for admins to generate `manifest.json` from a models directory
+- [ ] **10.5.8** In-app **APK** update checker: daily ping to `version.json`, non-blocking banner when newer APK available (no model network calls)
 
 ### Cross-platform smoke tests (release builds)
-- [ ] **10.5.8** Android release APK install → first-launch download → 1 STT call → 1 TTS playback — all succeed on emulator API 30+ and a physical mid-range device
-- [ ] **10.5.9** Windows release build → first-launch download → 1 STT call → 1 TTS playback — succeed on Windows 10 + Windows 11
-- [ ] **10.5.10** Android: verify models land under `/sdcard/Android/data/<pkg>/files/models/` and not internal app dir
-- [ ] **10.5.11** Android: verify uninstall removes the model directory (Mode A default behavior is expected)
-- [ ] **10.5.12** Android: optional SAF persistent path test — models survive uninstall when SAF mode is enabled
+- [ ] **10.5.9** Android release APK install on a **fresh device with no models** → boots to "Models not installed" screen (no crash, friendly UI)
+- [ ] **10.5.10** Android: `adb push` models to `/sdcard/Android/data/<pkg>/files/models/` → app launches → integrity verify passes → STT + TTS smoke calls succeed
+- [ ] **10.5.11** Android: copy models to `/sdcard/vLearn2-models/` via file manager → first-launch SAF picker resolves them → boot succeeds → models survive app uninstall + reinstall (SAF URI re-prompt or persist as designed)
+- [ ] **10.5.12** Android: corrupt one model file (truncate by 1 byte) → app detects hash mismatch → shows "Models corrupt" screen → admin re-pushes → recovery works
+- [ ] **10.5.13** Windows: place models at `%APPDATA%\vLearn2\models\` → app launches → verify passes → STT + TTS smoke calls succeed
+- [ ] **10.5.14** Windows: launch with no models → "Models not installed" screen → file dialog → user picks `C:\vLearn2-models\` → boot succeeds
+- [ ] **10.5.15** Performance: cold start with pre-verified models < 1s on mid-range Android (cached fast-path)
+- [ ] **10.5.16** Manifest-builder tool: run on a models directory → produces a valid `manifest.json` → app accepts it
