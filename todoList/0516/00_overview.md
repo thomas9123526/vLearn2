@@ -26,6 +26,7 @@
 | 08 | [08_i18n.md](08_i18n.md) | Internationalization (en/ko/zh) |
 | 09 | [09_ai_integration.md](09_ai_integration.md) | Claude API conversation engine |
 | 10 | [10_testing.md](10_testing.md) | Unit, widget, integration, API tests |
+| 11 | [11_security_and_performance.md](11_security_and_performance.md) | Content guard (profanity filter) + conditional gzip compression |
 
 ---
 

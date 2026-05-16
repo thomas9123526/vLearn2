@@ -198,6 +198,22 @@
 | earned_at | TIMESTAMPTZ | default now() |
 | PRIMARY KEY | (user_id, achievement_id) | |
 
+### Table: guard_violations
+Records content-guard rejections and warnings for moderation review. See [11_security_and_performance.md §11.1](11_security_and_performance.md).
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| user_id | UUID | FK → users.id, ON DELETE CASCADE | |
+| session_id | UUID | FK → conversation_sessions.id ON DELETE SET NULL, nullable | null if not in a session |
+| attempted_content | TEXT | NOT NULL | original user input (truncated to 2000 chars) |
+| matched_terms | TEXT[] | | which wordlist terms matched |
+| severity | VARCHAR(10) | | block / warn |
+| language | VARCHAR(10) | | wordlist language that matched (en/ko/zh) |
+| source | VARCHAR(10) | | client / server (server is authoritative; client value indicates client also flagged it) |
+| user_acknowledged_warn | BOOLEAN | default false | only true when severity=warn AND user clicked "Continue anyway" |
+| created_at | TIMESTAMPTZ | default now() | |
+
 ### Indexes
 ```sql
 CREATE INDEX idx_sessions_user_id ON conversation_sessions(user_id);
@@ -206,6 +222,8 @@ CREATE INDEX idx_messages_session_id ON conversation_messages(session_id);
 CREATE INDEX idx_skill_snapshots_user_date ON skill_snapshots(user_id, snapshot_date);
 CREATE INDEX idx_scenarios_difficulty ON scenarios(difficulty);
 CREATE INDEX idx_scenarios_category ON scenarios(category);
+CREATE INDEX idx_guard_violations_user_id ON guard_violations(user_id, created_at DESC);
+CREATE INDEX idx_guard_violations_severity ON guard_violations(severity, created_at DESC);
 ```
 
 ---
@@ -315,13 +333,15 @@ class AppSettings extends Table {
 ```
 
 ### Settings Keys (AppSettings)
-| Key | Values | Default |
-|-----|--------|---------|
-| theme | apricot/sage/iris/obsidian | apricot |
-| ui_language | en/ko/zh | en (device locale) |
-| conversation_mode | chat/face | chat |
-| notifications_enabled | true/false | true |
-| font_size_scale | 0.9/1.0/1.1/1.2 | 1.0 |
+| Key | Values | Default | Notes |
+|-----|--------|---------|-------|
+| theme | apricot/sage/iris/obsidian | apricot | |
+| ui_language | en/ko/zh | en (device locale) | |
+| conversation_mode | chat/face | chat | |
+| notifications_enabled | true/false | true | |
+| font_size_scale | 0.9/1.0/1.1/1.2 | 1.0 | |
+| compression_enabled | true/false | true | gzip toggle, see [11_security_and_performance §11.2](11_security_and_performance.md) |
+| guard_warn_acknowledged_at | ISO timestamp | unset | last time user clicked "Continue anyway" on a warn-tier guard match (per-session state lives in memory, not here) |
 
 ---
 
