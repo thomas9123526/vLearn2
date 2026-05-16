@@ -67,7 +67,7 @@ dev_dependencies:
   custom_lint: ^0.6.4
   riverpod_lint: ^2.3.10
   drift_dev: ^2.18.0
-  retrofit_generator: ^8.1.0
+  # retrofit_generator pinned in §03 once Retrofit clients are wired
   freezed: ^2.5.2
   json_serializable: ^6.8.0
 
