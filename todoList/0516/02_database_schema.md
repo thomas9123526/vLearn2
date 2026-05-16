@@ -116,15 +116,22 @@
 |--------|------|-------------|-------|
 | id | UUID | PK | |
 | session_id | UUID | FK → conversation_sessions.id, UNIQUE | |
-| overall_score | SMALLINT | 0–100 | weighted average |
-| pronunciation_score | SMALLINT | 0–100 | placeholder (STT) |
-| fluency_score | SMALLINT | 0–100 | words-per-turn ratio |
-| vocabulary_score | SMALLINT | 0–100 | unique words / total |
-| grammar_score | SMALLINT | 0–100 | AI assessed |
+| overall_score | SMALLINT | 0–100, nullable | weighted average; null until all sub-scores computed |
+| pronunciation_score | SMALLINT | 0–100, nullable | from sherpa-onnx GOP (Phase 3+); null when audio unavailable |
+| fluency_score | SMALLINT | 0–100, nullable | text-proxy in MVP; audio-based from Phase 2+ |
+| vocabulary_score | SMALLINT | 0–100 | CEFR-J coverage + MTLD + key-phrase bonus |
+| grammar_score | SMALLINT | 0–100 | ONNX model offline OR Claude online |
 | engagement_score | SMALLINT | 0–100 | turn count / time |
+| listening_score | SMALLINT | 0–100, nullable | only set when session contains a listening task |
+| pronunciation_metrics | JSONB | nullable | `{phoneme_avg, confidence_avg, mispronounced_phonemes:[{phoneme,word,score}]}` |
+| fluency_metrics | JSONB | nullable | `{wpm, pause_rate, articulation_rate, filler_count, voiced_seconds}` |
+| vocabulary_metrics | JSONB | | `{cefr_distribution:{A1,A2,B1,B2,C1,C2,unknown}, ttr, mtld, unique_words, total_words, keyphrases_used}` |
+| grammar_metrics | JSONB | | `{error_count, error_types:[...], scorer_used:'onnx'\|'claude'}` |
+| listening_metrics | JSONB | nullable | `{task_type:'dictation'\|'comprehension', similarity_score, dictation_accuracy, expected, actual}` |
 | strengths | TEXT[] | | e.g. ['Good use of tense'] |
 | improvements | TEXT[] | | e.g. ['Try longer sentences'] |
-| ai_feedback | TEXT | | paragraph from Claude |
+| ai_feedback | TEXT | nullable | paragraph from Claude/AI provider (null in fully-offline mode) |
+| evaluator_versions | JSONB | | `{sherpa_onnx:'1.10.0', cefr_wordlist:'v3', grammar_model:'flan-t5-small-q8'}` — for reproducibility across upgrades |
 | computed_at | TIMESTAMPTZ | default now() | |
 
 ### Table: skill_snapshots
@@ -132,13 +139,17 @@
 |--------|------|-------------|-------|
 | id | UUID | PK | |
 | user_id | UUID | FK → users.id | |
-| snapshot_date | DATE | | weekly snapshot |
-| pronunciation | SMALLINT | 0–100 | |
-| fluency | SMALLINT | 0–100 | |
+| snapshot_date | DATE | | weekly snapshot (Monday) |
+| pronunciation | SMALLINT | 0–100, nullable | null when no audio data in week |
+| fluency | SMALLINT | 0–100, nullable | |
 | vocabulary | SMALLINT | 0–100 | |
 | grammar | SMALLINT | 0–100 | |
-| listening | SMALLINT | 0–100 | placeholder |
+| listening | SMALLINT | 0–100, nullable | null when no listening tasks in week |
+| sessions_in_window | SMALLINT | default 0 | how many sessions contributed |
+| confidence | SMALLINT | 0–100, default 50 | how reliable this snapshot is (more sessions = higher confidence) |
 | UNIQUE | (user_id, snapshot_date) | | |
+
+**Computation:** weighted average of `session_scores` for sessions in the ISO week. Nullable columns reflect "we have no signal yet" — better than showing 0 in the radar chart.
 
 ### Table: user_progress
 | Column | Type | Constraints | Notes |

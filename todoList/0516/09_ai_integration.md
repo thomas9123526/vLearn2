@@ -692,3 +692,222 @@ const kTtsProvider = SpeechProvider.placeholder;   // → SherpaOnnxTtsService l
 - [ ] **9.14.6.1** Riverpod providers `sttServiceProvider` and `ttsServiceProvider` return the factory result
 - [ ] **9.14.6.2** Both services initialized on app start (after sign-in), disposed on sign-out
 - [ ] **9.14.6.3** Settings screen exposes voice selection per language (when sherpa-onnx is enabled)
+
+---
+
+## 9.15 Offline English-Level Evaluation Stack (Android + Windows)
+
+**Goal:** evaluate all 5 skills on the Progress radar — pronunciation, fluency, vocabulary, grammar, listening — **fully offline on both Android and Windows**. No reliance on cloud APIs in the evaluation hot path.
+
+This section defines the multi-library stack, the cross-platform constraints, and the per-skill computation pipelines.
+
+### 9.15.1 Library Matrix (Cross-Platform Verified)
+
+| Library | Purpose | Android | Windows | Distribution |
+|---------|---------|---------|---------|--------------|
+| **sherpa-onnx** | STT, TTS, pronunciation (GOP), VAD | ✅ via `sherpa_onnx` Flutter pkg | ✅ via `sherpa_onnx` Flutter pkg | Native bindings + ONNX models |
+| **Silero VAD** | Voice activity detection (pause measurement) | ✅ (bundled in sherpa-onnx) | ✅ (bundled) | ONNX model bundled |
+| **CEFR-J wordlist** | Word-level CEFR tagging (A1–C2) | ✅ Pure Dart | ✅ Pure Dart | ~1 MB CSV asset |
+| **Lexical diversity calc (TTR, MTLD)** | Vocabulary diversity metrics | ✅ Pure Dart | ✅ Pure Dart | <10 KB pure code |
+| **ONNX grammar model** (e.g. quantized flan-T5-small or Grammarly-style classifier) | Offline grammar scoring | ✅ via ONNX Runtime | ✅ via ONNX Runtime | ~150 MB downloaded |
+| **Sentence-Transformers MiniLM (ONNX)** | Semantic similarity for listening tasks | ✅ via ONNX Runtime | ✅ via ONNX Runtime | ~80 MB downloaded |
+
+**Explicitly NOT used (cross-platform failures):**
+- ❌ **LanguageTool** (Java) — would need embedded JVM on Android; tar pit
+- ❌ **spaCy / Python NLP** — Python on Android is impractical
+- ❌ **Praat / parselmouth** — Python-only, no mobile path
+
+### 9.15.2 Per-Skill Computation Pipelines
+
+#### Pronunciation — `PronunciationScorer`
+
+**File:** `lib/core/evaluation/pronunciation_scorer.dart`
+
+Pipeline (per user utterance):
+1. STT transcribes audio → text + word-level timestamps + word-level confidence
+2. **sherpa-onnx GOP** aligns audio against expected text → per-phoneme score (0.0–1.0)
+3. Aggregate: `pronunciation_score = mean(phoneme_scores) × 100`
+4. Identify low-scoring phonemes → return as `mispronounced_phonemes[]`
+
+```dart
+class PronunciationResult {
+  final int score;                            // 0-100
+  final double averagePhonemeScore;
+  final List<MispronouncedPhoneme> issues;    // [{phoneme: 'TH', word: 'think', score: 0.42}]
+  final double confidence;
+}
+
+abstract class PronunciationScorer {
+  Future<PronunciationResult> score({
+    required Uint8List audioData,
+    required String expectedText,
+  });
+}
+```
+
+- [ ] **9.15.2.1** `SherpaOnnxPronunciationScorer` implementation wraps sherpa-onnx GOP recipe via FFI
+- [ ] **9.15.2.2** Fallback when GOP model unavailable: use STT word-confidence as coarse proxy (`score = mean(confidence) × 100`)
+- [ ] **9.15.2.3** Run in a Dart isolate to keep UI responsive
+
+#### Fluency — `FluencyScorer`
+
+**File:** `lib/core/evaluation/fluency_scorer.dart`
+
+Pipeline (per user utterance):
+1. sherpa-onnx STT → word-level timestamps
+2. Silero VAD → voiced/silent segments
+3. Compute metrics from timestamps:
+   - `words_per_minute = words / (total_duration - silence) × 60`
+   - `pause_rate = silence_duration / total_duration`
+   - `articulation_rate = phonemes / voiced_duration`
+   - `filler_count = count of "um|uh|er|like|you know|hmm" in transcript`
+4. Score formula (level-adjusted):
+   ```
+   wpm_target = [80, 100, 120, 140, 160, 180]  // by level 1-6
+   wpm_score = clamp(100, (wpm / wpm_target[level-1]) × 100)
+   pause_penalty = clamp(0, (pause_rate - 0.3) × 100)   // >30% pause = penalty
+   filler_penalty = min(20, filler_count × 2)
+   fluency_score = max(0, wpm_score - pause_penalty - filler_penalty)
+   ```
+
+```dart
+class FluencyResult {
+  final int score;
+  final double wordsPerMinute;
+  final double pauseRate;
+  final double articulationRate;
+  final int fillerCount;
+}
+```
+
+- [ ] **9.15.2.4** `SherpaOnnxFluencyScorer` reads STT timing + VAD output
+- [ ] **9.15.2.5** Filler-word list configurable per language (en: um/uh/like; ko: 음/어; zh: 嗯/那个)
+- [ ] **9.15.2.6** Aggregate across all user utterances in a session for the session-level score
+
+#### Vocabulary — `VocabularyScorer`
+
+**File:** `lib/core/evaluation/vocabulary_scorer.dart`
+
+Pipeline (per session, all user messages combined):
+1. Tokenize messages → lowercase, strip punctuation
+2. Lookup each token in **CEFR-J wordlist** → CEFR level (A1–C2 or "unknown")
+3. Compute distribution: `{ A1: n, A2: n, B1: n, B2: n, C1: n, C2: n, unknown: n }`
+4. Compute lexical diversity:
+   - `TTR = unique_tokens / total_tokens`
+   - `MTLD = ...` (Measure of Textual Lexical Diversity — more robust than TTR)
+5. Score formula:
+   ```
+   level_appropriate_ratio = (words_at_or_above_user_level / total_known_words)
+   diversity_score = min(100, MTLD × 1.5)
+   keyphrase_bonus = min(20, key_phrases_used × 5)
+   vocabulary_score = (level_appropriate_ratio × 50) + (diversity_score × 0.3) + keyphrase_bonus
+   ```
+
+```dart
+class VocabularyResult {
+  final int score;
+  final Map<String, int> cefrDistribution;
+  final double ttr;
+  final double mtld;
+  final int uniqueWordCount;
+  final int totalWordCount;
+  final int keyPhrasesUsed;
+}
+```
+
+- [ ] **9.15.2.7** Bundle CEFR-J wordlist as Flutter asset (`assets/wordlists/cefr_j_en.csv`)
+- [ ] **9.15.2.8** Pre-load wordlist into HashMap at app start, query is O(1)
+- [ ] **9.15.2.9** Implement MTLD algorithm per McCarthy & Jarvis (2010)
+
+#### Grammar — `GrammarScorer`
+
+**File:** `lib/core/evaluation/grammar_scorer.dart`
+
+Two-implementation strategy depending on what's installed:
+
+**Default (offline):** ONNX grammar model
+- Quantized small grammar model (e.g. `flan-T5-small` fine-tuned for grammar OR a binary classifier "is this sentence grammatical?")
+- Per-message inference → grammatical-correctness score 0-100
+- Aggregate across messages for session score
+- Optionally generate corrections (heavier, T5-base)
+
+**Cloud fallback (optional):** delegate to the existing `AiProvider.structured()` call → reuses §9.9 prompt
+
+```dart
+abstract class GrammarScorer {
+  Future<GrammarResult> score(List<String> messages, int userLevel);
+}
+```
+
+- [ ] **9.15.2.10** `OnnxGrammarScorer` — load ONNX model via runtime; inference in isolate
+- [ ] **9.15.2.11** `AiProviderGrammarScorer` — wraps existing Claude-based `analyzeGrammar` path
+- [ ] **9.15.2.12** Build-time / settings toggle selects which scorer (default: offline ONNX)
+- [ ] **9.15.2.13** Both scorers return the same `GrammarResult` shape so callers don't care
+
+**Honest caveat:** offline grammar models (~150 MB quantized) are noticeably less nuanced than Claude. They catch mechanical errors (tense, agreement, articles) well, but miss subtle style/register issues. Acceptable trade-off for offline operation; users with internet can opt into AI-powered grammar feedback in Settings.
+
+#### Listening — `ListeningScorer`
+
+**Two scenario subtypes** in the DB (see §9.15.4 schema additions):
+
+1. **Dictation** — TTS plays sentence, user types or speaks it back
+   - Score = `1 - (levenshtein(user_text, expected_text) / max(len_user, len_expected))` × 100
+   - Pure Dart, no model needed
+2. **Comprehension Q&A** — TTS plays passage, asks 1-3 questions, user answers
+   - Use **sentence-transformers MiniLM ONNX** for semantic similarity
+   - Score = `cosine_similarity(user_answer_embedding, expected_answer_embedding)` × 100
+
+```dart
+abstract class ListeningScorer {
+  Future<int> scoreDictation({required String userText, required String expectedText});
+  Future<int> scoreComprehension({required String userAnswer, required List<String> acceptableAnswers});
+}
+```
+
+- [ ] **9.15.2.14** `MiniLMListeningScorer` — load `all-MiniLM-L6-v2` ONNX, run via `onnxruntime`
+- [ ] **9.15.2.15** Levenshtein-based dictation scorer in pure Dart
+- [ ] **9.15.2.16** Cache embeddings of expected answers at scenario-load time
+
+### 9.15.3 Cross-Platform Concerns
+
+| Concern | Platform | Mitigation |
+|---------|----------|------------|
+| AVX2 requirement on Windows | Windows | Document min CPU: Intel Haswell (2013+) / AMD Excavator (2015+). Provide non-AVX fallback build only if needed |
+| Google Play 200 MB base APK limit | Android | Models downloaded post-install (already planned in §9.14) |
+| Native ABI coverage | Android | Verify `arm64-v8a`, `armeabi-v7a`, `x86_64` ABIs in `build.gradle` `splits` block |
+| MSIX bundle includes ONNX DLLs | Windows | Verify in release smoke test — sherpa-onnx plugin handles this but confirm |
+| UI thread jank on heavy inference | Both | All STT / TTS / grammar / similarity inference runs in Dart isolates |
+| Mic permission denied | Both | Graceful fallback: text-only conversation, audio-scored skills marked "—" rather than 0 |
+| Model loading time on app start | Both | Lazy load — only load model when feature first used; show 1s loading indicator |
+| Storage permission on Android | Android | Use app-internal storage (`getApplicationDocumentsDirectory()`) — no permission needed |
+| File path differences | Both | Use `path_provider` package consistently; never hard-code paths |
+
+- [ ] **9.15.3.1** CI smoke test: release-mode build + first-run model download + 1 STT call on Android emulator
+- [ ] **9.15.3.2** CI smoke test: release-mode Windows build + first-run model download + 1 STT call
+- [ ] **9.15.3.3** Min CPU spec documented in README for Windows
+- [ ] **9.15.3.4** All inference paths use `compute()` or explicit `Isolate.spawn()`
+
+### 9.15.4 DB Schema Additions (Cross-Reference)
+
+The granular per-skill metrics need new columns in `session_scores`. Detailed in [todoList/02 §2.1](02_database_schema.md):
+
+- `pronunciation_metrics JSONB` — `{ phoneme_avg, confidence_avg, mispronounced_phonemes: [...] }`
+- `fluency_metrics JSONB` — `{ wpm, pause_rate, articulation_rate, filler_count }`
+- `vocabulary_metrics JSONB` — `{ cefr_distribution, ttr, mtld, unique_words, total_words, keyphrases_used }`
+- `grammar_metrics JSONB` — `{ error_count, error_types: [...], scorer_used }`
+- `listening_metrics JSONB` — `{ task_type, similarity_score, dictation_accuracy }` (only when listening task in session)
+
+The simple 0-100 columns (`pronunciation_score`, `fluency_score`, etc.) stay as-is for the radar chart.
+
+### 9.15.5 Phased Rollout (When Each Skill Becomes Real)
+
+| Phase | What works | What's hidden / mocked | Trigger |
+|-------|-----------|------------------------|---------|
+| **Phase 1 — MVP** | Vocabulary (CEFR-J), Engagement, Grammar (Claude only) | Pronunciation + Listening = "—" in radar; Fluency = text proxy with `?` tooltip | Ship without STT/TTS |
+| **Phase 2 — STT integration** | + real Fluency (audio timing), + dictation listening | Pronunciation + comprehension still mocked | sherpa-onnx STT + VAD shipped |
+| **Phase 3 — TTS + Pronunciation** | + real Pronunciation, + comprehension listening | None — all 5 skills real ✅ | sherpa-onnx TTS + GOP + MiniLM shipped |
+| **Phase 4 — Offline grammar** | Full offline mode (no Claude dependency) | None | ONNX grammar model shipped |
+
+- [ ] **9.15.5.1** Radar chart shows "—" + lock icon for unscored skills in each phase
+- [ ] **9.15.5.2** Tooltip on each skill: "Coming in Phase N" with brief explanation
+- [ ] **9.15.5.3** Per-phase release notes document which skills are newly real
