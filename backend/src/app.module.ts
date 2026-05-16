@@ -14,6 +14,7 @@ import { CoursesModule } from './courses/courses.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { ProgressModule } from './progress/progress.module';
 import { AchievementsModule } from './achievements/achievements.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AchievementsModule } from './achievements/achievements.module';
     ConversationsModule,
     ProgressModule,
     AchievementsModule,
+    AiModule,
   ],
   controllers: [HealthController],
   providers: [
