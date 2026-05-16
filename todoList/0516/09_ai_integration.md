@@ -637,7 +637,7 @@ Wraps `package:sherpa_onnx` ASR models. Recommended model choices:
 | **Paraformer (zh)** | zh | ~70 MB | ~200 ms streaming | If Chinese is primary user base |
 
 - [ ] **9.14.4.1** Add `sherpa_onnx: ^<version>` to pubspec.yaml when implementing
-- [ ] **9.14.4.2** Download model on first launch (not bundled) — show progress UI; cache to app document directory
+- [ ] **9.14.4.2** Download model on first launch (not bundled) — show progress UI; store to **external storage** per §9.15.6 (Android: `getExternalFilesDir(null)/models/stt/`; Windows: `%APPDATA%\vLearn2\models\stt\`)
 - [ ] **9.14.4.3** Verify ONNX runtime DLLs ship correctly on Windows MSIX bundle (known gotcha)
 - [ ] **9.14.4.4** Streaming pipeline: mic → 16 kHz PCM chunks → `OnlineRecognizer` → partial results → UI captions
 - [ ] **9.14.4.5** Map sherpa-onnx errors → unified `SttError`
@@ -666,8 +666,8 @@ Wraps `package:sherpa_onnx` TTS models. Recommended voice strategy:
 
 (Exact voice IDs depend on what's available in the sherpa-onnx model zoo at implementation time. Custom-trained voices are an option later.)
 
-- [ ] **9.14.5.1** Download persona voice models on first launch (one bundle per language) — show progress UI
-- [ ] **9.14.5.2** Cache audio: synthesize once per (text, voiceId) pair, store in app cache dir for replay
+- [ ] **9.14.5.1** Download persona voice models on first launch (one bundle per language) — show progress UI; store to **external storage** per §9.15.6 (`<external>/models/tts/<voice-id>/`)
+- [ ] **9.14.5.2** Cache audio: synthesize once per (text, voiceId) pair, store in `<external>/cache/tts/` for replay
 - [ ] **9.14.5.3** Streaming synthesis where supported — start playback before full generation completes
 - [ ] **9.14.5.4** Coordinate with [Rive animation](07_animation.md): `speak()` → set Rive `isSpeaking = true` → unset when audio ends
 - [ ] **9.14.5.5** Capabilities: `supportsStreaming: true`, `onDevice: true`, voices listed in `availableVoices`
@@ -873,13 +873,14 @@ abstract class ListeningScorer {
 | Concern | Platform | Mitigation |
 |---------|----------|------------|
 | AVX2 requirement on Windows | Windows | Document min CPU: Intel Haswell (2013+) / AMD Excavator (2015+). Provide non-AVX fallback build only if needed |
-| Google Play 200 MB base APK limit | Android | Models downloaded post-install (already planned in §9.14) |
+| ~~Google Play 200 MB cap~~ — **standalone APK distribution** | Android | Not on Google Play. APK is hosted directly (your site / GitHub releases / F-Droid). Size cap removed; users side-load. **Models live on external storage, not in APK** — see §9.15.6 |
+| Side-loading UX friction | Android | User must enable "Install unknown sources" once. First-launch screen explains this if install hint is detected. No Play auto-updates → ship in-app update checker (see §9.15.6) |
 | Native ABI coverage | Android | Verify `arm64-v8a`, `armeabi-v7a`, `x86_64` ABIs in `build.gradle` `splits` block |
 | MSIX bundle includes ONNX DLLs | Windows | Verify in release smoke test — sherpa-onnx plugin handles this but confirm |
 | UI thread jank on heavy inference | Both | All STT / TTS / grammar / similarity inference runs in Dart isolates |
 | Mic permission denied | Both | Graceful fallback: text-only conversation, audio-scored skills marked "—" rather than 0 |
 | Model loading time on app start | Both | Lazy load — only load model when feature first used; show 1s loading indicator |
-| Storage permission on Android | Android | Use app-internal storage (`getApplicationDocumentsDirectory()`) — no permission needed |
+| Scoped Storage (Android 10+) | Android | Use **app-specific external storage** (`getExternalFilesDir()`) — no permission required, write/read free. See §9.15.6 |
 | File path differences | Both | Use `path_provider` package consistently; never hard-code paths |
 
 - [ ] **9.15.3.1** CI smoke test: release-mode build + first-run model download + 1 STT call on Android emulator
@@ -911,3 +912,92 @@ The simple 0-100 columns (`pronunciation_score`, `fluency_score`, etc.) stay as-
 - [ ] **9.15.5.1** Radar chart shows "—" + lock icon for unscored skills in each phase
 - [ ] **9.15.5.2** Tooltip on each skill: "Coming in Phase N" with brief explanation
 - [ ] **9.15.5.3** Per-phase release notes document which skills are newly real
+
+### 9.15.6 Model Storage & Distribution Strategy
+
+**Distribution model:** standalone APK (not on Google Play). Hosted at: project website / GitHub releases / F-Droid mirror. Windows: MSIX or plain installer.
+
+**Storage philosophy:** the APK is small (~50 MB) — only code, UI assets, the CEFR-J wordlist (1 MB), and Flutter runtime. **All ONNX models and voice packs live on external storage**, downloaded on first launch (or pre-placed by an admin for kiosk deployments).
+
+#### Storage layout
+
+**Android:** `getExternalFilesDir(null)` → `/sdcard/Android/data/<package>/files/`
+
+```
+/sdcard/Android/data/com.vlearn2/files/
+├── models/
+│   ├── manifest.json                              ← lists installed model versions
+│   ├── stt/
+│   │   ├── whisper-tiny-multilingual-q8/           (50 MB)
+│   │   │   ├── encoder.onnx
+│   │   │   ├── decoder.onnx
+│   │   │   └── tokens.txt
+│   │   └── zipformer-streaming-en-zh/              (80 MB, optional)
+│   ├── tts/
+│   │   ├── vits-piper-en_US-amy/                   (60 MB)
+│   │   ├── vits-piper-ko_KR-rebecca/               (60 MB)
+│   │   └── vits-piper-zh_CN-huayan/                (60 MB)
+│   ├── pronunciation/
+│   │   └── gop-multilingual/                       (80 MB)
+│   ├── grammar/
+│   │   └── flan-t5-small-grammar-q8/               (150 MB)
+│   ├── semantic/
+│   │   └── all-MiniLM-L6-v2-q8/                    (80 MB)
+│   └── vad/
+│       └── silero-vad/                             (1.5 MB, bundled w/ sherpa-onnx)
+└── cache/
+    └── tts/                                        ← cached synthesized audio per (text, voice)
+```
+
+**Windows:** `getApplicationSupportDirectory()` → `%APPDATA%\vLearn2\` (same subdirectory layout under that root).
+
+**Optional advanced mode (Android):** users with the **MANAGE_EXTERNAL_STORAGE** workflow (since we're not on Play, restricted-Play policy doesn't apply) OR via **SAF folder picker** can opt into `/sdcard/vLearn2/models/` — this path **survives uninstall**, allowing model re-use across reinstalls or device wipes. Not the default.
+
+#### Model delivery — two modes supported
+
+**Mode A (default): Download on first launch**
+- On first sign-in, app fetches `manifest.json` from CDN (e.g. `https://cdn.vlearn2.com/models/v1/manifest.json`)
+- Manifest lists model bundles per language with hash + size + URL
+- User picks UI language → app downloads only the matching ASR + TTS + grammar bundle
+- Progress UI: per-bundle progress bar, retry on failure, resumable via HTTP Range
+- Hash-verify after download (SHA-256)
+
+**Mode B (advanced / kiosk): Pre-placed models**
+- Admin places models directory on the device's external storage **before** first launch
+- App detects `manifest.json` already present at the storage path → skips download, just verifies hashes
+- Useful for: enterprise deployments, classroom kiosks, no-internet first-launch, offline beta testing
+
+#### Settings UI
+
+- [ ] **9.15.6.1** Settings → "Storage" section shows:
+  - Total model storage used + free space available on the storage volume
+  - Per-language pack list with size + delete button
+  - "Download more languages" button
+  - "Re-verify integrity" button (hash-check all installed models)
+- [ ] **9.15.6.2** Models stored under `<external>/models/` — never inside internal app storage
+- [ ] **9.15.6.3** Cache directory under `<external>/cache/` cleanable by user without breaking models
+
+#### In-app updates (replaces Play auto-update)
+
+- [ ] **9.15.6.4** On app start, ping `https://cdn.vlearn2.com/version.json` once/day
+- [ ] **9.15.6.5** If newer version available, show non-blocking banner: "v1.4.2 available — tap to update"
+- [ ] **9.15.6.6** Tap → download new APK to `<external>/Download/vLearn2-1.4.2.apk` and launch installer intent
+- [ ] **9.15.6.7** Model manifest updates checked separately (more frequent, no APK update needed for model swaps)
+
+#### Implementation checklist
+
+- [ ] **9.15.6.8** `lib/core/storage/model_storage.dart` — resolves the platform-specific external root via `path_provider`
+- [ ] **9.15.6.9** `lib/core/storage/model_downloader.dart` — fetches manifest, downloads bundles, hash-verifies, supports resume
+- [ ] **9.15.6.10** `lib/core/storage/model_registry.dart` — tracks installed model versions in `manifest.json`; exposes "is this model present?" queries to the speech/grammar services
+- [ ] **9.15.6.11** Boot flow: after sign-in, check `model_registry.requiredModelsPresent(uiLanguage)` → if false, navigate to download screen → on completion, return to home
+- [ ] **9.15.6.12** Graceful degradation: if a required model is missing mid-session (e.g. user deleted the language pack), feature returns a "model not available" error and UI prompts re-download — does NOT crash
+- [ ] **9.15.6.13** Document the pre-placement workflow in `docs/kiosk-deployment.md` for advanced users
+
+#### Trade-offs accepted by this design
+
+| Trade-off | Why this is OK |
+|-----------|----------------|
+| First launch requires network (Mode A) | Almost universal in 2026; Mode B available for offline first-launch |
+| Models lost on uninstall (default path) | Re-download is straightforward; users opting for SAF persistent path keeps them |
+| Larger app data dir than typical (~150–600 MB depending on languages) | User has full visibility + control via Settings → Storage |
+| Need to host the model CDN ourselves | One-time setup; could mirror on GitHub releases or HuggingFace as backup |

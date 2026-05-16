@@ -147,24 +147,35 @@
 | **APK size** | **< 50 MB** |
 | **Windows installer** | **< 80 MB** |
 
-### Post-STT/TTS (sherpa-onnx on-device models)
-Model assets are **downloaded on first launch**, not bundled in the binary. The installer stays small; the device's app data directory grows as models are fetched.
+### Post-STT/TTS (sherpa-onnx + offline evaluation models)
+**Distribution: standalone APK.** Models are downloaded on first launch (default) or pre-placed by an admin (Mode B). All models live on **external storage**, not internal app storage. See [todoList/09 §9.15.6](09_ai_integration.md).
 
 | Metric | Target | Notes |
 |--------|--------|-------|
-| APK size | < 50 MB | unchanged — models downloaded post-install |
-| Windows installer | < 80 MB | unchanged — models downloaded post-install |
-| First-launch model download | < 5 min on 20 Mbps | Whisper-tiny (~40 MB) + 1 VITS voice (~80 MB) per language |
-| On-device storage after full setup (1 lang) | ~150 MB | ASR + TTS models in app document dir |
-| On-device storage after full setup (3 langs en/ko/zh) | ~400 MB | shared ASR + 3 voice packs |
+| APK size | < 50 MB | Code + UI + CEFR-J wordlist only; no models bundled |
+| Windows installer | < 80 MB | Same rationale — models live on external storage |
+| First-launch model download (1 lang, full stack) | < 5 min on 20 Mbps | STT (~50 MB) + TTS (~60 MB) + GOP (~80 MB) + grammar (~150 MB) + MiniLM (~80 MB) ≈ 420 MB |
+| External storage after full setup (1 lang) | ~420 MB | Under `/sdcard/Android/data/<pkg>/files/models/` |
+| External storage after full setup (3 langs en/ko/zh) | ~620 MB | Shared STT/grammar/MiniLM models + 3 TTS voice packs |
 | STT latency (transcribe 5s clip) | < 1.5s on mid-range Android | Whisper-tiny int8 |
 | STT streaming partial latency | < 300ms | Zipformer streaming |
 | TTS first-audio latency | < 800ms | VITS-medium |
 | TTS RTF (real-time factor) | < 0.5 | i.e. 1s of audio synthesized in < 500ms |
+| Grammar inference (single sentence) | < 600ms | flan-T5-small int8 |
+| Semantic similarity (MiniLM) | < 200ms | for listening comprehension scoring |
 
-### App-size strategy
-- [ ] **10.5.1** Models hosted on CDN (or Hugging Face mirror) — not in app bundle
-- [ ] **10.5.2** Download screen shown on first launch *after* sign-in: progress bar per model, retry on failure, resumable
-- [ ] **10.5.3** Models versioned and stored under `<app-docs>/speech-models/v1/`; old versions purged on upgrade
-- [ ] **10.5.4** "Manage downloads" section in Settings — let user delete unused language packs to free space
-- [ ] **10.5.5** Graceful degradation: if a model is missing, fall back to text-only conversation with a soft prompt to download
+### Storage & distribution strategy
+- [ ] **10.5.1** Models hosted on CDN (project domain) with HuggingFace + GitHub-releases mirrors as fallback
+- [ ] **10.5.2** First-launch download screen: per-bundle progress bar, retry on failure, HTTP Range resume, SHA-256 verification
+- [ ] **10.5.3** Models stored on external storage under `<external>/models/<category>/<bundle>/` and versioned via `manifest.json` — old versions purged on upgrade
+- [ ] **10.5.4** Settings → Storage section: total used, per-language pack list with delete, re-verify integrity button
+- [ ] **10.5.5** Graceful degradation: if a model is missing, feature returns "model not available" error; UI prompts re-download — never crash
+- [ ] **10.5.6** Mode B (pre-placed models): if `manifest.json` exists on external storage at app start, skip download phase entirely
+- [ ] **10.5.7** In-app update checker: daily ping to `version.json`, non-blocking banner when update available (replaces Play auto-update)
+
+### Cross-platform smoke tests (release builds)
+- [ ] **10.5.8** Android release APK install → first-launch download → 1 STT call → 1 TTS playback — all succeed on emulator API 30+ and a physical mid-range device
+- [ ] **10.5.9** Windows release build → first-launch download → 1 STT call → 1 TTS playback — succeed on Windows 10 + Windows 11
+- [ ] **10.5.10** Android: verify models land under `/sdcard/Android/data/<pkg>/files/models/` and not internal app dir
+- [ ] **10.5.11** Android: verify uninstall removes the model directory (Mode A default behavior is expected)
+- [ ] **10.5.12** Android: optional SAF persistent path test — models survive uninstall when SAF mode is enabled
