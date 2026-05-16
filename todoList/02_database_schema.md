@@ -1,0 +1,327 @@
+# 02 – Database Schema Design
+
+## 2.1 PostgreSQL Schema (Backend)
+
+### Table: users
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| email | VARCHAR(255) | UNIQUE, NOT NULL | |
+| password_hash | VARCHAR(255) | NOT NULL | bcrypt |
+| display_name | VARCHAR(100) | NOT NULL | |
+| avatar_emoji | VARCHAR(10) | default '🐣' | |
+| native_language | VARCHAR(10) | default 'en' | BCP-47 code |
+| ui_language | VARCHAR(10) | default 'en' | en/ko/zh |
+| current_level | SMALLINT | default 1 | 1-6 (A1-C2) |
+| xp_total | INTEGER | default 0 | |
+| streak_days | SMALLINT | default 0 | |
+| last_active_date | DATE | nullable | |
+| active_persona_id | UUID | FK → personas.id | selected tutor |
+| active_theme | VARCHAR(20) | default 'apricot' | apricot/sage/iris/obsidian |
+| onboarding_done | BOOLEAN | default false | |
+| created_at | TIMESTAMPTZ | default now() | |
+| updated_at | TIMESTAMPTZ | default now() | |
+
+### Table: refresh_tokens
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| user_id | UUID | FK → users.id, ON DELETE CASCADE |
+| token_hash | VARCHAR(255) | NOT NULL |
+| expires_at | TIMESTAMPTZ | NOT NULL |
+| created_at | TIMESTAMPTZ | default now() |
+
+### Table: personas
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| key | VARCHAR(20) | UNIQUE | maya/leo/sofia/theo |
+| name | VARCHAR(50) | NOT NULL | |
+| accent | VARCHAR(30) | | e.g. 'american', 'british' |
+| style | VARCHAR(50) | | e.g. 'encouraging tutor' |
+| specialties | TEXT[] | | e.g. ['business','travel'] |
+| accent_color | VARCHAR(7) | | hex |
+| gradient_from | VARCHAR(7) | | hex |
+| gradient_to | VARCHAR(7) | | hex |
+| rive_asset | VARCHAR(100) | | asset path for animation |
+| is_active | BOOLEAN | default true | |
+
+### Table: scenarios
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| slug | VARCHAR(100) | UNIQUE | url-safe identifier |
+| category | VARCHAR(50) | | travel/business/social/daily |
+| difficulty | SMALLINT | | 1(A1)–6(C2) |
+| title | JSONB | | {en, ko, zh} |
+| description | JSONB | | {en, ko, zh} |
+| scene_description | JSONB | | {en, ko, zh} |
+| user_role | JSONB | | {en, ko, zh} |
+| tutor_role | JSONB | | {en, ko, zh} |
+| objectives | JSONB | | [{en, ko, zh}] array |
+| key_phrases | JSONB | | [{phrase, translation}] |
+| estimated_minutes | SMALLINT | default 5 | |
+| xp_reward | SMALLINT | default 50 | |
+| order_index | SMALLINT | default 0 | |
+| is_active | BOOLEAN | default true | |
+| created_at | TIMESTAMPTZ | default now() | |
+
+### Table: courses
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| title | JSONB | {en, ko, zh} |
+| description | JSONB | {en, ko, zh} |
+| level | SMALLINT | 1–6 |
+| total_scenarios | SMALLINT | |
+| is_active | BOOLEAN | default true |
+
+### Table: course_scenarios
+| Column | Type | Constraints |
+|--------|------|-------------|
+| course_id | UUID | FK → courses.id |
+| scenario_id | UUID | FK → scenarios.id |
+| order_index | SMALLINT | |
+| PRIMARY KEY | (course_id, scenario_id) | |
+
+### Table: conversation_sessions
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| user_id | UUID | FK → users.id | |
+| scenario_id | UUID | FK → scenarios.id, nullable | null = free talk |
+| persona_id | UUID | FK → personas.id | |
+| mode | VARCHAR(20) | | chat/face |
+| status | VARCHAR(20) | default 'active' | active/completed/abandoned |
+| started_at | TIMESTAMPTZ | default now() | |
+| ended_at | TIMESTAMPTZ | nullable | |
+| duration_seconds | INTEGER | nullable | computed on end |
+| turn_count | SMALLINT | default 0 | |
+| word_count | INTEGER | default 0 | user words total |
+| xp_earned | SMALLINT | default 0 | |
+
+### Table: conversation_messages
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| session_id | UUID | FK → conversation_sessions.id, ON DELETE CASCADE | |
+| role | VARCHAR(10) | NOT NULL | user/assistant |
+| content | TEXT | NOT NULL | |
+| word_count | SMALLINT | | computed for user messages |
+| timestamp | TIMESTAMPTZ | default now() | |
+| sequence | SMALLINT | | ordering |
+
+### Table: session_scores
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| session_id | UUID | FK → conversation_sessions.id, UNIQUE | |
+| overall_score | SMALLINT | 0–100 | weighted average |
+| pronunciation_score | SMALLINT | 0–100 | placeholder (STT) |
+| fluency_score | SMALLINT | 0–100 | words-per-turn ratio |
+| vocabulary_score | SMALLINT | 0–100 | unique words / total |
+| grammar_score | SMALLINT | 0–100 | AI assessed |
+| engagement_score | SMALLINT | 0–100 | turn count / time |
+| strengths | TEXT[] | | e.g. ['Good use of tense'] |
+| improvements | TEXT[] | | e.g. ['Try longer sentences'] |
+| ai_feedback | TEXT | | paragraph from Claude |
+| computed_at | TIMESTAMPTZ | default now() | |
+
+### Table: skill_snapshots
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| user_id | UUID | FK → users.id | |
+| snapshot_date | DATE | | weekly snapshot |
+| pronunciation | SMALLINT | 0–100 | |
+| fluency | SMALLINT | 0–100 | |
+| vocabulary | SMALLINT | 0–100 | |
+| grammar | SMALLINT | 0–100 | |
+| listening | SMALLINT | 0–100 | placeholder |
+| UNIQUE | (user_id, snapshot_date) | | |
+
+### Table: user_progress
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| user_id | UUID | FK → users.id, UNIQUE | |
+| sessions_total | INTEGER | default 0 | |
+| sessions_this_week | SMALLINT | default 0 | reset weekly |
+| minutes_spoken_total | INTEGER | default 0 | |
+| minutes_spoken_this_week | SMALLINT | default 0 | reset weekly |
+| words_spoken_total | INTEGER | default 0 | |
+| scenarios_completed | INTEGER | default 0 | |
+| current_streak | SMALLINT | default 0 | |
+| longest_streak | SMALLINT | default 0 | |
+| level_history | JSONB | default '[]' | [{level, date}] |
+| updated_at | TIMESTAMPTZ | | |
+
+### Table: user_scenario_completions
+| Column | Type | Constraints |
+|--------|------|-------------|
+| user_id | UUID | FK → users.id |
+| scenario_id | UUID | FK → scenarios.id |
+| best_score | SMALLINT | 0–100 |
+| attempt_count | SMALLINT | default 1 |
+| first_completed_at | TIMESTAMPTZ | |
+| last_completed_at | TIMESTAMPTZ | |
+| PRIMARY KEY | (user_id, scenario_id) | |
+
+### Table: achievements
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| key | VARCHAR(50) | UNIQUE |
+| title | JSONB | {en, ko, zh} |
+| description | JSONB | {en, ko, zh} |
+| icon | VARCHAR(10) | emoji |
+| xp_reward | SMALLINT | |
+| condition_type | VARCHAR(50) | streak/sessions/score/level/etc |
+| condition_value | INTEGER | threshold |
+
+### Table: user_achievements
+| Column | Type | Constraints |
+|--------|------|-------------|
+| user_id | UUID | FK → users.id |
+| achievement_id | UUID | FK → achievements.id |
+| earned_at | TIMESTAMPTZ | default now() |
+| PRIMARY KEY | (user_id, achievement_id) | |
+
+### Indexes
+```sql
+CREATE INDEX idx_sessions_user_id ON conversation_sessions(user_id);
+CREATE INDEX idx_sessions_started_at ON conversation_sessions(started_at);
+CREATE INDEX idx_messages_session_id ON conversation_messages(session_id);
+CREATE INDEX idx_skill_snapshots_user_date ON skill_snapshots(user_id, snapshot_date);
+CREATE INDEX idx_scenarios_difficulty ON scenarios(difficulty);
+CREATE INDEX idx_scenarios_category ON scenarios(category);
+```
+
+---
+
+## 2.2 SQLite Schema (Flutter App — Drift)
+
+The app caches data locally for offline support and stores auth tokens.
+
+### Drift Tables
+
+```dart
+// auth_cache table
+class AuthCache extends Table {
+  TextColumn get userId => text()();
+  TextColumn get accessToken => text()();
+  TextColumn get refreshToken => text()();
+  DateTimeColumn get accessTokenExpiry => dateTime()();
+  TextColumn get userJson => text()(); // serialized UserProfile
+  @override
+  Set<Column> get primaryKey => {userId};
+}
+
+// user_profile_cache table
+class UserProfileCache extends Table {
+  TextColumn get id => text()();
+  TextColumn get email => text()();
+  TextColumn get displayName => text()();
+  TextColumn get avatarEmoji => text().withDefault(const Constant('🐣'))();
+  TextColumn get uiLanguage => text().withDefault(const Constant('en'))();
+  IntColumn get currentLevel => integer().withDefault(const Constant(1))();
+  IntColumn get xpTotal => integer().withDefault(const Constant(0))();
+  IntColumn get streakDays => integer().withDefault(const Constant(0))();
+  TextColumn get activePersonaKey => text().withDefault(const Constant('maya'))();
+  TextColumn get activeTheme => text().withDefault(const Constant('apricot'))();
+  BoolColumn get onboardingDone => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get cachedAt => dateTime()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// scenarios_cache table
+class ScenariosCache extends Table {
+  TextColumn get id => text()();
+  TextColumn get slug => text()();
+  TextColumn get category => text()();
+  IntColumn get difficulty => integer()();
+  TextColumn get titleJson => text()(); // {en, ko, zh}
+  TextColumn get descriptionJson => text()();
+  TextColumn get contentJson => text()(); // full scenario data
+  IntColumn get xpReward => integer()();
+  IntColumn get estimatedMinutes => integer()();
+  DateTimeColumn get cachedAt => dateTime()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// local_sessions table — sessions started offline
+class LocalSessions extends Table {
+  TextColumn get id => text()(); // local UUID
+  TextColumn get serverId => text().nullable()(); // null until synced
+  TextColumn get scenarioId => text().nullable()();
+  TextColumn get personaKey => text()();
+  TextColumn get mode => text().withDefault(const Constant('chat'))();
+  TextColumn get status => text().withDefault(const Constant('active'))();
+  DateTimeColumn get startedAt => dateTime()();
+  DateTimeColumn get endedAt => dateTime().nullable()();
+  IntColumn get turnCount => integer().withDefault(const Constant(0))();
+  IntColumn get wordCount => integer().withDefault(const Constant(0))();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// local_messages table
+class LocalMessages extends Table {
+  TextColumn get id => text()();
+  TextColumn get sessionId => text()();
+  TextColumn get role => text()(); // user/assistant
+  TextColumn get content => text()();
+  IntColumn get sequence => integer()();
+  DateTimeColumn get timestamp => dateTime()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// progress_cache table
+class ProgressCache extends Table {
+  TextColumn get userId => text()();
+  IntColumn get sessionsTotal => integer().withDefault(const Constant(0))();
+  IntColumn get minutesSpokenTotal => integer().withDefault(const Constant(0))();
+  IntColumn get wordsSpokenTotal => integer().withDefault(const Constant(0))();
+  IntColumn get scenariosCompleted => integer().withDefault(const Constant(0))();
+  IntColumn get currentStreak => integer().withDefault(const Constant(0))();
+  TextColumn get skillJson => text().nullable()(); // latest skill snapshot
+  DateTimeColumn get cachedAt => dateTime()();
+  @override
+  Set<Column> get primaryKey => {userId};
+}
+
+// app_settings table (device-local, not synced)
+class AppSettings extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+  @override
+  Set<Column> get primaryKey => {key};
+}
+```
+
+### Settings Keys (AppSettings)
+| Key | Values | Default |
+|-----|--------|---------|
+| theme | apricot/sage/iris/obsidian | apricot |
+| ui_language | en/ko/zh | en (device locale) |
+| conversation_mode | chat/face | chat |
+| notifications_enabled | true/false | true |
+| font_size_scale | 0.9/1.0/1.1/1.2 | 1.0 |
+
+---
+
+## 2.3 Seed Data
+
+- [ ] **2.3.1** Seed 4 personas (Maya, Leo, Sofia, Theo) with colors from tokens.json
+- [ ] **2.3.2** Seed 20 starter scenarios across 4 categories
+  - Travel (5): airport, hotel, restaurant, shopping, taxi
+  - Business (5): meeting, email, presentation, negotiation, networking
+  - Social (5): greeting, party, dating, sports, hobby
+  - Daily Life (5): grocery, doctor, bank, directions, phone call
+- [ ] **2.3.3** Seed 2 starter courses (Beginner A1-A2, Intermediate B1-B2)
+- [ ] **2.3.4** Seed 15 achievements (streak-based, session-based, score-based)
+- [ ] **2.3.5** Write TypeORM migration files for all tables
