@@ -1,3 +1,13 @@
+for admin type in admin panel, there should be two types.
+Super admin,  who sign up admin at first.
+Sub Admin.  all who sign up after admin.
+Super Admin can give the role for Sub Admin , the role to edit topics, the role to view user, the role to view user's progress, etc.
+
+So please the task for above requirement.
+
+After you have done , do the following.
+
+
 ok. let's go now
 For every txt files inside todoList\0516 folder, plz do the todo List one by one.
 After you have done task, produce report what you have done and save as md format to "todoList_report\0516" folder.
