@@ -581,7 +581,7 @@ Schema in §13.8.2 above.
 - [ ] **13.10.12** `AdminStatsModule` — `/admin/stats` with in-memory 60s cache
 - [ ] **13.10.13** `AdminAuditModule` — search + export + retention; `@AuditAction()` decorator + interceptor for automatic logging
 - [ ] **13.10.14** Update §12's `AdminConfigController` to log into `admin_audit_log` (action prefix: `config.*`) instead of the dropped `config_audit_log` table
-- [ ] **13.10.15** Role-based authorization helpers: `AdminGuard`, `SuperadminGuard`, `@RequireRole('admin'|'superadmin')` decorator
+- [ ] **13.10.15** Permission-based authorization helpers come from [14](14_admin_permissions.md): `PermissionGuard` + `@RequirePermission()` decorator. Every admin controller method in §13 declares its required permission per the [§14.8 mapping table](14_admin_permissions.md). The previous "admin / superadmin" coarse split is replaced by the granular catalog
 
 ## 13.11 Implementation Checklist (App-side awareness, v1)
 

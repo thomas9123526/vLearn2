@@ -29,6 +29,7 @@
 | 11 | [11_security_and_performance.md](11_security_and_performance.md) | Content guard (profanity filter) + conditional gzip compression |
 | 12 | [12_admin_visibility.md](12_admin_visibility.md) | Layout visibility flags + remote-config system for future Next.js admin panel |
 | 13 | [13_admin_content_and_users.md](13_admin_content_and_users.md) | Admin scenario/course/achievement CRUD + image uploads + user management + leaderboards + stats dashboard + unified audit log |
+| 14 | [14_admin_permissions.md](14_admin_permissions.md) | Two-tier admin (Superadmin + Sub-admins) with granular permission catalog (RBAC) — single source of truth for `@RequirePermission()` on every admin endpoint |
 
 ---
 

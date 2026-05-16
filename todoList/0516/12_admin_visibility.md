@@ -119,7 +119,7 @@ Returns all app-visible config in one shot. App polls this on launch + every 30 
 - [ ] **12.4.3** Cached at the backend in memory; cache busted on any admin write
 - [ ] **12.4.4** Response gzipped if eligible (see [§11.2](11_security_and_performance.md))
 
-### Admin endpoints (require `role IN ('admin', 'superadmin')`)
+### Admin endpoints (gated by `@RequirePermission()` per [14 §14.8](14_admin_permissions.md))
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -130,7 +130,7 @@ Returns all app-visible config in one shot. App polls this on launch + every 30 
 | POST | `/admin/config/reset-all` | Reset everything (`superadmin` only) |
 | GET | `/admin/config/audit` | Recent config changes (last 100, with user + timestamp) |
 
-- [ ] **12.4.5** `AdminGuard` extends `JwtAuthGuard`; checks `user.role` claim in JWT
+- [ ] **12.4.5** `JwtAuthGuard + PermissionGuard` (per [14 §14.6](14_admin_permissions.md)) gate every admin controller method; each method declares `@RequirePermission('config.view'|'config.edit'|...)` per the §14.8 mapping table
 - [ ] **12.4.6** JWT payload extended with `role` — issued on signin, refreshed on `/auth/refresh`
 - [ ] **12.4.7** Validation: PATCH body's `value` must match the row's `value_type` (`boolean` keys reject non-bool)
 - [ ] **12.4.8** Audit log: every admin write inserts into the unified `admin_audit_log` table with `action='config.update'|'config.reset'`, `target_type='config'`, `target_id=<key>`, `old_value`, `new_value`, `user_id`. Schema defined in [13_admin_content_and_users.md §13.8.2](13_admin_content_and_users.md)
@@ -385,7 +385,7 @@ These are the concrete tasks the Flutter dev does NOW, before the admin panel ex
 - [ ] **12.10.1** Create `app_config` table + migration
 - [ ] **12.10.2** Add `role` column to `users` table + migration; backfill existing users to `'user'`
 - [ ] **12.10.3** Implement `AppConfigModule` with `AppConfigService`, `AppConfigController` (`GET /app-config`), `AdminConfigController` (`/admin/config/*`)
-- [ ] **12.10.4** `AdminGuard` extending `JwtAuthGuard` with role check
+- [ ] **12.10.4** Use the shared `PermissionGuard` + `@RequirePermission()` from [14](14_admin_permissions.md); do NOT reintroduce a bespoke `AdminGuard`
 - [ ] **12.10.5** Extend JWT payload to include `role`
 - [ ] **12.10.6** Write to the unified `admin_audit_log` table on every admin mutation (table defined in [13 §13.8.2](13_admin_content_and_users.md); no separate `config_audit_log`)
 - [ ] **12.10.7** Seed file with the full §12.6 catalog

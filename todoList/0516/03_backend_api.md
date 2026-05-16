@@ -4,8 +4,9 @@
 - Content guard + gzip compression — [11_security_and_performance.md](11_security_and_performance.md)
 - Layout visibility + admin-config endpoints — [12_admin_visibility.md](12_admin_visibility.md) (adds `AppConfigModule` with `/app-config` and `/admin/config/*`)
 - Admin content + user management — [13_admin_content_and_users.md](13_admin_content_and_users.md) (adds `AdminScenariosModule`, `AdminCoursesModule`, `AdminAchievementsModule`, `AdminPersonasModule`, `AdminUsersModule`, `AdminLeaderboardModule`, `AdminStatsModule`, `AdminAuditModule`, `StorageProvider`, `ImageProcessor`)
+- **Admin RBAC (Superadmin + Sub-admins with granular permissions)** — [14_admin_permissions.md](14_admin_permissions.md) — defines the `PermissionGuard`, `@RequirePermission()` decorator, the canonical permission catalog, the bootstrap sign-up flow, and the per-endpoint permission map that every admin controller method honors
 
-The JWT payload extends to include `role` (see [12 §12.4](12_admin_visibility.md)). All `/admin/*` endpoints are guarded by `AdminGuard` which checks `user.role IN ('admin','superadmin')`. The most privacy-sensitive endpoints (transcript view, full guard-violation content) require `superadmin` and are audited per [13 §13.8](13_admin_content_and_users.md).
+The JWT payload extends to include `role` AND `permissions` (see [14](14_admin_permissions.md)). All `/admin/*` endpoints are guarded by `JwtAuthGuard + PermissionGuard` which check `user.role` and the granular permission required for the endpoint. The most privacy-sensitive endpoints (transcript view, full guard-violation content, role changes, soft-delete) require permissions with `grantable_to_subadmin=false` — effectively superadmin-only. All admin writes are audited per [13 §13.8](13_admin_content_and_users.md).
 
 ## 3.1 Auth Module (`/auth`)
 

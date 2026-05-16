@@ -256,6 +256,17 @@ Unified append-only audit log capturing every admin write across all domains (co
 | metadata | JSONB | nullable | extra context: reason, ip_address, user_agent |
 | created_at | TIMESTAMPTZ | default now() | |
 
+### Table: admin_permissions
+Granular permissions granted to sub-admins (`role='admin'`). Superadmin (`role='superadmin'`) implicitly has all permissions and has no rows here. See [14_admin_permissions.md](14_admin_permissions.md).
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| user_id | UUID | FK → users.id, ON DELETE CASCADE | sub-admin |
+| permission | VARCHAR(60) | NOT NULL | catalog key (e.g. `'scenarios.edit'`) |
+| granted_by | UUID | FK → users.id, ON DELETE SET NULL | which superadmin granted |
+| granted_at | TIMESTAMPTZ | default now() | |
+| PRIMARY KEY | (user_id, permission) | composite | |
+
 ### Table: uploaded_files
 Tracks every admin-uploaded asset (scenario images, persona portraits, etc) regardless of storage backend. Drives SHA-256 dedup and reference-counted garbage collection. See [13 §13.3](13_admin_content_and_users.md).
 
@@ -295,6 +306,9 @@ CREATE INDEX idx_scenarios_status ON scenarios(status);
 CREATE INDEX idx_users_status ON users(status) WHERE status != 'active';
 CREATE INDEX idx_users_xp_total ON users(xp_total DESC);
 CREATE INDEX idx_users_streak_days ON users(streak_days DESC);
+CREATE INDEX idx_admin_permissions_user ON admin_permissions(user_id);
+CREATE INDEX idx_admin_permissions_perm ON admin_permissions(permission);
+CREATE UNIQUE INDEX uniq_one_superadmin ON users(role) WHERE role = 'superadmin';
 ```
 
 ---
