@@ -136,6 +136,7 @@
 
 ## 10.5 Performance Targets
 
+### MVP (no STT/TTS — placeholder services)
 | Metric | Target |
 |--------|--------|
 | App cold start (Android) | < 3 seconds |
@@ -143,5 +144,27 @@
 | API response (conversation) | < 3 seconds (P90) |
 | SQLite read | < 50ms |
 | Rive animation FPS | 60 FPS |
-| APK size | < 50 MB |
-| Windows installer | < 80 MB |
+| **APK size** | **< 50 MB** |
+| **Windows installer** | **< 80 MB** |
+
+### Post-STT/TTS (sherpa-onnx on-device models)
+Model assets are **downloaded on first launch**, not bundled in the binary. The installer stays small; the device's app data directory grows as models are fetched.
+
+| Metric | Target | Notes |
+|--------|--------|-------|
+| APK size | < 50 MB | unchanged — models downloaded post-install |
+| Windows installer | < 80 MB | unchanged — models downloaded post-install |
+| First-launch model download | < 5 min on 20 Mbps | Whisper-tiny (~40 MB) + 1 VITS voice (~80 MB) per language |
+| On-device storage after full setup (1 lang) | ~150 MB | ASR + TTS models in app document dir |
+| On-device storage after full setup (3 langs en/ko/zh) | ~400 MB | shared ASR + 3 voice packs |
+| STT latency (transcribe 5s clip) | < 1.5s on mid-range Android | Whisper-tiny int8 |
+| STT streaming partial latency | < 300ms | Zipformer streaming |
+| TTS first-audio latency | < 800ms | VITS-medium |
+| TTS RTF (real-time factor) | < 0.5 | i.e. 1s of audio synthesized in < 500ms |
+
+### App-size strategy
+- [ ] **10.5.1** Models hosted on CDN (or Hugging Face mirror) — not in app bundle
+- [ ] **10.5.2** Download screen shown on first launch *after* sign-in: progress bar per model, retry on failure, resumable
+- [ ] **10.5.3** Models versioned and stored under `<app-docs>/speech-models/v1/`; old versions purged on upgrade
+- [ ] **10.5.4** "Manage downloads" section in Settings — let user delete unused language packs to free space
+- [ ] **10.5.5** Graceful degradation: if a model is missing, fall back to text-only conversation with a soft prompt to download

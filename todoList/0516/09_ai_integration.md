@@ -503,39 +503,192 @@ Honest read for picking a provider:
 
 ---
 
-## 9.14 STT/TTS Placeholder Hooks
+## 9.14 STT / TTS Provider Abstraction (Sherpa-ONNX Ready)
 
-These hooks are designed for easy implementation when STT/TTS is added later.
+STT and TTS use the same provider-abstraction pattern as the AI layer. STT and TTS are **two separate interfaces** so they can be swapped independently — e.g. on-device STT (sherpa-onnx) + cloud TTS (ElevenLabs), or fully on-device for both.
 
-**File:** `lib/features/conversation/services/speech_service.dart`
+**Planned production impl:** [`sherpa-onnx`](https://github.com/k2-fsa/sherpa-onnx) via the [`sherpa_onnx`](https://pub.dev/packages/sherpa_onnx) Flutter package — on-device, offline, multilingual (en/ko/zh), supports Android + Windows + the rest of Flutter's target platforms.
+
+### 9.14.1 SpeechToTextService Interface
+
+**File:** `lib/core/speech/stt_service.dart`
 
 ```dart
-abstract class SpeechService {
-  // STT placeholder
-  Future<String> transcribeAudio(Uint8List audioData);
+class SttResult {
+  final String text;
+  final double confidence;        // 0.0 - 1.0
+  final Duration audioDuration;
+  final String? detectedLanguage; // BCP-47 code if auto-detection enabled
   
-  // TTS placeholder  
-  Future<void> speak(String text, {String? personaVoice});
-  Future<void> stopSpeaking();
-  
-  bool get isAvailable;  // false until implemented
+  SttResult({required this.text, required this.confidence, required this.audioDuration, this.detectedLanguage});
 }
 
-class PlaceholderSpeechService implements SpeechService {
-  @override
-  bool get isAvailable => false;
+class SttCapabilities {
+  final bool supportsStreaming;
+  final bool supportsLanguageDetection;
+  final List<String> supportedLanguages;   // BCP-47 codes
+  final bool onDevice;                      // no network required
+}
+
+abstract class SpeechToTextService {
+  SttCapabilities get capabilities;
+  bool get isAvailable;
   
-  @override
-  Future<String> transcribeAudio(Uint8List audioData) =>
-    Future.value('');  // no-op
+  /// One-shot transcription of a complete audio clip.
+  Future<SttResult> transcribe(Uint8List audioData, {String? language});
   
-  @override
-  Future<void> speak(String text, {String? personaVoice}) =>
-    Future.value();  // no-op
+  /// Streaming transcription — yields partial results as audio arrives.
+  /// Default impl wraps transcribe() as a single chunk.
+  Stream<SttResult> transcribeStream(Stream<Uint8List> audioChunks, {String? language}) async* {
+    final chunks = <int>[];
+    await for (final chunk in audioChunks) { chunks.addAll(chunk); }
+    yield await transcribe(Uint8List.fromList(chunks), language: language);
+  }
+  
+  /// Lifecycle — call once at app start, dispose on signout.
+  Future<void> initialize();
+  Future<void> dispose();
 }
 ```
 
-- [ ] **9.14.1** Register `PlaceholderSpeechService` in Riverpod providers
-- [ ] **9.14.2** Conversation screen checks `speechService.isAvailable` before showing mic UI
-- [ ] **9.14.3** Face mode "Press to Speak" button: disabled state with tooltip "Coming soon"
-- [ ] **9.14.4** Backend: `POST .../messages` accepts optional `audio_url` field (null for now)
+### 9.14.2 TextToSpeechService Interface
+
+**File:** `lib/core/speech/tts_service.dart`
+
+```dart
+class TtsCapabilities {
+  final bool supportsStreaming;        // generate audio as it speaks
+  final List<String> supportedLanguages;
+  final List<String> availableVoices;  // voice IDs
+  final bool onDevice;
+}
+
+abstract class TextToSpeechService {
+  TtsCapabilities get capabilities;
+  bool get isAvailable;
+  
+  /// Speak text using a specific persona's voice. Returns when playback finishes.
+  Future<void> speak(String text, {required String voiceId, String? language, double rate = 1.0});
+  
+  /// Generate audio bytes without playing (e.g. for caching).
+  Future<Uint8List> synthesize(String text, {required String voiceId, String? language, double rate = 1.0});
+  
+  Future<void> stop();
+  Future<void> initialize();
+  Future<void> dispose();
+}
+```
+
+### 9.14.3 Placeholder Implementations (MVP)
+
+**File:** `lib/core/speech/placeholder_speech.dart`
+
+```dart
+class PlaceholderSttService extends SpeechToTextService {
+  @override
+  bool get isAvailable => false;
+  @override
+  SttCapabilities get capabilities => const SttCapabilities(
+    supportsStreaming: false, supportsLanguageDetection: false,
+    supportedLanguages: [], onDevice: false,
+  );
+  @override
+  Future<SttResult> transcribe(Uint8List audioData, {String? language}) async =>
+    SttResult(text: '', confidence: 0, audioDuration: Duration.zero);
+  @override Future<void> initialize() async {}
+  @override Future<void> dispose() async {}
+}
+
+class PlaceholderTtsService extends TextToSpeechService {
+  @override
+  bool get isAvailable => false;
+  @override
+  TtsCapabilities get capabilities => const TtsCapabilities(
+    supportsStreaming: false, supportedLanguages: [],
+    availableVoices: [], onDevice: false,
+  );
+  @override
+  Future<void> speak(String text, {required String voiceId, String? language, double rate = 1.0}) async {}
+  @override
+  Future<Uint8List> synthesize(String text, {required String voiceId, String? language, double rate = 1.0}) async =>
+    Uint8List(0);
+  @override Future<void> stop() async {}
+  @override Future<void> initialize() async {}
+  @override Future<void> dispose() async {}
+}
+```
+
+- [ ] **9.14.3.1** Register `PlaceholderSttService` and `PlaceholderTtsService` as default Riverpod providers
+- [ ] **9.14.3.2** Conversation screens check `service.isAvailable` before showing mic / speaker UI
+- [ ] **9.14.3.3** Face mode "Press to Speak" button: disabled state with tooltip "Coming soon" when STT unavailable
+- [ ] **9.14.3.4** Backend: `POST .../messages` accepts optional `audio_url` field (null for now)
+
+### 9.14.4 Future: SherpaOnnxSttService (Stub)
+
+**File (future):** `lib/core/speech/sherpa_onnx_stt.dart`
+
+Wraps `package:sherpa_onnx` ASR models. Recommended model choices:
+
+| Model | Languages | Size | Latency (mid-range Android) | Use case |
+|-------|-----------|------|------------------------------|----------|
+| **Whisper-tiny** (int8) | 99 langs | ~40 MB | ~400 ms | Default MVP — small, multilingual |
+| **Whisper-base** (int8) | 99 langs | ~75 MB | ~700 ms | Higher quality, still acceptable |
+| **Streaming Zipformer (multi-zh-en)** | en + zh | ~80 MB | ~150 ms streaming | Best for Face Mode live captions |
+| **Paraformer (zh)** | zh | ~70 MB | ~200 ms streaming | If Chinese is primary user base |
+
+- [ ] **9.14.4.1** Add `sherpa_onnx: ^<version>` to pubspec.yaml when implementing
+- [ ] **9.14.4.2** Download model on first launch (not bundled) — show progress UI; cache to app document directory
+- [ ] **9.14.4.3** Verify ONNX runtime DLLs ship correctly on Windows MSIX bundle (known gotcha)
+- [ ] **9.14.4.4** Streaming pipeline: mic → 16 kHz PCM chunks → `OnlineRecognizer` → partial results → UI captions
+- [ ] **9.14.4.5** Map sherpa-onnx errors → unified `SttError`
+- [ ] **9.14.4.6** Capabilities: `supportsStreaming: true`, `onDevice: true`, `supportedLanguages: ['en', 'ko', 'zh']`
+
+### 9.14.5 Future: SherpaOnnxTtsService (Stub)
+
+**File (future):** `lib/core/speech/sherpa_onnx_tts.dart`
+
+Wraps `package:sherpa_onnx` TTS models. Recommended voice strategy:
+
+| Voice family | Languages | Size per voice | Notes |
+|--------------|-----------|----------------|-------|
+| **VITS (`vits-piper-*`)** | en, ko, zh + more | ~60–100 MB | High quality, many speaker voices available |
+| **MatchaTTS** | en | ~80 MB | Newer, faster inference |
+| **Coqui XTTS-v2** (via ONNX) | multilingual + voice cloning | ~1 GB | Optional later — too heavy for MVP |
+
+**Persona → voice mapping** (initial proposal — finalize when implementing):
+
+| Persona | en voice | ko voice | zh voice |
+|---------|----------|----------|----------|
+| Maya | vits-piper-en_US-amy-medium | vits-piper-ko_KR-rebecca-medium | vits-piper-zh_CN-huayan-medium |
+| Leo | vits-piper-en_US-ryan-high | (alternate) | (alternate) |
+| Sofia | vits-piper-en_GB-jenny-high | (alternate) | (alternate) |
+| Theo | vits-piper-en_US-joe-medium | (alternate) | (alternate) |
+
+(Exact voice IDs depend on what's available in the sherpa-onnx model zoo at implementation time. Custom-trained voices are an option later.)
+
+- [ ] **9.14.5.1** Download persona voice models on first launch (one bundle per language) — show progress UI
+- [ ] **9.14.5.2** Cache audio: synthesize once per (text, voiceId) pair, store in app cache dir for replay
+- [ ] **9.14.5.3** Streaming synthesis where supported — start playback before full generation completes
+- [ ] **9.14.5.4** Coordinate with [Rive animation](07_animation.md): `speak()` → set Rive `isSpeaking = true` → unset when audio ends
+- [ ] **9.14.5.5** Capabilities: `supportsStreaming: true`, `onDevice: true`, voices listed in `availableVoices`
+
+### 9.14.6 Provider Factory (Speech)
+
+**File:** `lib/core/speech/speech_factory.dart`
+
+```dart
+enum SpeechProvider { placeholder, sherpaOnnx, /* future: whisperApi, elevenLabs */ }
+
+SpeechToTextService createStt(SpeechProvider provider) { /* ... */ }
+TextToSpeechService createTts(SpeechProvider provider) { /* ... */ }
+```
+
+Toggle via app setting (eventually) or build-time flag:
+```dart
+const kSttProvider = SpeechProvider.placeholder;   // → SherpaOnnxSttService later
+const kTtsProvider = SpeechProvider.placeholder;   // → SherpaOnnxTtsService later
+```
+
+- [ ] **9.14.6.1** Riverpod providers `sttServiceProvider` and `ttsServiceProvider` return the factory result
+- [ ] **9.14.6.2** Both services initialized on app start (after sign-in), disposed on sign-out
+- [ ] **9.14.6.3** Settings screen exposes voice selection per language (when sherpa-onnx is enabled)
