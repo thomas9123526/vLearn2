@@ -15,6 +15,9 @@ import { ConversationsModule } from './conversations/conversations.module';
 import { ProgressModule } from './progress/progress.module';
 import { AchievementsModule } from './achievements/achievements.module';
 import { AiModule } from './ai/ai.module';
+import { GuardModule } from './guard/guard.module';
+import { AdminModule } from './admin/admin.module';
+import { AppConfigModule } from './app-config/app-config.module';
 
 @Module({
   imports: [
@@ -44,6 +47,9 @@ import { AiModule } from './ai/ai.module';
     ProgressModule,
     AchievementsModule,
     AiModule,
+    GuardModule,
+    AdminModule,
+    AppConfigModule,
   ],
   controllers: [HealthController],
   providers: [
