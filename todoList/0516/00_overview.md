@@ -32,7 +32,7 @@
 ## Delivery Phases
 
 ### Phase 1 — Foundation (Week 1-2)
-- Project scaffold (Flutter + NestJS monorepo)
+- Project scaffold — two independent siblings: `backend/` (NestJS) and `flutter_app/` (Flutter), each runnable on its own
 - Database schemas finalized
 - Auth endpoints (sign-up, sign-in, JWT refresh)
 - Flutter navigation shell + theme system

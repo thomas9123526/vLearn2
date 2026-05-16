@@ -1,28 +1,68 @@
 # 01 – Project Setup & Tooling
 
-## 1.1 Monorepo Structure
+## 1.1 Repository Layout — Two Independent Projects
+
+The Flutter app and the NestJS backend live as **sibling top-level folders in the same repo**, each fully self-contained. You can `cd` into either one and run/build/test it without touching the other — no monorepo tooling, no `pnpm workspaces`, no `apps/` wrapper.
 
 ```
 vLearn2/
-├── apps/
-│   ├── flutter_app/          # Flutter (Android + Windows)
-│   └── backend/              # NestJS API
-├── packages/
-│   └── shared_types/         # Shared TypeScript types (optional)
-├── todoList/
-├── vLearn2Spec/
-├── .github/
-│   └── workflows/
-│       ├── flutter_ci.yml
-│       └── backend_ci.yml
-└── docker-compose.yml        # PostgreSQL + Redis for local dev
+├── backend/                  # NestJS API — own package.json, own .env, own node_modules
+│   ├── src/
+│   ├── test/
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── nest-cli.json
+│   ├── .env.example
+│   └── README.md             # how to run the backend on its own
+│
+├── flutter_app/              # Flutter app — own pubspec.yaml, own android/, own windows/
+│   ├── lib/
+│   ├── test/
+│   ├── android/
+│   ├── windows/
+│   ├── assets/
+│   ├── pubspec.yaml
+│   ├── analysis_options.yaml
+│   └── README.md             # how to run the app on its own
+│
+├── todoList/                 # planning docs (this folder)
+├── todoList_report/          # per-task completion reports
+├── vLearn2Spec/              # design handoff from claude.design
+├── docker-compose.yml        # OPTIONAL convenience: PostgreSQL for local dev
+└── .github/
+    └── workflows/
+        ├── flutter_ci.yml    # runs only when flutter_app/** changes
+        └── backend_ci.yml    # runs only when backend/** changes
 ```
+
+**Running each project independently:**
+
+```bash
+# Backend only — needs PostgreSQL (use docker-compose up postgres or your own)
+cd backend
+npm install
+npm run start:dev        # localhost:3000
+
+# Flutter app only — needs nothing else running (uses local SQLite cache)
+cd flutter_app
+flutter pub get
+flutter run -d windows   # or: flutter run -d <android-device-id>
+```
+
+**Why this layout (not a monorepo):**
+- **Independent run/build.** No coordination needed between the two — backend devs don't need Flutter SDK, Flutter devs don't need Node.
+- **Independent versioning + CI.** Path-filtered workflows mean a backend change doesn't trigger Flutter builds and vice-versa.
+- **Clean dependency graph.** No shared `node_modules` at the root, no shared `package.json`, no cross-project type imports. If shared types are needed later, generate them from the OpenAPI spec the backend already emits via `@nestjs/swagger`.
+- **Same Git history.** Single repo, single source of truth, but each project is self-contained.
 
 ## 1.2 Flutter App Setup
 
-- [ ] **1.2.1** Create Flutter project
+**All commands below run from the repo root unless noted. The Flutter project root will be `<repo>/flutter_app/`.**
+
+- [ ] **1.2.1** Create Flutter project at the repo root (creates `flutter_app/`)
   ```bash
   flutter create --org com.vlearn2 --platforms android,windows flutter_app
+  cd flutter_app
   ```
 - [ ] **1.2.2** Add pubspec.yaml dependencies
   ```yaml
@@ -107,20 +147,24 @@ vLearn2/
 
 ## 1.3 NestJS Backend Setup
 
-- [ ] **1.3.1** Scaffold NestJS project
+**All commands below run from the repo root unless noted. The backend project root will be `<repo>/backend/`. Using `npm` (pnpm is not assumed to be installed).**
+
+- [ ] **1.3.1** Scaffold NestJS project at the repo root (creates `backend/`)
   ```bash
-  nest new backend --package-manager pnpm
+  npx -y @nestjs/cli new backend --package-manager npm --skip-git
+  cd backend
   ```
-- [ ] **1.3.2** Add dependencies
+- [ ] **1.3.2** Add dependencies (run inside `backend/`)
   ```bash
-  pnpm add @nestjs/typeorm typeorm pg
-  pnpm add @nestjs/jwt @nestjs/passport passport passport-jwt passport-local
-  pnpm add @nestjs/config class-validator class-transformer
-  pnpm add @nestjs/swagger swagger-ui-express
-  pnpm add bcrypt uuid
-  pnpm add @anthropic-ai/sdk
-  pnpm add nestjs-i18n
-  pnpm add -D @types/bcrypt @types/passport-jwt @types/passport-local
+  npm install @nestjs/typeorm typeorm pg
+  npm install @nestjs/jwt @nestjs/passport passport passport-jwt passport-local
+  npm install @nestjs/config class-validator class-transformer
+  npm install @nestjs/swagger swagger-ui-express
+  npm install @nestjs/throttler helmet
+  npm install bcrypt uuid
+  npm install @anthropic-ai/sdk openai
+  npm install nestjs-i18n
+  npm install -D @types/bcrypt @types/passport-jwt @types/passport-local @types/uuid
   ```
 - [ ] **1.3.3** Set up folder structure
   ```
@@ -165,9 +209,11 @@ vLearn2/
 - [ ] **1.3.6** Configure Swagger at `/api/docs`
 - [ ] **1.3.7** Set up global validation pipe, exception filter, response interceptor
 
-## 1.4 Docker / Local Dev
+## 1.4 Docker / Local Dev (Optional Convenience)
 
-- [ ] **1.4.1** Write `docker-compose.yml`
+`docker-compose.yml` lives at the **repo root** so either project can use it (only the backend actually depends on Postgres). The Flutter app is fully independent — it does not require Docker or Postgres to run.
+
+- [ ] **1.4.1** Write `<repo>/docker-compose.yml`
   ```yaml
   services:
     postgres:
@@ -182,10 +228,22 @@ vLearn2/
   volumes:
     pg_data:
   ```
-- [ ] **1.4.2** Add npm script: `pnpm db:start`, `pnpm db:migrate`, `pnpm db:seed`
+- [ ] **1.4.2** Backend `package.json` scripts (inside `backend/`):
+  ```json
+  "scripts": {
+    "db:up":      "docker compose -f ../docker-compose.yml up -d postgres",
+    "db:down":    "docker compose -f ../docker-compose.yml down",
+    "db:migrate": "typeorm-ts-node-commonjs migration:run -d ./src/database/data-source.ts",
+    "db:seed":    "ts-node ./src/database/seeds/run-seeds.ts"
+  }
+  ```
+- [ ] **1.4.3** Backend includes its own `README.md` documenting: prereqs (Node 20+, Postgres 16), `npm install`, copy `.env.example → .env`, `npm run db:up`, `npm run db:migrate`, `npm run db:seed`, `npm run start:dev`
+- [ ] **1.4.4** Flutter app includes its own `README.md` documenting: prereqs (Flutter 3.41+), `flutter pub get`, `flutter run -d windows` or `flutter run -d <android>`, how to point at a local vs remote backend
 
 ## 1.5 CI/CD
 
-- [ ] **1.5.1** GitHub Actions: Flutter CI (analyze, test, build APK, build Windows)
-- [ ] **1.5.2** GitHub Actions: Backend CI (lint, test, build)
-- [ ] **1.5.3** Add `.gitignore` for both projects
+CI workflows live at `<repo>/.github/workflows/` and use **path filters** so a change to one project never builds the other.
+
+- [ ] **1.5.1** `flutter_ci.yml` — `on: push, paths: ['flutter_app/**']`. Steps: `cd flutter_app && flutter pub get && flutter analyze && flutter test && flutter build apk --debug && flutter build windows --debug`
+- [ ] **1.5.2** `backend_ci.yml` — `on: push, paths: ['backend/**']`. Steps: `cd backend && npm ci && npm run lint && npm test && npm run build`
+- [ ] **1.5.3** Add `.gitignore` for both projects (each project has its own `.gitignore`; the repo-root `.gitignore` we already created handles cross-project + tooling)
