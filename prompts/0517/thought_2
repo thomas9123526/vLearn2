@@ -1,0 +1,5 @@
+"at the signin screen on the application, when there's error occurs because password is not correct or user credentials is not correct,  DioException error message shows. It looks bad.
+So I want you to don't show this bad look message and show polite and green message based on the error types. 
+Please do only in signin screen"
+
+I want do this all over the screens.

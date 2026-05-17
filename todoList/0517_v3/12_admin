@@ -1,0 +1,20 @@
+I want you generate all available pages for admin panel.
+I will list the functions that I need on the admin panel.
+Sub Admin can create,edit ,delete for scenarios,news.
+Scenario may have image also so you have to do image upload function when create scenario.
+Sub Admin can 
+For Leaderboard, I'm new to this concept so please create all available functions and pages for it.
+
+Super Admin can give the sub admin for the role or rights to have above functions like create or edit or delete or view scenarios.
+So SubAdmin have specific permissions for scenarios,news.
+Allowed Sub Admin can also block a user in case if the sub admin find some illegal actions from the user.
+
+
+
+
+I want settings tab there.
+put gzip option in settings tab. So admin can enable or disable to use gzip or not between application and backend.
+
+
+
+Super Admin have all the rights. He can do everythings on the admin panel and can view all the pages.
