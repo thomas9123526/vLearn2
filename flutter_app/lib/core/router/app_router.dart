@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
@@ -32,11 +33,15 @@ class AppRoute {
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final auth = ref.watch(authProvider);
+  final refresh = _AuthRefreshListenable();
+  ref.listen<AuthState>(authProvider, (_, _) => refresh.bump());
+  ref.onDispose(refresh.dispose);
 
   return GoRouter(
     initialLocation: AppRoute.splash,
+    refreshListenable: refresh,
     redirect: (context, state) {
+      final auth = ref.read(authProvider);
       final loc = state.matchedLocation;
       final signedIn = auth.isSignedIn;
       final checking = auth.status == AuthStatus.checking;
@@ -45,6 +50,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           loc == AppRoute.splash;
 
       if (checking) return null; // keep current — splash will animate
+      // Auth resolved & no token: leave splash for the sign-in screen.
+      if (!signedIn && loc == AppRoute.splash) return AppRoute.signIn;
       if (!signedIn && !isPublic) return AppRoute.signIn;
       if (signedIn && (loc == AppRoute.signIn || loc == AppRoute.signUp)) {
         return auth.user!.onboardingDone ? AppRoute.home : AppRoute.onboarding;
@@ -91,3 +98,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class _AuthRefreshListenable extends ChangeNotifier {
+  void bump() => notifyListeners();
+}
