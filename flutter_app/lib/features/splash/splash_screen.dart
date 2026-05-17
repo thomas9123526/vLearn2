@@ -15,7 +15,7 @@ class SplashScreen extends StatelessWidget {
             Icon(Icons.school_rounded, size: 96, color: scheme.primary),
             const SizedBox(height: 24),
             Text(
-              'vLearn2',
+              'Virtual Foreign Language',
               style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),

@@ -1,71 +1,123 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, CheckCircle2, Archive, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
+import { usePermission } from '@/hooks/use-permission';
 
-interface ScenarioRow {
+interface Scenario {
   id: string;
   slug: string;
   category: string;
   difficulty: number;
-  title: { en: string; ko?: string; zh?: string };
-  status: 'published' | 'draft' | 'archived';
-  xp_reward: number;
-  estimated_minutes: number;
+  status: 'draft' | 'published' | 'archived';
+  title: Record<string, string>;
+  image_url: string | null;
+  created_at: string;
 }
 
 export default function ScenariosPage() {
-  // Reads the existing user-facing endpoint, which returns published only.
-  // A dedicated admin endpoint that shows drafts + archives is a follow-up.
-  const { data, isLoading, error } = useQuery<ScenarioRow[]>({
-    queryKey: ['scenarios', 'list'],
-    queryFn: () => api<ScenarioRow[]>('/scenarios'),
+  const canEdit = usePermission('scenarios.edit');
+  const canDelete = usePermission('scenarios.delete');
+  const qc = useQueryClient();
+
+  const { data, isLoading, error } = useQuery<Scenario[]>({
+    queryKey: ['admin-scenarios'],
+    queryFn: () => api<Scenario[]>('/admin/scenarios'),
   });
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
-  if (error) {
-    return (
-      <p className="text-sm text-destructive">
-        Could not load scenarios: {error instanceof Error ? error.message : 'unknown error'}
-      </p>
-    );
-  }
-
-  const rows = data ?? [];
+  const publish = useMutation({
+    mutationFn: (id: string) => api(`/admin/scenarios/${id}/publish`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-scenarios'] }),
+  });
+  const archive = useMutation({
+    mutationFn: (id: string) => api(`/admin/scenarios/${id}/archive`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-scenarios'] }),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/admin/scenarios/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-scenarios'] }),
+  });
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Scenarios</h2>
-        <p className="text-sm text-muted-foreground">
-          Read-only list of <strong>published</strong> scenarios from the
-          user-facing endpoint. A dedicated <code>/admin/scenarios</code>{' '}
-          endpoint (with drafts + create/edit/publish actions) is a follow-up.
-        </p>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Scenarios</h1>
+        {canEdit && (
+          <Link href="/scenarios/new">
+            <Button>
+              <Plus className="h-4 w-4" />
+              New scenario
+            </Button>
+          </Link>
+        )}
       </div>
 
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No published scenarios yet.</p>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {rows.map((s) => (
-            <Card key={s.id}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{s.title.en}</CardTitle>
-                <div className="text-xs text-muted-foreground">{s.slug}</div>
-              </CardHeader>
-              <CardContent className="space-y-1 text-xs">
-                <div><span className="text-muted-foreground">Category:</span> {s.category}</div>
-                <div><span className="text-muted-foreground">Difficulty:</span> {s.difficulty}</div>
-                <div><span className="text-muted-foreground">XP:</span> {s.xp_reward}</div>
-                <div><span className="text-muted-foreground">Est. time:</span> {s.estimated_minutes} min</div>
-                <div><span className="text-muted-foreground">Status:</span> {s.status}</div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
+
+      <Card className="overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border bg-muted/50">
+            <tr>
+              <th className="px-4 py-2 text-left font-medium">Title</th>
+              <th className="px-4 py-2 text-left font-medium">Category</th>
+              <th className="px-4 py-2 text-left font-medium">Difficulty</th>
+              <th className="px-4 py-2 text-left font-medium">Status</th>
+              <th className="px-4 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data ?? []).map((s) => (
+              <tr key={s.id} className="border-b border-border last:border-0">
+                <td className="px-4 py-2">
+                  <Link href={`/scenarios/${s.id}`} className="hover:underline">
+                    {s.title?.en ?? s.slug}
+                  </Link>
+                </td>
+                <td className="px-4 py-2 capitalize">{s.category}</td>
+                <td className="px-4 py-2">{'★'.repeat(s.difficulty)}</td>
+                <td className="px-4 py-2 capitalize">{s.status}</td>
+                <td className="px-4 py-2 text-right space-x-1">
+                  {canEdit && s.status === 'draft' && (
+                    <Button size="sm" variant="outline" onClick={() => publish.mutate(s.id)}>
+                      <CheckCircle2 className="h-4 w-4" /> Publish
+                    </Button>
+                  )}
+                  {canEdit && s.status === 'published' && (
+                    <Button size="sm" variant="ghost" onClick={() => archive.mutate(s.id)}>
+                      <Archive className="h-4 w-4" /> Archive
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => {
+                        if (confirm(`Delete "${s.title?.en ?? s.slug}"?`)) {
+                          remove.mutate(s.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {(data ?? []).length === 0 && !isLoading && (
+              <tr>
+                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                  No scenarios yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }

@@ -26,7 +26,8 @@ const NAV = [
   { href: '/leaderboard', label: 'Leaderboard', icon: Trophy, perm: 'leaderboard.view' },
   { href: '/audit', label: 'Audit log', icon: ScrollText, perm: 'audit.view' },
   { href: '/admins', label: 'Admins', icon: ShieldCheck, perm: 'admins.view' },
-  { href: '/config', label: 'Config', icon: Settings, perm: 'config.view' },
+  { href: '/config', label: 'Config flags', icon: Settings, perm: 'config.view' },
+  { href: '/settings', label: 'Settings', icon: Settings, perm: null },
 ] as const;
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

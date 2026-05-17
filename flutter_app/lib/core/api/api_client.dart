@@ -1,12 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../config/app_config.dart';
 import '../providers/auth_provider.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/compression_interceptor.dart';
-
-const String _defaultApiBaseUrl = 'http://localhost:3000/api';
 
 /// Token storage facade — `flutter_secure_storage` for production; an
 /// in-memory map for widget tests.
@@ -40,17 +39,21 @@ final tokenStoreProvider = Provider<TokenStore>((ref) {
 });
 
 final apiClientProvider = Provider<Dio>((ref) {
-  const baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: _defaultApiBaseUrl,
-  );
+  // Resolved at boot — `main.dart` awaits `appConfigProvider.future` before
+  // building the widget tree, so by the time any feature provider reads the
+  // Dio client this is already populated.
+  final config = ref.watch(appConfigProvider).asData?.value ?? AppConfig.defaults;
+  // Compile-time override (`--dart-define=API_BASE_URL=...`) wins so CI and
+  // dev scripts can target a non-default backend without editing the JSON.
+  const envOverride = String.fromEnvironment('API_BASE_URL');
+  final baseUrl = envOverride.isNotEmpty ? envOverride : config.backendBaseUrl;
   final tokenStore = ref.watch(tokenStoreProvider);
 
   final dio = Dio(
     BaseOptions(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 30),
+      receiveTimeout: Duration(seconds: config.requestTimeout),
       headers: const {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

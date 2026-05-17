@@ -21,12 +21,29 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { PermissionGuard, RequirePermission } from '../admin/permissions/permission.guard';
 
+/// Live in-memory cache for the gzip-enable flag. The compression filter in
+/// `main.ts` reads this directly because it's on the hot path of every
+/// request. The cache is seeded on service init and refreshed whenever an
+/// admin updates `system.gzip_enabled`.
+class GzipFlagCache {
+  static enabled = true;
+}
+
 @Injectable()
 class AppConfigService {
   constructor(
     @InjectRepository(AppConfigEntity)
     private readonly repo: Repository<AppConfigEntity>,
-  ) {}
+  ) {
+    void this.refreshGzipCache();
+  }
+
+  async refreshGzipCache(): Promise<void> {
+    const row = await this.repo.findOne({ where: { key: 'system.gzip_enabled' } });
+    if (row && typeof row.value === 'boolean') {
+      GzipFlagCache.enabled = row.value;
+    }
+  }
 
   async appVisibleFlags(): Promise<{ version: string; flags: Record<string, unknown> }> {
     const rows = await this.repo.find({ where: { is_visible_to_app: true } });
@@ -56,14 +73,22 @@ class AppConfigService {
     }
     row.value = value;
     row.updated_by = updatedBy;
-    return this.repo.save(row);
+    const saved = await this.repo.save(row);
+    if (key === 'system.gzip_enabled' && typeof value === 'boolean') {
+      GzipFlagCache.enabled = value;
+    }
+    return saved;
   }
 
   async reset(key: string, updatedBy: string): Promise<AppConfigEntity> {
     const row = await this.getOne(key);
     row.value = row.default_value;
     row.updated_by = updatedBy;
-    return this.repo.save(row);
+    const saved = await this.repo.save(row);
+    if (key === 'system.gzip_enabled' && typeof row.value === 'boolean') {
+      GzipFlagCache.enabled = row.value;
+    }
+    return saved;
   }
 
   private typeMatches(t: string, v: unknown): boolean {
@@ -147,3 +172,5 @@ class AdminConfigController {
   exports: [AppConfigService],
 })
 export class AppConfigModule {}
+
+export { GzipFlagCache };

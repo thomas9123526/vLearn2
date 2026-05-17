@@ -2,13 +2,18 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import compression from 'compression';
+import * as path from 'path';
 import { AppModule } from './app.module';
+import { GzipFlagCache } from './app-config/app-config.module';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule, { bufferLogs: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: false,
+  });
   const config = app.get(ConfigService);
 
   // ─── Security headers ──────────────────────────────────────
@@ -25,7 +30,10 @@ async function bootstrap() {
   });
 
   // ─── Conditional gzip (see todoList/0516/11 §11.2) ────────
-  const gzipEnabled = config.get<string>('GZIP_ENABLED') !== 'false';
+  // The env-var `GZIP_ENABLED=false` forces compression off (useful for local
+  // debugging). Otherwise the live `system.gzip_enabled` flag is consulted on
+  // every request — admins flip it from the admin panel without restarting.
+  const gzipForcedOff = config.get<string>('GZIP_ENABLED') === 'false';
   const gzipThreshold = parseInt(
     config.get<string>('GZIP_THRESHOLD_BYTES') ?? '102400',
     10,
@@ -34,7 +42,8 @@ async function bootstrap() {
     compression({
       threshold: gzipThreshold,
       filter: (req, res) => {
-        if (!gzipEnabled) return false;
+        if (gzipForcedOff) return false;
+        if (!GzipFlagCache.enabled) return false;
         return compression.filter(req, res);
       },
     }),
@@ -52,6 +61,10 @@ async function bootstrap() {
 
   // ─── API prefix + versioning ───────────────────────────────
   app.setGlobalPrefix('api', { exclude: ['health', 'uploads/(.*)'] });
+
+  // ─── Static uploads (scenario hero images, news hero images) ──
+  const uploadsDir = process.env.UPLOADS_DIR ?? path.resolve('uploads');
+  app.useStaticAssets(uploadsDir, { prefix: '/uploads/' });
 
   // ─── Swagger docs at /api/docs ─────────────────────────────
   const swagger = new DocumentBuilder()
@@ -72,7 +85,13 @@ async function bootstrap() {
   logger.log(`vLearn2 backend listening on http://localhost:${port}`);
   logger.log(`Swagger docs at http://localhost:${port}/api/docs`);
   logger.log(`AI provider: ${config.get('AI_PROVIDER') ?? 'anthropic'}`);
-  logger.log(`Gzip: ${gzipEnabled ? `enabled (≥${gzipThreshold}B)` : 'disabled'}`);
+  logger.log(
+    `Gzip: ${
+      gzipForcedOff
+        ? 'forced off (GZIP_ENABLED=false)'
+        : `runtime-toggled (≥${gzipThreshold}B); current=${GzipFlagCache.enabled}`
+    }`,
+  );
 }
 
 bootstrap().catch((err) => {

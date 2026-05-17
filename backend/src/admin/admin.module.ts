@@ -14,6 +14,9 @@ import { AdminAuthController } from './admins/admin-auth.controller';
 import { AdminAuthService } from './admins/admin-auth.service';
 import { AdminAdminsController } from './admins/admin-admins.controller';
 import { AdminStatsController } from './stats/admin-stats.controller';
+import { AdminUsersController } from './admin-users.controller';
+import { AdminScenariosController } from './admin-scenarios.controller';
+import { AdminLeaderboardController } from './admin-leaderboard.controller';
 import { AuthModule } from '../auth/auth.module';
 
 @Global()
@@ -37,7 +40,14 @@ import { AuthModule } from '../auth/auth.module';
     }),
   ],
   providers: [AdminPermissionsService, PermissionGuard, AdminAuthService],
-  controllers: [AdminAuthController, AdminAdminsController, AdminStatsController],
+  controllers: [
+    AdminAuthController,
+    AdminAdminsController,
+    AdminStatsController,
+    AdminUsersController,
+    AdminScenariosController,
+    AdminLeaderboardController,
+  ],
   exports: [AdminPermissionsService, PermissionGuard, AdminAuthService],
 })
 export class AdminModule {}
