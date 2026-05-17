@@ -1,0 +1,18 @@
+give me todoList as md inside todoList\0517_v2 to implement following task.
+
+
+1. stt,tts implement with sherpa_onnx
+2. admin panel with next.js 
+3. I want put news inside the application. So subadmin upload news and then application user can see news on the homescreen. User can notice with bell icon on homescreen.
+4. I want various bubble layout for the conversation screen. I want at least 5 types. And put the bubble type setting on the settings screen and below font setting area.
+5. In the setting screen I want add font group part.
+So there can be 4 font group. 
+Each font group consists of multiple font type and they are used across the applications to represent various font styles and feels.
+Can u give me solution about this?
+And I want put all font files inside the application code part and donn't want fetch font from the internet.
+I don't want big trafic through the network.
+
+
+
+
+
