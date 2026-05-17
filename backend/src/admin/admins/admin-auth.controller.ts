@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, ConflictException, Controller, HttpCode, Post } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -48,6 +48,16 @@ export class AdminAuthController {
       'Sign up as an admin. First signup = superadmin, subsequent = admin.',
   })
   async signup(@Body() dto: AdminSignupDto) {
+    // Reject duplicates up-front so we return a clean 409 instead of letting
+    // Postgres' unique-email constraint trip and surface as a generic 500.
+    // This also catches the case where the email already exists as a regular
+    // (non-admin) user — they need to be promoted via the Admins page rather
+    // than re-signed-up here.
+    const existing = await this.users.findOne({ where: { email: dto.email } });
+    if (existing) {
+      throw new ConflictException({ i18nKey: 'auth.email_taken' });
+    }
+
     const adminCount = await this.users.count({
       where: [{ role: 'admin' }, { role: 'superadmin' }],
     });
