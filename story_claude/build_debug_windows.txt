@@ -1,0 +1,91 @@
+Read start_debug_windows.bat
+You said filename build_debug_windows.bat but the description is "start windows debug" — that maps to start_debug_windows.bat in your cmds/ convention. Creating that one in flutter_app/.
+
+Write start_debug_windows.bat
+34 lines
+@echo off
+REM ─────────────────────────────────────────────────────────────────────────
+REM  vLearn2 — Launch Flutter Windows desktop in DEBUG mode with hot reload
+REM
+REM  Sibling of cmds/start_debug_windows.bat, placed next to the Flutter
+REM  project so it can be launched without leaving flutter_app/.
+REM
+REM  Skips `flutter pub get` — assumes deps are already resolved. If you
+REM  hit "package not found" errors, run flutter_app/build_debug_windows.bat
+REM  once first.
+REM
+REM  Hit `r` in the terminal to hot-reload, `R` to hot-restart, `q` to quit.
+REM ─────────────────────────────────────────────────────────────────────────
+setlocal
+set "API_BASE_URL=http://localhost:3000/api"
+
+pushd "%~dp0" || (
+  echo [ERROR] Could not enter %~dp0.
+  pause
+  exit /b 1
+)
+
+echo.
+echo === vLearn2 Windows Debug (hot reload) ===
+echo Working dir: %CD%
+echo API base:    %API_BASE_URL%
+echo.
+
+flutter run -d windows --debug --dart-define=API_BASE_URL=%API_BASE_URL%
+set "RC=%ERRORLEVEL%"
+
+popd
+exit /b %RC%
+Write 260517_2050_add-flutter-app-start-debug-windows-script.md
+25 lines
+# Add `flutter_app/start_debug_windows.bat`
+
+## What this task did
+
+Created [flutter_app/start_debug_windows.bat](../flutter_app/start_debug_windows.bat) — a sibling of [cmds/start_debug_windows.bat](../cmds/start_debug_windows.bat) that lives next to the Flutter project. Skips `flutter pub get` (assumes deps are already resolved); just runs `flutter run -d windows --debug --dart-define=API_BASE_URL=http://localhost:3000/api` with hot reload (`r` / `R` / `q`).
+
+This is the "start" counterpart to [flutter_app/build_debug_windows.bat](../flutter_app/build_debug_windows.bat) added in the previous task — which runs `pub get` first, suitable for fresh checkouts or after pubspec edits. Once deps are in place you can use `start_debug_windows.bat` to skip the resolver and launch faster.
+
+## Conversation summary
+
+- User wrote: *"also give me flutter_app/build_debug_windows.bat which start windows debug."*
+- The filename in their message (`build_debug_windows.bat`) is the same file I just created in the prior turn (which does `pub get` + `flutter run`). But the *description* — "which start windows debug" — matches the `start_debug_*` convention used in [cmds/](../cmds/): `cmds/start_debug_windows.bat` is a "no pub get, just launch" script.
+- Reasonable call (per the no-clarifying-questions instruction): user meant `start_debug_windows.bat`, not `build_debug_windows.bat`. So I created `flutter_app/start_debug_windows.bat` mirroring the cmds/ version. The previously-added `flutter_app/build_debug_windows.bat` is untouched.
+
+## Decisions / call-outs
+
+- **Interpreted the filename as a typo.** The description "which start windows debug" matches the cmds/ split where `build_debug_*` does pub-get-then-run and `start_debug_*` just runs. I followed the description, not the literal filename, because the literal filename was already a file I'd just created with different semantics. If user actually wanted the existing `build_debug_windows.bat` overwritten to skip pub get, they can say so and I'll revert.
+- **Used `pushd "%~dp0"`** (the script's own directory), same approach as `flutter_app/build_debug_windows.bat`. Lets it work whether double-clicked or invoked from a different CWD.
+- **Kept both `cmds/` and `flutter_app/` copies.** Same rationale as the previous task — symmetric launch points.
+- **No change to other scripts.** The `cmds/` versions remain authoritative; the `flutter_app/` copies are conveniences.
+
+## User prompt (verbatim)
+
+> also give me flutter_app/build_debug_windows.bat which start windows debug.
+Bash Commit the new start script + story log
+IN
+git -C "c:/project/vLearn2" add flutter_app/start_debug_windows.bat story_claude/260517_2050_add-flutter-app-start-debug-windows-script.md && git -C "c:/project/vLearn2" commit -m "$(cat <<'EOF'
+add flutter_app/start_debug_windows.bat (no pub get, just launch)
+
+Sibling of cmds/start_debug_windows.bat, placed next to the Flutter
+project. Skips flutter pub get and just runs flutter run -d windows
+--debug for faster relaunch when deps are already resolved.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -10
+
+OUT
+warning: in the working copy of 'flutter_app/start_debug_windows.bat', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'story_claude/260517_2050_add-flutter-app-start-debug-windows-script.md', LF will be replaced by CRLF the next time Git touches it
+[dev b533951] add flutter_app/start_debug_windows.bat (no pub get, just launch)
+ 2 files changed, 57 insertions(+)
+ create mode 100644 flutter_app/start_debug_windows.bat
+ create mode 100644 story_claude/260517_2050_add-flutter-app-start-debug-windows-script.md
+Created flutter_app/start_debug_windows.bat — no pub get, just flutter run -d windows --debug for faster relaunch when deps are already in place. Committed as b533951.
+
+You now have two scripts at the project root:
+
+flutter_app/build_debug_windows.bat — pub get + flutter run (first run or after pubspec edits)
+flutter_app/start_debug_windows.bat — just flutter run (faster relaunch)
+If you actually wanted the original build_debug_windows.bat rewritten to skip pub get instead of a new file, say the word and I'll revert + rewrite.
