@@ -104,6 +104,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = AuthState.signedOut();
   }
 
+  /// Drop local session without hitting the server. Used by [AuthInterceptor]
+  /// when token refresh definitively fails — calling /auth/signout would
+  /// require a valid bearer we no longer have, and would just 401 again.
+  Future<void> forceSignOut() async {
+    if (state.status == AuthStatus.signedOut) return;
+    await _ref.read(tokenStoreProvider).clear();
+    state = AuthState.signedOut();
+  }
+
   Future<void> _persistAndFetch(Map<String, dynamic> tokens) async {
     final access = tokens['accessToken'] as String;
     final refresh = tokens['refreshToken'] as String;
