@@ -17,7 +17,7 @@ Next.js 14 (App Router) admin UI for the vLearn2 backend. Sibling project to `..
 ```bash
 cp .env.example .env.local
 npm install
-npm run dev    # http://localhost:3001
+npm run dev    # http://localhost:4000
 ```
 
 The backend must be running on `http://localhost:3000` (or whatever you set as `NEXT_PUBLIC_API_BASE_URL`).

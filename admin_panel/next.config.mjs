@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    serverActions: { allowedOrigins: ['localhost:3001'] },
+    serverActions: { allowedOrigins: ['localhost:4000'] },
   },
   // Proxy bearer-token traffic through Next.js so admin-only routes can be
   // gated by middleware. The backend lives on a separate origin.
