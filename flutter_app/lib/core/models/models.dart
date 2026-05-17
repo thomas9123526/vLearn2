@@ -205,3 +205,58 @@ class ConversationMessage {
   final int sequence;
   final DateTime createdAt;
 }
+
+class NewsPost {
+  const NewsPost({
+    required this.id,
+    required this.slug,
+    required this.title,
+    required this.body,
+    this.summary,
+    this.imageUrl,
+    required this.status,
+    required this.pinned,
+    this.publishedAt,
+    required this.read,
+  });
+
+  factory NewsPost.fromJson(Map<String, dynamic> j) => NewsPost(
+        id: j['id'] as String,
+        slug: j['slug'] as String,
+        title: (j['title'] as Map).cast<String, dynamic>(),
+        body: (j['body'] as Map).cast<String, dynamic>(),
+        summary: j['summary'] == null
+            ? null
+            : (j['summary'] as Map).cast<String, dynamic>(),
+        imageUrl: j['image_url'] as String?,
+        status: j['status'] as String,
+        pinned: (j['pinned'] as bool?) ?? false,
+        publishedAt: j['published_at'] == null
+            ? null
+            : DateTime.parse(j['published_at'] as String),
+        read: (j['read'] as bool?) ?? false,
+      );
+
+  final String id;
+  final String slug;
+  final Map<String, dynamic> title;
+  final Map<String, dynamic> body;
+  final Map<String, dynamic>? summary;
+  final String? imageUrl;
+  final String status;
+  final bool pinned;
+  final DateTime? publishedAt;
+  final bool read;
+
+  /// Resolve i18n text for the current locale, falling back to English.
+  String titleFor(String lang) => _pick(title, lang);
+  String bodyFor(String lang) => _pick(body, lang);
+  String? summaryFor(String lang) =>
+      summary == null ? null : _pick(summary!, lang);
+
+  static String _pick(Map<String, dynamic> m, String lang) {
+    final v = m[lang] as String?;
+    if (v != null && v.isNotEmpty) return v;
+    return (m['en'] as String?) ?? '';
+  }
+}

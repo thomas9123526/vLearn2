@@ -22,6 +22,10 @@ export const PERMISSION_CATALOG: PermissionDef[] = [
   { key: 'achievements.grant',     category: 'content',  description: 'Manually grant achievements to users',                             grantable_to_subadmin: true },
   { key: 'personas.edit',          category: 'content',  description: 'Edit persona settings and portraits',                              grantable_to_subadmin: true },
   { key: 'wordlist.edit',          category: 'content',  description: 'Edit the profanity wordlist (custom.json)',                        grantable_to_subadmin: true },
+  { key: 'news.view',              category: 'content',  description: 'View all news posts including drafts',                              grantable_to_subadmin: true },
+  { key: 'news.edit',              category: 'content',  description: 'Create, update, publish, archive news posts',                       grantable_to_subadmin: true, implies: ['news.view'] },
+  { key: 'news.delete',            category: 'content',  description: 'Permanently delete news posts',                                     grantable_to_subadmin: true, implies: ['news.edit'] },
+  { key: 'news.upload_image',      category: 'content',  description: 'Upload hero images for news posts',                                 grantable_to_subadmin: true, implies: ['news.edit'] },
 
   // Users
   { key: 'users.view',                    category: 'users', description: 'List users and view basic profiles',                          grantable_to_subadmin: true },

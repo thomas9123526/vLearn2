@@ -9,6 +9,7 @@ import {
 } from './conversation.entity';
 import { CourseEntity, CourseScenarioEntity } from './course.entity';
 import { GuardViolationEntity } from './guard-violation.entity';
+import { NewsPostEntity, NewsReadStatusEntity } from './news.entity';
 import { PersonaEntity } from './persona.entity';
 import {
   SkillSnapshotEntity,
@@ -32,6 +33,8 @@ export {
   CourseEntity,
   CourseScenarioEntity,
   GuardViolationEntity,
+  NewsPostEntity,
+  NewsReadStatusEntity,
   PersonaEntity,
   SkillSnapshotEntity,
   UserProgressEntity,
@@ -54,6 +57,8 @@ export const ALL_ENTITIES = [
   CourseEntity,
   CourseScenarioEntity,
   GuardViolationEntity,
+  NewsPostEntity,
+  NewsReadStatusEntity,
   PersonaEntity,
   SkillSnapshotEntity,
   UserProgressEntity,

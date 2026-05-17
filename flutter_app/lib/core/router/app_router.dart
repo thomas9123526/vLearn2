@@ -8,6 +8,8 @@ import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/scenarios/scenarios_screen.dart';
 import '../../features/conversation/conversation_screen.dart';
+import '../../features/news/news_detail_screen.dart';
+import '../../features/news/news_list_screen.dart';
 import '../../features/report/session_report_screen.dart';
 import '../../features/progress/progress_screen.dart';
 import '../../features/course/course_detail_screen.dart';
@@ -84,6 +86,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             CourseDetailScreen(idOrSlug: s.pathParameters['idOrSlug']!),
       ),
       GoRoute(path: AppRoute.profileEdit, builder: (_, _) => const ProfileEditScreen()),
+      GoRoute(path: '/news', builder: (_, _) => const NewsListScreen()),
+      GoRoute(
+        path: '/news/:idOrSlug',
+        builder: (_, s) =>
+            NewsDetailScreen(idOrSlug: s.pathParameters['idOrSlug']!),
+      ),
 
       // Shell-wrapped main tabs
       ShellRoute(

@@ -6,6 +6,9 @@ import '../../core/models/models.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/router/app_router.dart';
+import '../../shared/widgets/layout_visibility.dart';
+import '../news/widgets/bell_icon.dart';
+import '../news/widgets/news_strip.dart';
 
 final _scenariosProvider = FutureProvider<List<Scenario>>((ref) async {
   final raw = await ref.read(scenariosApiProvider).list();
@@ -28,6 +31,16 @@ class HomeScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text(''),
+        actions: const [
+          LayoutVisibility(
+            configKey: 'home.notification_bell',
+            child: BellIcon(),
+          ),
+          SizedBox(width: 4),
+        ],
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
@@ -36,30 +49,51 @@ class HomeScreen extends ConsumerWidget {
             await ref.read(authProvider.notifier).refreshProfile();
           },
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
             children: [
-              _Greeting(user: user, scheme: scheme),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _Greeting(user: user, scheme: scheme),
+              ),
               const SizedBox(height: 16),
-              if (user != null) _StreakAndXp(user: user),
-              const SizedBox(height: 24),
-              progress.when(
-                data: (p) => _QuickStats(progress: p),
-                loading: () => const Center(child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
-                )),
-                error: (_, _) => const SizedBox.shrink(),
+              if (user != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _StreakAndXp(user: user),
+                ),
+              const SizedBox(height: 16),
+              const LayoutVisibility(
+                configKey: 'home.news_strip',
+                child: NewsStrip(),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: progress.when(
+                  data: (p) => _QuickStats(progress: p),
+                  loading: () => const Center(child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: CircularProgressIndicator(),
+                  )),
+                  error: (_, _) => const SizedBox.shrink(),
+                ),
               ),
               const SizedBox(height: 24),
-              Text(
-                'Recommended scenarios',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Recommended scenarios',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
               ),
               const SizedBox(height: 8),
-              scenarios.when(
-                data: (list) => _ScenarioStrip(scenarios: list.take(4).toList(), locale: locale),
-                loading: () => const _ScenarioStripSkeleton(),
-                error: (e, _) => _ErrorTile(message: e.toString()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: scenarios.when(
+                  data: (list) => _ScenarioStrip(scenarios: list.take(4).toList(), locale: locale),
+                  loading: () => const _ScenarioStripSkeleton(),
+                  error: (e, _) => _ErrorTile(message: e.toString()),
+                ),
               ),
               const SizedBox(height: 24),
             ],

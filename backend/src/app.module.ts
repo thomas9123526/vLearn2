@@ -18,6 +18,7 @@ import { AiModule } from './ai/ai.module';
 import { GuardModule } from './guard/guard.module';
 import { AdminModule } from './admin/admin.module';
 import { AppConfigModule } from './app-config/app-config.module';
+import { NewsModule } from './news/news.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { AppConfigModule } from './app-config/app-config.module';
     GuardModule,
     AdminModule,
     AppConfigModule,
+    NewsModule,
   ],
   controllers: [HealthController],
   providers: [

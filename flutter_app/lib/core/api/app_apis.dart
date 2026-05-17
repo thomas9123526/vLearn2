@@ -155,6 +155,38 @@ class ProgressApi {
   }
 }
 
+// ─── News ───────────────────────────────────────────────────
+class NewsApi {
+  NewsApi(this._dio);
+  final Dio _dio;
+
+  Future<Map<String, dynamic>> list({int page = 1, int limit = 20}) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/news',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    return res.data!;
+  }
+
+  Future<Map<String, dynamic>> get(String idOrSlug) async {
+    final res = await _dio.get<Map<String, dynamic>>('/news/$idOrSlug');
+    return res.data!;
+  }
+
+  Future<void> markRead(String id) async {
+    await _dio.post<Map<String, dynamic>>('/news/$id/read');
+  }
+
+  Future<void> markAllRead() async {
+    await _dio.post<Map<String, dynamic>>('/news/read-all');
+  }
+
+  Future<int> unreadCount() async {
+    final res = await _dio.get<Map<String, dynamic>>('/news/unread-count');
+    return (res.data!['count'] as num).toInt();
+  }
+}
+
 // ─── Achievements ───────────────────────────────────────────
 class AchievementsApi {
   AchievementsApi(this._dio);
@@ -179,3 +211,4 @@ final coursesApiProvider = Provider<CoursesApi>((ref) => CoursesApi(ref.watch(ap
 final conversationsApiProvider = Provider<ConversationsApi>((ref) => ConversationsApi(ref.watch(apiClientProvider)));
 final progressApiProvider = Provider<ProgressApi>((ref) => ProgressApi(ref.watch(apiClientProvider)));
 final achievementsApiProvider = Provider<AchievementsApi>((ref) => AchievementsApi(ref.watch(apiClientProvider)));
+final newsApiProvider = Provider<NewsApi>((ref) => NewsApi(ref.watch(apiClientProvider)));

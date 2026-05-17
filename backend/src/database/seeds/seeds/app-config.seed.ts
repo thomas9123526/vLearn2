@@ -41,6 +41,7 @@ const CATALOG: ConfigSeed[] = [
   { key: 'home.recommended_scenarios.max_count', value: 4, value_type: 'number', category: 'home', description: 'Max recommendations shown' },
   { key: 'home.recent_activity',         value: true, value_type: 'boolean', category: 'home', description: 'Recent activity list' },
   { key: 'home.notification_bell',       value: true, value_type: 'boolean', category: 'home', description: 'Notification bell icon' },
+  { key: 'home.news_strip',              value: true, value_type: 'boolean', category: 'home', description: 'Horizontal news strip on the home screen' },
 
   // ── Progress ─────────────────────────────────────────────
   { key: 'progress.level_badge',         value: true, value_type: 'boolean', category: 'progress', description: 'Level badge with XP bar' },
