@@ -1,0 +1,19 @@
+What npm run db:seed does
+The script runs backend/src/database/seeds/run-seeds.ts, which connects to your Postgres database (using the same DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME env vars as the running app) and inserts the default catalog content the app needs to function on a fresh DB. It assumes the schema is already there (created by npm run db:migrate — seeds insert data, they don't create tables).
+
+It runs 5 seeders in order, each one idempotent (re-runnable — it checks if a row exists by a unique key, then either UPDATEs it or INSERTs a new one):
+
+#	Seeder	Table	What it inserts	How to re-identify
+1	seedPersonas	personas	4 AI tutors: Maya (warm American), Leo (casual British), Sofia (crisp British), Theo (Australian) — each with accent, style, specialties, gradient colors, Rive asset filename	slug
+2	seedScenarios	scenarios	20 conversation scenarios across 4 categories (travel/business/social/daily — 5 each), with multilingual titles (en/ko/zh), scene description, roles, objectives, key phrases, difficulty, XP reward	slug
+3	seedCourses	courses + course_scenarios	2 starter courses: Beginner Foundations (A1–A2, 5 scenarios) and Intermediate Fluency (B1–B2, 5 scenarios). Wipes & re-inserts course→scenario membership; computes total_xp by summing each scenario's XP	slug
+4	seedAchievements	achievements	12 achievements covering sessions completed (1/10/50), streaks (7/30 day), levels reached (A2/B1/B2), high scores (80/95), variety (10 scenarios, all 4 personas)	key
+5	seedAppConfig	app_config	~50 remote-config flags for showing/hiding UI sections (home cards, evaluation report blocks, conversation features, settings sections, system flags). Preserves any value an admin edited; only refreshes default_value, category, description, value_type, is_visible_to_app	key
+When to run it
+First-time setup — after npm run db:migrate, before starting the app for the first time.
+After adding new catalog content to a seed file (a new persona, scenario, achievement, or config key) — the existing rows are safely updated, new ones inserted.
+You do not need to run it to apply user-facing data changes — only changes to the bundled defaults.
+What it does NOT do
+Doesn't create users, conversations, progress, or any per-user data — that's all generated at runtime by the app.
+Doesn't create or alter tables — that's the migration runner's job.
+Doesn't delete rows the seed file no longer mentions — if you remove a scenario from SCENARIOS[], the old DB row stays.

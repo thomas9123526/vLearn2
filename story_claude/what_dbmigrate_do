@@ -1,0 +1,71 @@
+Bash Show all db:* npm scripts
+IN
+cd c:/project/vLearn2/backend && grep '"db:' package.json
+
+OUT
+    "db:up": "docker compose -f ../docker-compose.yml up -d postgres",
+    "db:down": "docker compose -f ../docker-compose.yml down",
+    "db:logs": "docker compose -f ../docker-compose.yml logs -f postgres",
+    "db:migrate": "npm run typeorm -- migration:run",
+    "db:migrate:revert": "npm run typeorm -- migration:revert",
+    "db:migrate:generate": "typeorm-ts-node-commonjs migration:generate -d ./src/database/data-source.ts",
+    "db:seed": "ts-node ./src/database/seeds/run-seeds.ts"
+Bash Show the typeorm npm script definition
+IN
+cd c:/project/vLearn2/backend && grep '"typeorm"' package.json
+
+OUT
+    "typeorm": "typeorm-ts-node-commonjs -d ./src/database/data-source.ts",
+    "typeorm": "^0.3.29",
+Globpattern: "c:\project\vLearn2\backend\src\database\migrations\*"
+Found 1 file
+Read c:\project\vLearn2\backend\src\database\migrations\1715800000000-initial-schema.ts
+Bash Count tables created in the initial migration
+IN
+cd c:/project/vLearn2/backend && grep -c "CREATE TABLE" src/database/migrations/1715800000000-initial-schema.ts
+
+OUT
+19
+Grep "CREATE TABLE "([^"]+)"" (in c:\project\vLearn2\backend\src\database\migrations\1715800000000-initial-schema.ts)
+19 lines of output
+Read c:\project\vLearn2\backend\src\database\migrations\1715800000000-initial-schema.ts (lines 371-430)
+What npm run db:migrate does
+It runs TypeORM's migration runner against your Postgres database to bring the schema (tables, indexes, foreign keys, extensions) up to date.
+
+The full chain expands like this:
+
+
+npm run db:migrate
+  → npm run typeorm -- migration:run
+  → typeorm-ts-node-commonjs -d ./src/database/data-source.ts migration:run
+It uses the same data-source.ts as db:seed (same DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME env vars), scans backend/src/database/migrations/ for migration files, and:
+
+Creates a migrations tracking table the first time it runs (records which migrations have been applied, with timestamps).
+Looks at every migration class on disk, compares its timestamp prefix against the tracking table.
+Runs the up() method of each unapplied migration in timestamp order, inside a transaction.
+Inserts a row into migrations for each one that succeeded, so it won't run again next time.
+What this project currently has
+One migration: 1715800000000-initial-schema.ts. On a fresh DB it:
+
+Enables the pgcrypto extension (for gen_random_uuid()).
+Creates 19 tables in FK-dependency order:
+Auth/users: users, refresh_tokens
+Catalog content: personas, scenarios, courses, course_scenarios
+Conversation runtime: conversation_sessions, conversation_messages, session_scores
+Progress tracking: skill_snapshots, user_progress, user_scenario_completions
+Achievements: achievements, user_achievements
+Moderation/admin: guard_violations, app_config, admin_audit_log, admin_permissions, uploaded_files
+Adds all the supporting indexes (XP/streak leaderboards, status partials, FK indexes, the uniq_one_superadmin partial unique index, etc.).
+Defines a down() that drops everything in reverse FK order — that's what npm run db:migrate:revert triggers.
+Typical lifecycle
+
+db:up         # docker compose up postgres
+db:migrate    # create tables (this command)
+db:seed       # fill catalog content (personas, scenarios, courses, …)
+Related scripts
+db:migrate:revert — runs the last applied migration's down() and removes its row from migrations. One step back at a time.
+db:migrate:generate — diffs your entities against the live DB schema and writes a new migration file with the SQL needed to close the gap. You'd use this after editing an entity; review the generated file before checking it in.
+What it does NOT do
+Doesn't insert any data — that's db:seed's job.
+Doesn't drop or recreate tables that already exist — migration files are append-only history.
+Doesn't auto-detect entity changes — you have to run db:migrate:generate (or hand-write a new migration) for the runner to have something new to apply.
