@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { join } from 'path';
+import { ALL_ENTITIES } from './entities';
 
 /**
  * TypeORM config consumed by TypeOrmModule.forRootAsync() in AppModule.
@@ -15,8 +16,8 @@ export const typeormConfigFactory = (
   username: config.get<string>('DB_USER') ?? 'postgres',
   password: config.get<string>('DB_PASSWORD') ?? '',
   database: config.get<string>('DB_NAME') ?? 'vlearn2',
-  entities: [join(__dirname, 'entities', '*.entity.{ts,js}')],
-  migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
+  entities: ALL_ENTITIES,
+  migrations: [join(__dirname, 'migrations', '*.{ts,js}').replace(/\\/g, '/')],
   migrationsRun: false,
   synchronize: false,
   logging: config.get<string>('DB_LOGGING') === 'true' ? ['error', 'query'] : ['error'],

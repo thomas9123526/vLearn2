@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { DataSource } from 'typeorm';
 import { join } from 'path';
+import { ALL_ENTITIES } from './entities';
 
 /**
  * Standalone TypeORM data source for migrations and seeds.
@@ -14,8 +15,8 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER ?? 'postgres',
   password: process.env.DB_PASSWORD ?? '',
   database: process.env.DB_NAME ?? 'vlearn2',
-  entities: [join(__dirname, 'entities', '*.entity.{ts,js}')],
-  migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
+  entities: ALL_ENTITIES,
+  migrations: [join(__dirname, 'migrations', '*.{ts,js}').replace(/\\/g, '/')],
   synchronize: false, // never true — migrations are the source of truth
   logging: process.env.DB_LOGGING === 'true' ? ['query', 'error'] : ['error'],
 });
