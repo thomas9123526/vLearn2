@@ -1,0 +1,17 @@
+I want put config file.
+For android ,it is located on the relative path of the sdcard or storage and so the absolute path should be like as  ROOT_PATH + "/룡마/가상외국어회화/config". 
+Here ROOT_PATH can be either sdcard or storage root path.
+For application, it is located on the same folder which windows application executable file locates .
+I want convert some information to json format and save that to that config file.
+And everytime the application starts, the app should read the corresponding config file first and set AppConfig  information in the app_config.dart.
+Let me describe what fields are in the config json data.
+baseurl,reqTout,tSync,dev
+baseurl is the backendBaseUrl where you can find in the app_config.dart.
+reqTimeout is integer value and is corresponding to the requestTimeout for the AppConfig.
+tSync is integer value and is corresponding to the topicSyncInterval for the AppConfig.
+dev can be either of "dev" or "prod".
+In the app_config.dat, it may be useless to seperate dev or prod for AppConfig because I get information from config file.
+
+So the purpose is that Applications should read information from the config file and set corresponding values to AppConfig at the first time when app launches.
+If there's no config file, the application should create config file that it has default.
+

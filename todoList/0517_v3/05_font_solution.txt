@@ -1,0 +1,6 @@
+In the setting screen I want add font group part.
+So there can be 4 font group. 
+Each font group consists of multiple font type and they are used across the applications to represent various font styles and feels.
+Can u give me solution about this?
+And I want put all font files inside the application code part and donn't want fetch font from the internet.
+I don't want big trafic through the network.

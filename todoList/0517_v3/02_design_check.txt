@@ -1,0 +1,5 @@
+I want know if the application provide high resolution for the all controls.
+The UI elements should be sharp and high-res on all screens of the app.
+so the icons,images or controls should be resolution-independent and scales losslessly.
+I want you to check the applications for this design aspects and give me solutions how we can modify the application to achieve high resolution , resolution-independent , scales losslessly.
+But remember that I do not want the assets size grow bigger.
