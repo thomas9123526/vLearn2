@@ -14,6 +14,7 @@ class AppSettingsState {
     required this.compressionEnabled,
     required this.fontGroup,
     required this.bubbleStyle,
+    required this.textOnlyAcknowledged,
   });
 
   final String theme;
@@ -22,18 +23,26 @@ class AppSettingsState {
   final String fontGroup;
   final String bubbleStyle;
 
+  /// `true` once the user dismissed the "Models not installed" setup screen
+  /// with the "Continue in text-only mode" button. The router uses this to
+  /// stop forcing the setup screen on every cold boot. Resets back to false
+  /// once a valid model bundle is detected (see [AppSettingsNotifier.snap]).
+  final bool textOnlyAcknowledged;
+
   AppSettingsState copyWith({
     String? theme,
     String? uiLanguage,
     bool? compressionEnabled,
     String? fontGroup,
     String? bubbleStyle,
+    bool? textOnlyAcknowledged,
   }) => AppSettingsState(
         theme: theme ?? this.theme,
         uiLanguage: uiLanguage ?? this.uiLanguage,
         compressionEnabled: compressionEnabled ?? this.compressionEnabled,
         fontGroup: fontGroup ?? this.fontGroup,
         bubbleStyle: bubbleStyle ?? this.bubbleStyle,
+        textOnlyAcknowledged: textOnlyAcknowledged ?? this.textOnlyAcknowledged,
       );
 
   static const initial = AppSettingsState(
@@ -42,6 +51,7 @@ class AppSettingsState {
     compressionEnabled: true,
     fontGroup: 'editorial',
     bubbleStyle: 'classic',
+    textOnlyAcknowledged: false,
   );
 }
 
@@ -55,6 +65,7 @@ class AppSettingsNotifier extends StateNotifier<AppSettingsState> {
   static const _kCompression = 'settings.compression_enabled';
   static const _kFontGroup = 'appearance.font_group';
   static const _kBubbleStyle = 'appearance.bubble_style';
+  static const _kTextOnly = 'speech.text_only_acknowledged';
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -64,7 +75,24 @@ class AppSettingsNotifier extends StateNotifier<AppSettingsState> {
       compressionEnabled: prefs.getBool(_kCompression) ?? AppSettingsState.initial.compressionEnabled,
       fontGroup: prefs.getString(_kFontGroup) ?? AppSettingsState.initial.fontGroup,
       bubbleStyle: prefs.getString(_kBubbleStyle) ?? AppSettingsState.initial.bubbleStyle,
+      textOnlyAcknowledged:
+          prefs.getBool(_kTextOnly) ?? AppSettingsState.initial.textOnlyAcknowledged,
     );
+  }
+
+  /// Persist the user's "I'll use the app without speech" choice. Cleared
+  /// by [resetTextOnlyAck] once a valid model bundle is detected.
+  Future<void> acknowledgeTextOnly() async {
+    state = state.copyWith(textOnlyAcknowledged: true);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kTextOnly, true);
+  }
+
+  Future<void> resetTextOnlyAck() async {
+    if (!state.textOnlyAcknowledged) return;
+    state = state.copyWith(textOnlyAcknowledged: false);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kTextOnly, false);
   }
 
   Future<void> setTheme(String theme) async {

@@ -17,23 +17,59 @@ The actual resolved path is shown in the app under **Settings → Storage → Mo
 models/
 ├── manifest.json
 ├── stt/
-│   ├── encoder.onnx
+│   ├── encoder.onnx               (streaming: zipformer transducer)
 │   ├── decoder.onnx
+│   ├── joiner.onnx
+│   ├── tokens.txt
+│   │                              ──── OR ────
+│   ├── whisper-encoder.onnx       (fallback: whisper-tiny multilingual)
+│   ├── whisper-decoder.onnx
 │   └── tokens.txt
 ├── tts/
-│   ├── vits.onnx
+│   ├── model.onnx                 (VITS Piper voice)
 │   ├── tokens.txt
-│   └── voices/                  (optional per-speaker assets)
-└── vad/
-    └── silero.onnx
+│   └── espeak-ng-data/            (Piper requires the espeak-ng data dir)
+│       └── ...
+├── vad/
+│   └── silero.onnx                (optional, for end-of-utterance detection)
+└── cache/                         (created at runtime — leave empty)
+    └── tts/
 ```
+
+The app picks the **streaming** STT bundle if `stt/encoder*`, `stt/decoder*`, `stt/joiner*`, and `stt/tokens*` are all present. Otherwise it falls back to the **Whisper** bundle (`stt/whisper-encoder*` + `stt/whisper-decoder*` + tokens).
+
+## manifest.json shape
+
+```json
+{
+  "version": "2026.05.18-1",
+  "stt":   { "name": "zipformer-streaming-en" },
+  "tts":   { "name": "vits-piper-en", "voices": ["en_US-amy", "en_GB-jenny"] },
+  "vad":   { "name": "silero-v4" },
+  "files": [
+    { "path": "stt/encoder.onnx",      "sha256": "...", "size": 12345678 },
+    { "path": "stt/decoder.onnx",      "sha256": "...", "size":    98765 },
+    { "path": "stt/joiner.onnx",       "sha256": "...", "size":   456789 },
+    { "path": "stt/tokens.txt",        "sha256": "...", "size":     2048 },
+    { "path": "tts/model.onnx",        "sha256": "...", "size": 30000000 },
+    { "path": "tts/tokens.txt",        "sha256": "...", "size":     4096 },
+    { "path": "tts/espeak-ng-data/phontab", "sha256": "...", "size": 8192 },
+    { "path": "vad/silero.onnx",       "sha256": "...", "size":   456789 }
+  ]
+}
+```
+
+- **`version`** — free-form. Surface it in your release notes; the app doesn't enforce it.
+- **`stt.name` / `tts.name`** — informational; shown on the setup screen so admins can confirm which bundle is loaded.
+- **`tts.voices`** — list in the order the model expects (`sid=0` is index 0). The UI maps personas → voices by index.
+- **`files`** — every file the app should hash-check at boot. Files not listed are ignored (e.g. the `cache/` directory).
 
 ## Building `manifest.json`
 
 The repo ships a helper at [`tools/build-manifest.py`](../../tools/build-manifest.py). It walks the model folder, SHA-256s every file, and writes a `manifest.json` next to the files.
 
 ```
-python tools/build-manifest.py /path/to/models
+python tools/build-manifest.py --root /path/to/models > /path/to/models/manifest.json
 ```
 
 The app verifies every entry on first launch (and on **Re-verify all** in Settings → Storage). Hash mismatches surface as ⚠️ rows on the Speech-setup screen.
@@ -44,9 +80,9 @@ So a partial copy (network blip, ADB push interrupted, MDM rollout that died mid
 
 ## The "ready" path
 
-1. App boots → `ModelRegistry.snapshot()` resolves the model root, reads manifest, verifies every file
-2. Status is one of: `ready` / `corrupt` / `manifestMissing` / `notReady`
-3. `ready` → `sttServiceProvider` and `ttsServiceProvider` return the sherpa-backed services
-4. Otherwise → providers return placeholder no-op services; the conversation screen falls back to keyboard input only
+1. App boots → `ModelRegistry.snapshot()` resolves the model root, reads manifest, verifies every file.
+2. Status is one of: `ready` / `corrupt` / `manifestMissing` / `notReady`.
+3. `ready` → `sttServiceProvider` and `ttsServiceProvider` return the sherpa-backed services.
+4. Otherwise → providers return placeholder no-op services; the conversation screen falls back to keyboard input only, and the router redirects users who try to start a conversation to **Speech setup**.
 
 The user can always opt into **Text-only mode** from the "Speech setup" screen and use the app without speech.

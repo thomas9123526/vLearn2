@@ -1,3 +1,19 @@
+// vLearn2 — entry point.
+//
+// Architecture summary:
+//   * State: Riverpod. Every cross-screen thing (auth, settings, model
+//     registry, API clients) lives behind a Provider so widgets stay
+//     stateless and tests can override.
+//   * Navigation: go_router. The single source of truth is
+//     [routerProvider] (see core/router/app_router.dart) which wires auth
+//     redirects, the speech-models gate, and per-route deeplinks.
+//   * Theming: built per-(theme key × font group) pair via [AppTheme.build]
+//     and rebuilt automatically when either changes.
+//
+// The runApp call uses `UncontrolledProviderScope` so we can warm one
+// provider (the on-disk config) before the first widget tree builds. This
+// avoids a flash of fallback config during cold start.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +43,8 @@ Future<void> main() async {
   );
 }
 
+/// Root widget. Reads the theme key, font group, locale, and router from
+/// providers so changes in any of them rebuild the MaterialApp once.
 class VLearn2App extends ConsumerWidget {
   const VLearn2App({super.key});
 
@@ -40,8 +58,12 @@ class VLearn2App extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Virtual Foreign Language',
       debugShowCheckedModeBanner: false,
+      // `themeKey + fontGroup` are the two ColorScheme/typography inputs;
+      // AppTheme.build memoizes the result for the current pair.
       theme: AppTheme.build(themeKey, fontGroup),
       locale: locale,
+      // Locales are the three the app's ARB files cover. ICU 73's
+      // fallback rules pick `en` for any unsupported locale automatically.
       supportedLocales: const [
         Locale('en'),
         Locale('ko'),

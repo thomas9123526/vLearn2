@@ -8,6 +8,7 @@ import { AdminRefreshTokenEntity } from '../database/entities/admin-refresh-toke
 import { AdminPermissionEntity } from '../database/entities/admin-permission.entity';
 import { ConversationSessionEntity } from '../database/entities/conversation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
+import { PersonaEntity } from '../database/entities/persona.entity';
 import { AdminPermissionsService } from './permissions/admin-permissions.service';
 import { PermissionGuard } from './permissions/permission.guard';
 import { AdminAuthController } from './admins/admin-auth.controller';
@@ -16,6 +17,7 @@ import { AdminAdminsController } from './admins/admin-admins.controller';
 import { AdminStatsController } from './stats/admin-stats.controller';
 import { AdminUsersController } from './admin-users.controller';
 import { AdminScenariosController } from './admin-scenarios.controller';
+import { AdminPersonasController } from './admin-personas.controller';
 import { AdminLeaderboardController } from './admin-leaderboard.controller';
 import { AuthModule } from '../auth/auth.module';
 
@@ -29,6 +31,7 @@ import { AuthModule } from '../auth/auth.module';
       AdminPermissionEntity,
       ConversationSessionEntity,
       ScenarioEntity,
+      PersonaEntity,
     ]),
     AuthModule,
     JwtModule.registerAsync({
@@ -46,6 +49,7 @@ import { AuthModule } from '../auth/auth.module';
     AdminStatsController,
     AdminUsersController,
     AdminScenariosController,
+    AdminPersonasController,
     AdminLeaderboardController,
   ],
   exports: [AdminPermissionsService, PermissionGuard, AdminAuthService],

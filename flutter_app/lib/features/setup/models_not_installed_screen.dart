@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/errors/polite_error.dart';
+import '../../core/providers/settings_provider.dart';
 import '../../core/storage/model_registry.dart';
 
 /// First-launch screen shown when the sherpa-onnx model bundle isn't on disk.
@@ -128,7 +129,16 @@ class ModelsNotInstalledScreen extends ConsumerWidget {
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.text_fields),
                         label: const Text('Text-only mode'),
-                        onPressed: () => context.go('/home'),
+                        onPressed: () async {
+                          // Persist the opt-out so the router stops forcing
+                          // this screen on every cold boot. The opt-out is
+                          // automatically cleared when a valid bundle is
+                          // detected (see SpeechReadyBanner.dispose).
+                          await ref
+                              .read(appSettingsProvider.notifier)
+                              .acknowledgeTextOnly();
+                          if (context.mounted) context.go('/home');
+                        },
                       ),
                     ),
                   ],

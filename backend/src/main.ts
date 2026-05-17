@@ -1,3 +1,18 @@
+// vLearn2 — backend bootstrap.
+//
+// Wires the NestJS app the way the rest of the codebase assumes:
+//   * helmet for security headers and CORS pinned to CORS_ORIGINS;
+//   * compression with a runtime kill-switch (admins can disable gzip
+//     without restarting via the `system.gzip_enabled` app_config flag);
+//   * a global validation pipe that strips unknown fields so DTOs are the
+//     single source of truth for request payloads;
+//   * an /api prefix on every route except /health and /uploads/* (static
+//     file serving for scenario / persona / news images);
+//   * Swagger docs at /api/docs with persisted bearer-token auth.
+//
+// All real business logic lives inside feature modules under src/*. This
+// file is intentionally thin.
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';

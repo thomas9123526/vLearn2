@@ -1,0 +1,5 @@
+there should be recommendataion or request when the user enter conversation screen and the user never answer or reply to ai tutor.
+Ai tutor can suggest some sentences to continue the conversation.
+Ai tutor can request some information to the user or ask about his feelings to do the conversation friendly.
+
+Is it possible?

@@ -59,6 +59,9 @@ class Persona {
     required this.specialties,
     required this.gradientFrom,
     required this.gradientTo,
+    this.gender = 'neutral',
+    this.voiceId,
+    this.riveAsset,
     this.imageUrl,
   });
 
@@ -71,6 +74,9 @@ class Persona {
         specialties: (j['specialties'] as List<dynamic>? ?? []).cast<String>(),
         gradientFrom: j['gradient_from'] as String? ?? j['gradientFrom'] as String? ?? '#FF6B47',
         gradientTo: j['gradient_to'] as String? ?? j['gradientTo'] as String? ?? '#FFB997',
+        gender: j['gender'] as String? ?? 'neutral',
+        voiceId: j['voice_id'] as String? ?? j['voiceId'] as String?,
+        riveAsset: j['rive_asset'] as String? ?? j['riveAsset'] as String?,
         imageUrl: j['image_url'] as String? ?? j['imageUrl'] as String?,
       );
 
@@ -82,6 +88,19 @@ class Persona {
   final List<String> specialties;
   final String gradientFrom;
   final String gradientTo;
+
+  /// `'female' | 'male' | 'neutral'`. Drives the avatar animation set
+  /// used in tutor-mode conversation.
+  final String gender;
+
+  /// TTS voice id pointing at an entry in `manifest.tts.voices`. Null
+  /// means "use the default (first) voice".
+  final String? voiceId;
+
+  /// `.riv` filename under `assets/animations/` for the avatar. Null
+  /// means use the gender-default body animation.
+  final String? riveAsset;
+
   final String? imageUrl;
 }
 

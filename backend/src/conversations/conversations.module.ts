@@ -66,6 +66,14 @@ class ConversationsController {
   ) {
     return this.svc.endSession(user.sub, id, dto);
   }
+
+  @Post('sessions/:id/suggest')
+  @ApiOperation({
+    summary: 'Get a short suggested user line (used by tutor-mode idle prompt)',
+  })
+  suggest(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.svc.suggestNextLine(user.sub, id);
+  }
 }
 
 @Module({

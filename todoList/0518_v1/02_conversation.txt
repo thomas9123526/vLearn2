@@ -1,0 +1,14 @@
+I want you check if the application implement conversation screen in two modes.
+one for normal mode and one for ai tutor mode.
+You can find specs for two screen mode for conversation inside vLearn2Spec\design_handoff_freetalk
+Normal mode means normal chat screen like messengers. Current application already implement this mode.
+Tutor mode means there come ai tutor on the center of the screen, when there's comes ai reply from backend api, the app do the tts for the sentence.
+so while the application under doing tts , there must be animation like the following.
+The ai tutor should behave like a real person based on gender. Let's say person's gender is a man.
+He can smiles, lipsync with tts ,  hand moves, body moves , etc.
+Also there can be some emotics around the tutor showing his emotions or feelings.
+
+
+And this is another case.
+If the user speaks , app should show some animation that indicating voice is recording. While recording user's voice and do the stt for user's spoken voice, the ai tutor can behave like he is carefully listening to user's speak and if there's some errors he can show emotions like he is disapointed. But he can show smiles or prase the user to go ahead or do the best for his english speaking.
+

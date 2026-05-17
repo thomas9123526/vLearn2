@@ -82,6 +82,59 @@ export class ConversationOrchestrator {
     }
   }
 
+  /**
+   * Idle-prompt suggestion: the user has been silent in tutor mode for a
+   * while; we ask the LLM for a short, conversational sentence the user can
+   * read aloud (or tap to send) to keep things moving.
+   *
+   * Falls back to a canned suggestion when the AI is offline so the UI
+   * always has something to show.
+   */
+  async suggestNextLine(args: {
+    persona: PersonaEntity;
+    scenario: ScenarioEntity | null;
+    userLevel: number;
+    userNativeLanguage: string;
+    history: ChatMessage[];
+  }): Promise<string> {
+    const systemPrompt =
+      this.prompts.buildSystemPrompt(
+        args.persona,
+        args.scenario,
+        args.userLevel,
+        args.userNativeLanguage,
+      ) +
+      '\n\nThe student has gone quiet. Reply ONLY with a single short English sentence (8–15 words) ' +
+      'the student could say next to continue the conversation. ' +
+      'Do not introduce yourself, do not explain, do not use quotation marks.';
+    try {
+      const res = await this.ai.chat({
+        systemPrompt,
+        messages: args.history,
+        maxTokens: 60,
+        temperature: 0.7,
+        enablePromptCache: this.ai.capabilities.supportsPromptCache,
+      });
+      // Strip surrounding quotes the model might still emit and squeeze
+      // whitespace so the suggestion fits in a single chip.
+      return res.content.replace(/^["'`\s]+|["'`\s]+$/g, '').replace(/\s+/g, ' ');
+    } catch (e) {
+      this.logger.warn(`AI suggestion failed (${(e as AiProviderError).kind}): using canned suggestion`);
+      return this.fallbackSuggestion(args.history);
+    }
+  }
+
+  private fallbackSuggestion(history: ChatMessage[]): string {
+    // If the assistant just asked a question, suggest a friendly opener.
+    // Otherwise nudge the user to ask the tutor a question.
+    const lastAssistant = [...history].reverse().find((m) => m.role === 'assistant');
+    const content = lastAssistant?.content.trim() ?? '';
+    if (content.endsWith('?')) {
+      return "I'm not sure — could you give me an example?";
+    }
+    return 'That sounds interesting — could you tell me more?';
+  }
+
   private fallbackReply(history: ChatMessage[]): string {
     const lastUser = [...history].reverse().find((m) => m.role === 'user');
     const content = lastUser?.content.trim().toLowerCase() ?? '';

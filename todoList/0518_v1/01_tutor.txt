@@ -1,4 +1,4 @@
-I want make the android apk size smaller than 50mb.  Can you recommend solution?
-I can put sherpa_onnx model files on sdcard for android. 
-Also I can put ttf font files on sdcard also.
-I can put other large files on sdcard also.
+I want you check if the application implement tutor.
+If not please implement tutor for English Conversation and Learning.
+You can find specs for tutor inside vLearn2Spec\design_handoff_freetalk
+remember you can add tutor on admin panel.

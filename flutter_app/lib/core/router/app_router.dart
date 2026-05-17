@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
+import '../providers/settings_provider.dart';
+import '../storage/model_registry.dart';
 import '../../features/auth/sign_in_screen.dart';
 import '../../features/auth/sign_up_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
@@ -38,6 +40,10 @@ class AppRoute {
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = _AuthRefreshListenable();
   ref.listen<AuthState>(authProvider, (_, _) => refresh.bump());
+  // Refresh the router whenever the model bundle status resolves so the
+  // "speech models not installed" redirect kicks in once the snapshot is
+  // available (rather than on the next navigation).
+  ref.listen(modelRegistrySnapshotProvider, (_, _) => refresh.bump());
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
@@ -61,6 +67,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       if (signedIn && loc == AppRoute.splash) {
         return auth.user!.onboardingDone ? AppRoute.home : AppRoute.onboarding;
+      }
+
+      // Once the user is signed in AND past onboarding, gate them on the
+      // sherpa-onnx model bundle. We only redirect when the snapshot has
+      // actually resolved (skip while still loading) and we honor the
+      // text-only opt-out so the user isn't repeatedly forced back.
+      if (signedIn && auth.user!.onboardingDone && !isPublic) {
+        final settings = ref.read(appSettingsProvider);
+        final snapshot = ref.read(modelRegistrySnapshotProvider).valueOrNull;
+        final isSetup = loc == '/setup/models';
+        final isConversation = loc.startsWith('/conversation/');
+        if (snapshot != null &&
+            !snapshot.isReady &&
+            !settings.textOnlyAcknowledged &&
+            !isSetup &&
+            isConversation) {
+          // Only force the setup screen when the user is actively trying to
+          // start a conversation; the rest of the app (home, scenarios,
+          // settings, etc.) still works without speech models.
+          return '/setup/models';
+        }
       }
       return null;
     },

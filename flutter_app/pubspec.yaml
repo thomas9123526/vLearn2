@@ -58,12 +58,22 @@ dependencies:
   package_info_plus: ^8.0.0
   device_info_plus: ^10.1.0
 
-  # STT / TTS — uncomment after dropping a sherpa-onnx model bundle on the
-  # device per todoList/0517_v2/01_stt_tts_sherpa_onnx.md §1.2. The Dart-level
-  # services (SherpaOnnxSttService / SherpaOnnxTtsService) compile without
-  # this package by guarding the native calls behind ModelRegistry checks.
-  # sherpa_onnx: ^1.10.0
-  # permission_handler: ^11.3.1
+  # STT / TTS — see todoList/0517_v2/01_stt_tts_sherpa_onnx.md.
+  # `sherpa_onnx` ships the ONNX runtime + recognizer/tts FFI. Native code is
+  # guarded behind ModelRegistry.isReady() so the app still boots without a
+  # model bundle on disk — the user just lands on ModelsNotInstalledScreen
+  # and can continue in text-only mode.
+  sherpa_onnx: ^1.10.46
+  permission_handler: ^11.3.1
+  # Mic capture. `record` is the official Flutter Community recorder; it
+  # streams 16-bit PCM at the rate we ask for, which feeds straight into
+  # sherpa-onnx without an extra resample. The 5.x record_linux fork has a
+  # bug where its `hasPermission` signature drifted from the platform
+  # interface; 6.x ships a fixed record_linux 1.x so we pin there.
+  record: ^6.0.0
+  # WAV playback for synthesized TTS clips. `audioplayers` is the most
+  # widely-used cross-platform option and already a transitive dep.
+  audioplayers: ^6.0.0
 
 dev_dependencies:
   flutter_test:

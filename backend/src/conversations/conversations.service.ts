@@ -175,6 +175,46 @@ export class ConversationsService {
     };
   }
 
+  /**
+   * Tutor-mode idle prompt. Looks at the current session history and asks
+   * the orchestrator for a short line the user could say next. The mobile
+   * UI shows this as a suggestion chip after ~20s of silence.
+   */
+  async suggestNextLine(userId: string, sessionId: string): Promise<{ suggestion: string }> {
+    const session = await this.sessions.findOne({ where: { id: sessionId } });
+    if (!session) throw new NotFoundException({ i18nKey: 'session.not_found' });
+    if (session.user_id !== userId) throw new ForbiddenException();
+    if (session.status !== 'active') {
+      throw new ForbiddenException({ i18nKey: 'session.not_active' });
+    }
+
+    const persona = await this.personas.findOne({ where: { id: session.persona_id } });
+    if (!persona) throw new NotFoundException({ i18nKey: 'persona.not_found' });
+
+    const scenario = session.scenario_id
+      ? await this.scenarios.findOne({ where: { id: session.scenario_id } })
+      : null;
+    const user = await this.users.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException({ i18nKey: 'user.not_found' });
+
+    const history = await this.messages.find({
+      where: { session_id: sessionId },
+      order: { sequence: 'ASC' },
+    });
+
+    const suggestion = await this.orchestrator.suggestNextLine({
+      persona,
+      scenario,
+      userLevel: user.current_level,
+      userNativeLanguage: user.native_language,
+      history: history.map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+    });
+    return { suggestion };
+  }
+
   async endSession(
     userId: string,
     sessionId: string,
