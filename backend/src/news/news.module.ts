@@ -29,8 +29,8 @@ import type { JwtPayload } from '../auth/strategies/jwt.strategy';
 import {
   NewsPostEntity,
   NewsReadStatusEntity,
-  NewsStatus,
 } from '../database/entities/news.entity';
+import type { NewsStatus } from '../database/entities/news.entity';
 import type { I18nText } from '../database/entities/scenario.entity';
 import { PermissionGuard, RequirePermission } from '../admin/permissions/permission.guard';
 
