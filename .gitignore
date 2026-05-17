@@ -1,6 +1,9 @@
 # Secrets & environment
 .env
 .env.*
+# ...but DO track the documented example so newcomers know what env to set
+!.env.example
+!**/.env.example
 *.key
 *.pem
 *.p12
