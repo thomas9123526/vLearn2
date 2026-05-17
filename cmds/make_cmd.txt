@@ -5,3 +5,15 @@ also give me cmds/build_debug_windows.bat which build flutter windows and start 
 give me cmds/build_release_android.bat which build flutter android release version.
 
 give me cmds/build_release_windows.bat which build flutter windows release version.
+
+backend.
+
+
+give me cmds/start_service.bat which start backend service.
+
+give me cmds/build_backend.bat which build backend.
+
+give me cmds/build_backend_debug.bat which build backend service and start debug.
+
+give me cmds/build_backend_release.bat which build releaser version of backend api.
+
