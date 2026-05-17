@@ -1,0 +1,7 @@
+can u give me cmds/build_debug_android.bat which build flutter android and start debug.
+
+also give me cmds/build_debug_windows.bat which build flutter windows and start debug.
+
+give me cmds/build_release_android.bat which build flutter android release version.
+
+give me cmds/build_release_windows.bat which build flutter windows release version.
