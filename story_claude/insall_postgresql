@@ -1,0 +1,177 @@
+I want to install PostgreSQL for this project
+I'll check if PostgreSQL is already installed and look at what the project needs.
+
+Bash Check existing Postgres install
+IN
+where psql 2>&1; echo "---pg_isready---"; where pg_isready 2>&1; echo "---postgres service---"; sc query state= all 2>&1 | grep -i postgres | head -5
+
+OUT
+INFO: Could not find files for the given pattern(s).
+---pg_isready---
+INFO: Could not find files for the given pattern(s).
+---postgres service---
+Bash Check database folder
+IN
+ls "c:/project/vLearn2/backend/src/database/" 2>&1
+
+OUT
+data-source.ts
+entities
+migrations
+seeds
+typeorm-config.factory.ts
+Read typeorm-config.factory.ts
+Bash List migrations and seeds
+IN
+ls "c:/project/vLearn2/backend/src/database/migrations/" 2>&1 | head -10; echo "---seeds---"; ls "c:/project/vLearn2/backend/src/database/seeds/" 2>&1 | head -10
+
+OUT
+1715800000000-initial-schema.ts
+---seeds---
+data
+run-seeds.ts
+seeds
+Bash Find db scripts in package.json
+IN
+grep -nE "\"db:|\"typeorm|\"migration|\"seed|\"start" "c:/project/vLearn2/backend/package.json" 2>&1 | head -20
+
+OUT
+11:    "start": "nest start",
+12:    "start:dev": "nest start --watch",
+13:    "start:debug": "nest start --debug --watch",
+14:    "start:prod": "node dist/main",
+21:    "db:up": "docker compose -f ../docker-compose.yml up -d postgres",
+22:    "db:down": "docker compose -f ../docker-compose.yml down",
+23:    "db:logs": "docker compose -f ../docker-compose.yml logs -f postgres",
+24:    "typeorm": "typeorm-ts-node-commonjs -d ./src/database/data-source.ts",
+25:    "db:migrate": "npm run typeorm -- migration:run",
+26:    "db:migrate:revert": "npm run typeorm -- migration:revert",
+27:    "db:migrate:generate": "typeorm-ts-node-commonjs migration:generate -d ./src/database/data-source.ts",
+28:    "db:seed": "ts-node ./src/database/seeds/run-seeds.ts"
+56:    "typeorm": "^0.3.29",
+Bash Inspect docker-compose and docker install
+IN
+cat "c:/project/vLearn2/docker-compose.yml" 2>&1; echo "---docker check---"; where docker 2>&1; docker --version 2>&1 | head -2
+
+OUT
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vlearn2-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: vlearn2
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_password
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vlearn2"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:
+---docker check---
+INFO: Could not find files for the given pattern(s).
+/usr/bin/bash: line 1: docker: command not found
+Bash Sample migration contents
+IN
+grep -n "CREATE\|class.*Schema\|public async up" "c:/project/vLearn2/backend/src/database/migrations/1715800000000-initial-schema.ts" 2>&1 | head -20
+
+OUT
+21:export class InitialSchema1715800000000 implements MigrationInterface {
+24:  public async up(q: QueryRunner): Promise<void> {
+26:    await q.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+30:      CREATE TABLE "users" (
+54:    await q.query(`CREATE INDEX "idx_users_xp_total" ON "users"("xp_total" DESC);`);
+55:    await q.query(`CREATE INDEX "idx_users_streak_days" ON "users"("streak_days" DESC);`);
+56:    await q.query(`CREATE INDEX "idx_users_status" ON "users"("status") WHERE "status" != 'active';`);
+57:    await q.query(`CREATE UNIQUE INDEX "uniq_one_superadmin" ON "users"("role") WHERE "role" = 'superadmin';`);
+61:      CREATE TABLE "refresh_tokens" (
+69:    await q.query(`CREATE INDEX "idx_refresh_tokens_user_id" ON "refresh_tokens"("user_id");`);
+73:      CREATE TABLE "personas" (
+98:      CREATE TABLE "scenarios" (
+122:    await q.query(`CREATE INDEX "idx_scenarios_category" ON "scenarios"("category");`);
+123:    await q.query(`CREATE INDEX "idx_scenarios_difficulty" ON "scenarios"("difficulty");`);
+124:    await q.query(`CREATE INDEX "idx_scenarios_status" ON "scenarios"("status");`);
+128:      CREATE TABLE "courses" (
+141:    await q.query(`CREATE INDEX "idx_courses_status" ON "courses"("status");`);
+145:      CREATE TABLE "course_scenarios" (
+153:    await q.query(`CREATE INDEX "idx_course_scenarios_order" ON "course_scenarios"("course_id", "order_index");`);
+157:      CREATE TABLE "conversation_sessions" (
+Read run-seeds.ts
+You don't have PostgreSQL or Docker installed yet. The project supports both paths — npm run db:up uses Docker; otherwise a native install works fine. Since you said "install PostgreSQL", I'll guide you through the native Windows install. Mentioning Docker only for completeness.
+
+Native install (recommended for your case)
+1. Download
+Grab the PostgreSQL 16 installer for Windows x86-64 from EnterpriseDB:
+
+https://www.enterprisedb.com/downloads/postgres-postgresql-downloads
+
+(Pick 16.x — your docker-compose pins postgres:16-alpine, so matching versions keeps migrations consistent.)
+
+2. Run the installer
+Choices that matter:
+
+Prompt	Value to use
+Installation directory	Default (C:\Program Files\PostgreSQL\16)
+Components	Keep all checked (PostgreSQL Server, pgAdmin 4, Stack Builder, Command Line Tools)
+Data directory	Default
+Password for postgres superuser	dev_password — must match DB_PASSWORD in backend/.env
+Port	5432 (default)
+Locale	[Default locale]
+Stack Builder	Skip (uncheck "Launch Stack Builder" at the end)
+Install takes ~3 min.
+
+3. Create the vlearn2 database
+Two ways — pick one:
+
+Way A — pgAdmin (GUI):
+
+Open pgAdmin 4 (just installed)
+Set a master password for pgAdmin (any value — local-only)
+Expand Servers → PostgreSQL 16 → Databases, enter dev_password when asked
+Right-click Databases → Create → Database…
+Name: vlearn2 → Save
+Way B — psql (terminal):
+
+
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "CREATE DATABASE vlearn2;"
+(Enter dev_password when prompted.)
+
+4. Verify the connection
+From the backend folder:
+
+
+cd c:\project\vLearn2\backend
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -d vlearn2 -c "SELECT version();"
+You should see something like PostgreSQL 16.x on x86_64-windows….
+
+5. Run migrations + seeds
+
+cd c:\project\vLearn2\backend
+npm run db:migrate
+npm run db:seed
+db:migrate runs src/database/migrations/1715800000000-initial-schema.ts which creates the schema (users, refresh_tokens, personas, scenarios, courses, conversation_sessions, etc.) plus the pgcrypto extension. db:seed populates personas, scenarios, courses, achievements, and app config.
+
+6. Start the backend
+
+cd c:\project\vLearn2\backend
+npm run start:dev
+Boot log should include the TypeORM connection success line and Using OpenAICompatibleProvider (label=lmstudio). App is up on http://localhost:3000.
+
+Alternative — Docker (if you'd prefer)
+If at any point you'd rather skip the native install: install Docker Desktop for Windows, then npm run db:up from backend/ and the same migrations/seeds work. Faster to nuke and reset. ~5 GB install, needs WSL2.
+
+When you're done, tell me
+Paste the output of:
+
+
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -d vlearn2 -c "\dt"
+after running migrations + seeds. I'll verify the schema looks right and we can move on to LM Studio smoke-testing.
+
+If the installer asks something I didn't cover or the db:migrate step errors out, paste the error and I'll dig in.
