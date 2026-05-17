@@ -7,6 +7,8 @@ import {
 } from '../database/entities/conversation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
+import { UserEntity } from '../database/entities/user.entity';
+import { ConversationOrchestrator } from '../ai/conversation.orchestrator';
 import type {
   StartSessionDto,
   SendMessageDto,
@@ -27,6 +29,9 @@ export class ConversationsService {
     private readonly scenarios: Repository<ScenarioEntity>,
     @InjectRepository(PersonaEntity)
     private readonly personas: Repository<PersonaEntity>,
+    @InjectRepository(UserEntity)
+    private readonly users: Repository<UserEntity>,
+    private readonly orchestrator: ConversationOrchestrator,
   ) {}
 
   async start(userId: string, dto: StartSessionDto): Promise<SessionDto> {
@@ -103,12 +108,15 @@ export class ConversationsService {
       throw new ForbiddenException({ i18nKey: 'session.not_active' });
     }
 
-    // Determine next sequence number
-    const last = await this.messages.findOne({
+    // Load full history (ascending) so we can: (a) determine next sequence,
+    // (b) hand the prior turns to the AI orchestrator as chat history.
+    const priorMessages = await this.messages.find({
       where: { session_id: sessionId },
-      order: { sequence: 'DESC' },
+      order: { sequence: 'ASC' },
     });
-    const nextSeq = (last?.sequence ?? -1) + 1;
+    const nextSeq = priorMessages.length > 0
+      ? priorMessages[priorMessages.length - 1].sequence + 1
+      : 0;
 
     const userMsg = await this.messages.save(
       this.messages.create({
@@ -120,8 +128,32 @@ export class ConversationsService {
       }),
     );
 
-    // Placeholder assistant reply — real AI lands in §09
-    const reply = this.generatePlaceholderReply(dto.content);
+    const persona = await this.personas.findOne({ where: { id: session.persona_id } });
+    const scenario = session.scenario_id
+      ? await this.scenarios.findOne({ where: { id: session.scenario_id } })
+      : null;
+    const user = await this.users.findOne({ where: { id: userId } });
+
+    let reply: string;
+    if (persona && user) {
+      const history = [
+        ...priorMessages.map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        })),
+        { role: 'user' as const, content: dto.content },
+      ];
+      reply = await this.orchestrator.generateTutorReply({
+        persona,
+        scenario,
+        userLevel: user.current_level,
+        userNativeLanguage: user.native_language,
+        history,
+      });
+    } else {
+      // Orchestrator can't run without persona+user. Use the canned fallback.
+      reply = this.generatePlaceholderReply(dto.content);
+    }
     const aiMsg = await this.messages.save(
       this.messages.create({
         session_id: sessionId,

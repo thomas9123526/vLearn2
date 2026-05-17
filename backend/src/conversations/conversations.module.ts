@@ -10,6 +10,8 @@ import {
 } from '../database/entities/conversation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
+import { UserEntity } from '../database/entities/user.entity';
+import { AiModule } from '../ai/ai.module';
 import { ConversationsService } from './conversations.service';
 import {
   StartSessionDto,
@@ -73,7 +75,9 @@ class ConversationsController {
       ConversationMessageEntity,
       ScenarioEntity,
       PersonaEntity,
+      UserEntity,
     ]),
+    AiModule,
   ],
   providers: [ConversationsService],
   controllers: [ConversationsController],
