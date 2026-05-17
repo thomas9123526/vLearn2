@@ -37,7 +37,7 @@ export default function SignInPage() {
   async function onSubmit(values: FormValues) {
     setError(null);
     try {
-      const data = await api<SignInResponse>('/auth/signin', {
+      const data = await api<SignInResponse>('/admin/auth/signin', {
         method: 'POST',
         body: values,
       });

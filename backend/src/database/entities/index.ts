@@ -1,5 +1,7 @@
+import { AdminEntity } from './admin.entity';
 import { AdminAuditLogEntity } from './admin-audit-log.entity';
 import { AdminPermissionEntity } from './admin-permission.entity';
+import { AdminRefreshTokenEntity } from './admin-refresh-token.entity';
 import { AchievementEntity, UserAchievementEntity } from './achievement.entity';
 import { AppConfigEntity } from './app-config.entity';
 import {
@@ -22,8 +24,10 @@ import { UploadedFileEntity } from './uploaded-file.entity';
 import { UserEntity } from './user.entity';
 
 export {
+  AdminEntity,
   AdminAuditLogEntity,
   AdminPermissionEntity,
+  AdminRefreshTokenEntity,
   AchievementEntity,
   UserAchievementEntity,
   AppConfigEntity,
@@ -46,8 +50,10 @@ export {
 };
 
 export const ALL_ENTITIES = [
+  AdminEntity,
   AdminAuditLogEntity,
   AdminPermissionEntity,
+  AdminRefreshTokenEntity,
   AchievementEntity,
   UserAchievementEntity,
   AppConfigEntity,

@@ -1,13 +1,29 @@
-import { Body, ConflictException, Controller, HttpCode, Post } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength, MaxLength, Matches } from 'class-validator';
-import * as bcrypt from 'bcrypt';
-import { ApiProperty } from '@nestjs/swagger';
-import { UserEntity } from '../../database/entities/user.entity';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  Matches,
+} from 'class-validator';
 import { Public } from '../../auth/decorators/public.decorator';
-import { AuthService } from '../../auth/auth.service';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import type { JwtPayload } from '../../auth/strategies/jwt.strategy';
+import { AdminAuthService } from './admin-auth.service';
 
 class AdminSignupDto {
   @ApiProperty({ example: 'founder@example.com' })
@@ -22,23 +38,29 @@ class AdminSignupDto {
   displayName!: string;
 }
 
+class AdminSignInDto {
+  @ApiProperty() @IsEmail() email!: string;
+  @ApiProperty() @IsString() password!: string;
+}
+
+class AdminRefreshDto {
+  @ApiProperty() @IsString() refreshToken!: string;
+}
+
+class AdminSignOutDto {
+  @ApiProperty({ required: false }) @IsOptional() @IsString()
+  refreshToken?: string;
+}
+
 @ApiTags('Admin / Auth')
 @Controller('admin/auth')
 export class AdminAuthController {
-  constructor(
-    @InjectRepository(UserEntity)
-    private readonly users: Repository<UserEntity>,
-    private readonly authService: AuthService,
-  ) {}
+  constructor(private readonly auth: AdminAuthService) {}
 
   /**
-   * Public admin signup. The first account to sign up becomes the superadmin;
-   * every subsequent account becomes a regular admin ("subadmin"). The
-   * endpoint stays open — invitations are NOT required.
-   *
-   * Note (operator): this is intentionally permissive for the development
-   * flow. If you ever deploy this publicly, gate it (IP allow-list, invite
-   * codes, or auto-close after first signup) before exposing.
+   * Public admin signup. First account → superadmin, rest → admin.
+   * Stays open by design for the dev flow; gate (auto-close, invite codes,
+   * IP allow-list) before any public deploy.
    */
   @Public()
   @Post('signup')
@@ -47,36 +69,35 @@ export class AdminAuthController {
     summary:
       'Sign up as an admin. First signup = superadmin, subsequent = admin.',
   })
-  async signup(@Body() dto: AdminSignupDto) {
-    // Reject duplicates up-front so we return a clean 409 instead of letting
-    // Postgres' unique-email constraint trip and surface as a generic 500.
-    // This also catches the case where the email already exists as a regular
-    // (non-admin) user — they need to be promoted via the Admins page rather
-    // than re-signed-up here.
-    const existing = await this.users.findOne({ where: { email: dto.email } });
-    if (existing) {
-      throw new ConflictException({ i18nKey: 'auth.email_taken' });
-    }
+  signup(@Body() dto: AdminSignupDto) {
+    return this.auth.signUp(dto.email, dto.password, dto.displayName);
+  }
 
-    const adminCount = await this.users.count({
-      where: [{ role: 'admin' }, { role: 'superadmin' }],
-    });
-    const role: 'superadmin' | 'admin' =
-      adminCount === 0 ? 'superadmin' : 'admin';
+  @Public()
+  @Post('signin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Sign in as an admin' })
+  signin(@Body() dto: AdminSignInDto) {
+    return this.auth.signIn(dto.email, dto.password);
+  }
 
-    const hash = await bcrypt.hash(dto.password, 10);
-    await this.users.save(
-      this.users.create({
-        email: dto.email,
-        password_hash: hash,
-        display_name: dto.displayName,
-        role,
-      }),
-    );
+  @Public()
+  @Post('refresh')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Rotate the admin refresh token' })
+  refresh(@Body() dto: AdminRefreshDto) {
+    return this.auth.refresh(dto.refreshToken);
+  }
 
-    // Re-use the regular sign-in flow to issue tokens. The simplest way is
-    // to call the auth service's internal token issuance — but since that's
-    // private, we just call signIn with the plaintext we just hashed.
-    return this.authService.signIn({ email: dto.email, password: dto.password });
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('signout')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Revoke admin refresh token(s)' })
+  async signout(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: AdminSignOutDto,
+  ): Promise<void> {
+    await this.auth.signOut(user.sub, body.refreshToken);
   }
 }

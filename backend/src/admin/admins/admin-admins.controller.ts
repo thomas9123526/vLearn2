@@ -13,11 +13,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiProperty } from '@nestjs/swagger';
 import { ArrayMinSize, IsArray, IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
 import * as bcrypt from 'bcrypt';
-import { UserEntity } from '../../database/entities/user.entity';
+import { AdminEntity } from '../../database/entities/admin.entity';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../../auth/strategies/jwt.strategy';
@@ -46,8 +46,8 @@ class ReplacePermissionsDto {
 @Controller('admin/admins')
 export class AdminAdminsController {
   constructor(
-    @InjectRepository(UserEntity)
-    private readonly users: Repository<UserEntity>,
+    @InjectRepository(AdminEntity)
+    private readonly admins: Repository<AdminEntity>,
     private readonly permissions: AdminPermissionsService,
   ) {}
 
@@ -62,7 +62,7 @@ export class AdminAdminsController {
   @RequirePermission('admins.view')
   @ApiOperation({ summary: 'List all sub-admins with their permissions' })
   async list() {
-    const admins = await this.users.find({ where: { role: 'admin' } });
+    const admins = await this.admins.find({ where: { role: 'admin' } });
     const out = await Promise.all(
       admins.map(async (a) => ({
         id: a.id,
@@ -82,14 +82,14 @@ export class AdminAdminsController {
     if (user.role !== 'superadmin') {
       throw new ForbiddenException({ i18nKey: 'admin.superadmin_only' });
     }
-    const dup = await this.users.findOne({ where: { email: dto.email } });
+    const dup = await this.admins.findOne({ where: { email: dto.email } });
     if (dup) throw new ConflictException({ i18nKey: 'auth.email_taken' });
 
     this.validatePermissions(dto.permissions);
 
     const hash = await bcrypt.hash(dto.password, 10);
-    const created = await this.users.save(
-      this.users.create({
+    const created = await this.admins.save(
+      this.admins.create({
         email: dto.email,
         password_hash: hash,
         display_name: dto.displayName,
@@ -141,20 +141,18 @@ export class AdminAdminsController {
   @ApiOperation({ summary: 'Suspend a sub-admin' })
   async suspend(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     if (id === user.sub) throw new ForbiddenException({ i18nKey: 'admin.cannot_self_modify' });
-    const u = await this.ensureTargetIsAdmin(id);
-    u.status = 'suspended';
-    await this.users.save(u);
+    const a = await this.ensureTargetIsAdmin(id);
+    a.status = 'suspended';
+    await this.admins.save(a);
     return { ok: true };
   }
 
   @Post(':id/restore')
   @RequirePermission('admins.suspend')
   async restore(@Param('id') id: string) {
-    const u = await this.ensureTargetIsAdmin(id);
-    u.status = 'active';
-    u.suspended_until = null;
-    u.suspended_reason = null;
-    await this.users.save(u);
+    const a = await this.ensureTargetIsAdmin(id);
+    a.status = 'active';
+    await this.admins.save(a);
     return { ok: true };
   }
 
@@ -162,12 +160,11 @@ export class AdminAdminsController {
   @RequirePermission('admins.delete')
   async softDelete(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     if (id === user.sub) throw new ForbiddenException({ i18nKey: 'admin.cannot_self_modify' });
-    const u = await this.ensureTargetIsAdmin(id);
-    u.status = 'deleted';
-    u.email = `deleted-${id}@removed.local`;
-    u.display_name = '(deleted)';
-    await this.users.save(u);
-    await this.users.update({ id }, { role: 'user' });
+    const a = await this.ensureTargetIsAdmin(id);
+    a.status = 'deleted';
+    a.email = `deleted-${id}@removed.local`;
+    a.display_name = '(deleted)';
+    await this.admins.save(a);
     return { ok: true };
   }
 
@@ -182,14 +179,9 @@ export class AdminAdminsController {
     }
   }
 
-  private async ensureTargetIsAdmin(id: string): Promise<UserEntity> {
-    const u = await this.users.findOne({ where: { id, role: 'admin' } });
-    if (!u) throw new NotFoundException({ i18nKey: 'admin.not_found' });
-    if (u.role === ('superadmin' as never)) {
-      throw new ForbiddenException({ i18nKey: 'admin.cannot_modify_superadmin' });
-    }
-    // unused guard against Not(); kept for type safety
-    void Not;
-    return u;
+  private async ensureTargetIsAdmin(id: string): Promise<AdminEntity> {
+    const a = await this.admins.findOne({ where: { id, role: 'admin' } });
+    if (!a) throw new NotFoundException({ i18nKey: 'admin.not_found' });
+    return a;
   }
 }

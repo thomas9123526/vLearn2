@@ -147,6 +147,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       permissions,
+      actor: 'user' as const,
     };
     const accessExpiresStr = this.config.get<string>('JWT_ACCESS_EXPIRES') ?? '15m';
     const refreshExpiresStr = this.config.get<string>('JWT_REFRESH_EXPIRES') ?? '7d';

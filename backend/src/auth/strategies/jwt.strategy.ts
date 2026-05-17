@@ -8,6 +8,12 @@ export interface JwtPayload {
   email: string;
   role: 'user' | 'admin' | 'superadmin';
   permissions: string[];
+  /**
+   * Discriminator so guards can tell which table the `sub` points to.
+   * Missing on tokens issued before the admins-separate-table migration —
+   * treat absent as `'user'` for backward compatibility.
+   */
+  actor?: 'user' | 'admin';
   iat?: number;
   exp?: number;
 }
