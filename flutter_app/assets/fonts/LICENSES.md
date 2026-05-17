@@ -2,17 +2,19 @@
 
 All fonts shipped under [`assets/fonts/`](.) are distributed under the **SIL Open Font License 1.1** (OFL 1.1). Bundling inside a closed-source app is explicitly permitted by the license, provided the OFL.txt for each typeface is included.
 
-| Family | License | Upstream | Used in groups |
-|--------|---------|----------|----------------|
-| Inter | OFL 1.1 | https://github.com/rsms/inter | editorial, modern |
-| Lora | OFL 1.1 | https://github.com/cyrealtype/Lora-Cyrillic | editorial |
-| Quicksand | OFL 1.1 | https://github.com/andrew-paglinawan/QuicksandFamily | friendly |
-| Nunito | OFL 1.1 | https://github.com/googlefonts/nunito | friendly |
-| Playfair Display | OFL 1.1 | https://github.com/clauseggers/Playfair | classic |
-| Source Serif Pro | OFL 1.1 | https://github.com/adobe-fonts/source-serif | classic |
-| JetBrains Mono | OFL 1.1 | https://github.com/JetBrains/JetBrainsMono | all groups (mono role) |
+Every bundled `.ttf` is a **variable font** — one file per family carries the full weight axis. Flutter's text engine maps `TextStyle(fontWeight: …)` onto the axis automatically.
 
-When the `.ttf` files are placed in their group folders, also drop each upstream `OFL.txt` next to them (or aggregate verbatim into this file). The in-app About → Licenses screen (Flutter's `showLicensePage`) surfaces bundled fonts automatically.
+| Family | Bundled filename | License | Upstream | Used in groups |
+|--------|------------------|---------|----------|----------------|
+| Inter | `Inter.ttf` | OFL 1.1 | https://github.com/rsms/inter (mirrored via google/fonts) | editorial, modern |
+| Lora | `Lora.ttf` | OFL 1.1 | https://github.com/cyrealtype/Lora-Cyrillic (mirrored via google/fonts) | editorial |
+| Quicksand | `Quicksand.ttf` | OFL 1.1 | https://github.com/andrew-paglinawan/QuicksandFamily (mirrored via google/fonts) | friendly |
+| Nunito | `Nunito.ttf` | OFL 1.1 | https://github.com/googlefonts/nunito (mirrored via google/fonts) | friendly |
+| Playfair Display | `PlayfairDisplay.ttf` | OFL 1.1 | https://github.com/clauseggers/Playfair (mirrored via google/fonts) | classic |
+| Source Serif 4 | `SourceSerif4.ttf` | OFL 1.1 | https://github.com/adobe-fonts/source-serif (mirrored via google/fonts) | classic |
+| JetBrains Mono | `JetBrainsMono.ttf` | OFL 1.1 | https://github.com/JetBrains/JetBrainsMono (mirrored via google/fonts) | all groups (mono role) |
+
+The bundled .ttf binaries are mirrored from [google/fonts](https://github.com/google/fonts) under their `ofl/<family>/` paths, all distributed under OFL 1.1. Each upstream repo's `OFL.txt` is the authoritative license text; the in-app About → Licenses screen (Flutter's `showLicensePage`) surfaces bundled fonts automatically.
 
 ## OFL 1.1 summary (not a substitute for the full text)
 

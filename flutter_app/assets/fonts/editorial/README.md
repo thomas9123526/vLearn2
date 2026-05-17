@@ -2,22 +2,22 @@
 
 Magazine-style: serif headings + clean sans body.
 
-Drop these `.ttf` files in this folder (then uncomment the `EditorialHeading` / `EditorialBody` / `EditorialMono` blocks in [`pubspec.yaml`](../../../pubspec.yaml)):
+## Bundled files (variable fonts)
 
-- `Lora-Regular.ttf`
-- `Lora-Bold.ttf`
-- `Inter-Regular.ttf`
-- `Inter-Medium.ttf`
-- `Inter-SemiBold.ttf`
-- `Inter-Bold.ttf`
-- `JetBrainsMono-Regular.ttf`
+| File | Family in pubspec | Role |
+|------|-------------------|------|
+| `Lora.ttf` | `EditorialHeading` | Serif heading |
+| `Inter.ttf` | `EditorialBody` | Sans body |
+| `JetBrainsMono.ttf` | `EditorialMono` | Mono / code |
 
-Sources (all OFL 1.1, free to bundle in a closed-source app):
+These are **variable** TTFs — one file per family carries the full weight axis. Flutter selects the right axis position from `TextStyle(fontWeight: …)` automatically.
 
-| Family | URL |
-|--------|-----|
-| Lora | https://github.com/cyrealtype/Lora-Cyrillic |
-| Inter | https://github.com/rsms/inter |
-| JetBrains Mono | https://github.com/JetBrains/JetBrainsMono |
+## Sources (all OFL 1.1)
 
-Attribution goes into [`../LICENSES.md`](../LICENSES.md).
+| Family | Upstream |
+|--------|----------|
+| Lora | https://github.com/cyrealtype/Lora-Cyrillic (mirrored via google/fonts) |
+| Inter | https://github.com/rsms/inter (mirrored via google/fonts) |
+| JetBrains Mono | https://github.com/JetBrains/JetBrainsMono (mirrored via google/fonts) |
+
+Attribution lives in [`../LICENSES.md`](../LICENSES.md).

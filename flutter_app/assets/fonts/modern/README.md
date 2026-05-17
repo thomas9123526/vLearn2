@@ -2,17 +2,18 @@
 
 Geometric sans throughout — business-y, works with sage / iris / obsidian themes.
 
-Drop these `.ttf` files in this folder (then uncomment the `ModernHeading` / `ModernBody` / `ModernMono` blocks in [`pubspec.yaml`](../../../pubspec.yaml)):
+## Bundled files (variable fonts)
 
-- `Inter-Regular.ttf`
-- `Inter-Medium.ttf`
-- `Inter-SemiBold.ttf`
-- `Inter-Bold.ttf`
-- `JetBrainsMono-Regular.ttf`
+| File | Family in pubspec | Role |
+|------|-------------------|------|
+| `Inter.ttf` | `ModernHeading` + `ModernBody` | Sans heading + sans body (same family) |
+| `JetBrainsMono.ttf` | `ModernMono` | Mono / code |
 
-Sources (OFL 1.1):
+`Inter.ttf` is referenced by both `ModernHeading` and `ModernBody`; one file on disk, two registered families.
 
-| Family | URL |
-|--------|-----|
-| Inter | https://github.com/rsms/inter |
-| JetBrains Mono | https://github.com/JetBrains/JetBrainsMono |
+## Sources (OFL 1.1)
+
+| Family | Upstream |
+|--------|----------|
+| Inter | https://github.com/rsms/inter (mirrored via google/fonts) |
+| JetBrains Mono | https://github.com/JetBrains/JetBrainsMono (mirrored via google/fonts) |
