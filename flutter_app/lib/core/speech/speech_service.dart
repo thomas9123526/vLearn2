@@ -1,5 +1,8 @@
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../storage/model_registry.dart';
+import 'sherpa_onnx_stt.dart';
+import 'sherpa_onnx_tts.dart';
 
 class SttResult {
   const SttResult({
@@ -112,5 +115,33 @@ class PlaceholderTtsService extends TextToSpeechService {
   Future<void> dispose() async {}
 }
 
-final sttServiceProvider = Provider<SpeechToTextService>((_) => PlaceholderSttService());
-final ttsServiceProvider = Provider<TextToSpeechService>((_) => PlaceholderTtsService());
+/// Picks the sherpa-onnx implementation when the model registry reports the
+/// bundle is ready, otherwise falls back to the no-op placeholder so the app
+/// still boots without speech.
+///
+/// The factory returns a fresh instance per consumer because the sherpa
+/// services own native handles and want explicit `dispose()` lifecycle
+/// management. Use `ref.onDispose(() => service.dispose())` when watching.
+final sttServiceProvider = Provider<SpeechToTextService>((ref) {
+  final snap = ref.watch(modelRegistrySnapshotProvider).valueOrNull;
+  if (snap?.isReady == true) {
+    return SherpaOnnxSttService(registry: ref.read(modelRegistryProvider));
+  }
+  return PlaceholderSttService();
+});
+
+final ttsServiceProvider = Provider<TextToSpeechService>((ref) {
+  final snap = ref.watch(modelRegistrySnapshotProvider).valueOrNull;
+  if (snap?.isReady == true) {
+    return SherpaOnnxTtsService(registry: ref.read(modelRegistryProvider));
+  }
+  return PlaceholderTtsService();
+});
+
+/// `true` only when both STT and TTS report ready. UI mic buttons should
+/// gate visibility on this.
+final speechReadyProvider = Provider<bool>((ref) {
+  final stt = ref.watch(sttServiceProvider);
+  final tts = ref.watch(ttsServiceProvider);
+  return stt.isAvailable && tts.isAvailable;
+});

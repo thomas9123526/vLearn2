@@ -53,9 +53,17 @@ dependencies:
   # Utilities
   logger: ^2.3.0
   collection: ^1.18.0
+  crypto: ^3.0.3
   equatable: ^2.0.5
   package_info_plus: ^8.0.0
   device_info_plus: ^10.1.0
+
+  # STT / TTS — uncomment after dropping a sherpa-onnx model bundle on the
+  # device per todoList/0517_v2/01_stt_tts_sherpa_onnx.md §1.2. The Dart-level
+  # services (SherpaOnnxSttService / SherpaOnnxTtsService) compile without
+  # this package by guarding the native calls behind ModelRegistry checks.
+  # sherpa_onnx: ^1.10.0
+  # permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:

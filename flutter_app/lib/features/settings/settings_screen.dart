@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/storage/model_registry.dart';
 import '../../core/theme/bubble_style.dart';
 import '../../core/theme/font_group.dart';
 import '../../features/conversation/widgets/chat_bubble.dart';
@@ -64,6 +66,9 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickBubbleStyle(context, ref, bubbleStyle),
           ),
+          const Divider(),
+          const _SectionHeader(text: 'Storage'),
+          const _ModelStorageTile(),
           const Divider(),
           const _SectionHeader(text: 'Network'),
           SwitchListTile(
@@ -263,6 +268,83 @@ class SettingsScreen extends ConsumerWidget {
     if (picked != null) {
       await ref.read(appSettingsProvider.notifier).setBubbleStyle(picked);
     }
+  }
+}
+
+class _ModelStorageTile extends ConsumerWidget {
+  const _ModelStorageTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snap = ref.watch(modelRegistrySnapshotProvider);
+    final scheme = Theme.of(context).colorScheme;
+    return snap.when(
+      loading: () => const ListTile(
+        leading: Icon(Icons.storage_outlined),
+        title: Text('Speech models'),
+        subtitle: Text('Checking…'),
+      ),
+      error: (e, _) => ListTile(
+        leading: Icon(Icons.storage_outlined, color: scheme.error),
+        title: const Text('Speech models'),
+        subtitle: Text('Error: $e'),
+      ),
+      data: (s) {
+        final okCount = s.verifications
+            .where((v) => v.status == FileVerificationStatus.ok)
+            .length;
+        final totalCount = s.verifications.length;
+        final subtitle = switch (s.status) {
+          ModelRegistryStatus.ready => '$okCount/$totalCount files verified',
+          ModelRegistryStatus.corrupt => 'Bundle corrupted ($okCount/$totalCount ok)',
+          ModelRegistryStatus.manifestMissing => 'manifest.json not found',
+          ModelRegistryStatus.notReady => 'Not ready',
+        };
+        return Column(
+          children: [
+            ListTile(
+              leading: Icon(
+                s.isReady ? Icons.check_circle_outline : Icons.warning_amber_outlined,
+                color: s.isReady ? Colors.green : scheme.error,
+              ),
+              title: const Text('Speech models'),
+              subtitle: Text(subtitle),
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_outlined),
+              title: const Text('Model folder'),
+              subtitle: SelectableText(
+                s.modelRoot,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Re-verify all'),
+                      onPressed: () =>
+                          ref.invalidate(modelRegistrySnapshotProvider),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text('Setup screen'),
+                      onPressed: () => context.push('/setup/models'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 

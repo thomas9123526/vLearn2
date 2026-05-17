@@ -162,7 +162,63 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get settingsFont => '글꼴';
+
+  @override
+  String get settingsFontGroup => '글꼴 그룹';
+
+  @override
+  String get fontGroupEditorial => '에디토리얼';
+
+  @override
+  String get fontGroupModern => '모던';
+
+  @override
+  String get fontGroupFriendly => '프렌들리';
+
+  @override
+  String get fontGroupClassic => '클래식';
+
+  @override
+  String get settingsConversation => '대화';
+
+  @override
+  String get settingsBubbleStyle => '말풍선 스타일';
+
+  @override
+  String get bubbleStyleClassic => '클래식';
+
+  @override
+  String get bubbleStyleModern => '모던';
+
+  @override
+  String get bubbleStyleTail => '꼬리형';
+
+  @override
+  String get bubbleStyleSoft => '소프트 파스텔';
+
+  @override
+  String get bubbleStyleNotebook => '노트북';
+
+  @override
   String get settingsAccount => '계정';
+
+  @override
+  String get newsTitle => '소식';
+
+  @override
+  String get newsEmpty => '아직 소식이 없습니다.';
+
+  @override
+  String get newsMarkAllRead => '모두 읽음 표시';
+
+  @override
+  String get newsUnreadBadge => '안 읽음';
+
+  @override
+  String newsPublishedOn(String date) {
+    return '$date 게시';
+  }
 
   @override
   String get guardBlockedTitle => '보낼 수 없습니다';

@@ -394,11 +394,119 @@ abstract class AppLocalizations {
   /// **'Save bandwidth by compressing server responses larger than {thresholdKb} KB. Small responses stay uncompressed for speed.'**
   String settingsCompressionHint(int thresholdKb);
 
+  /// No description provided for @settingsFont.
+  ///
+  /// In en, this message translates to:
+  /// **'Font'**
+  String get settingsFont;
+
+  /// No description provided for @settingsFontGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Font group'**
+  String get settingsFontGroup;
+
+  /// No description provided for @fontGroupEditorial.
+  ///
+  /// In en, this message translates to:
+  /// **'Editorial'**
+  String get fontGroupEditorial;
+
+  /// No description provided for @fontGroupModern.
+  ///
+  /// In en, this message translates to:
+  /// **'Modern'**
+  String get fontGroupModern;
+
+  /// No description provided for @fontGroupFriendly.
+  ///
+  /// In en, this message translates to:
+  /// **'Friendly'**
+  String get fontGroupFriendly;
+
+  /// No description provided for @fontGroupClassic.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic'**
+  String get fontGroupClassic;
+
+  /// No description provided for @settingsConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation'**
+  String get settingsConversation;
+
+  /// No description provided for @settingsBubbleStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bubble style'**
+  String get settingsBubbleStyle;
+
+  /// No description provided for @bubbleStyleClassic.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic'**
+  String get bubbleStyleClassic;
+
+  /// No description provided for @bubbleStyleModern.
+  ///
+  /// In en, this message translates to:
+  /// **'Modern'**
+  String get bubbleStyleModern;
+
+  /// No description provided for @bubbleStyleTail.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech tail'**
+  String get bubbleStyleTail;
+
+  /// No description provided for @bubbleStyleSoft.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft pastel'**
+  String get bubbleStyleSoft;
+
+  /// No description provided for @bubbleStyleNotebook.
+  ///
+  /// In en, this message translates to:
+  /// **'Notebook'**
+  String get bubbleStyleNotebook;
+
   /// No description provided for @settingsAccount.
   ///
   /// In en, this message translates to:
   /// **'Account'**
   String get settingsAccount;
+
+  /// No description provided for @newsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'News'**
+  String get newsTitle;
+
+  /// No description provided for @newsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No news yet.'**
+  String get newsEmpty;
+
+  /// No description provided for @newsMarkAllRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all read'**
+  String get newsMarkAllRead;
+
+  /// No description provided for @newsUnreadBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Unread'**
+  String get newsUnreadBadge;
+
+  /// No description provided for @newsPublishedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Published {date}'**
+  String newsPublishedOn(String date);
 
   /// No description provided for @guardBlockedTitle.
   ///

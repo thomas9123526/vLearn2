@@ -163,7 +163,63 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsFont => 'Font';
+
+  @override
+  String get settingsFontGroup => 'Font group';
+
+  @override
+  String get fontGroupEditorial => 'Editorial';
+
+  @override
+  String get fontGroupModern => 'Modern';
+
+  @override
+  String get fontGroupFriendly => 'Friendly';
+
+  @override
+  String get fontGroupClassic => 'Classic';
+
+  @override
+  String get settingsConversation => 'Conversation';
+
+  @override
+  String get settingsBubbleStyle => 'Bubble style';
+
+  @override
+  String get bubbleStyleClassic => 'Classic';
+
+  @override
+  String get bubbleStyleModern => 'Modern';
+
+  @override
+  String get bubbleStyleTail => 'Speech tail';
+
+  @override
+  String get bubbleStyleSoft => 'Soft pastel';
+
+  @override
+  String get bubbleStyleNotebook => 'Notebook';
+
+  @override
   String get settingsAccount => 'Account';
+
+  @override
+  String get newsTitle => 'News';
+
+  @override
+  String get newsEmpty => 'No news yet.';
+
+  @override
+  String get newsMarkAllRead => 'Mark all read';
+
+  @override
+  String get newsUnreadBadge => 'Unread';
+
+  @override
+  String newsPublishedOn(String date) {
+    return 'Published $date';
+  }
 
   @override
   String get guardBlockedTitle => 'We can\'t send this';

@@ -162,7 +162,63 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsFont => '字体';
+
+  @override
+  String get settingsFontGroup => '字体组';
+
+  @override
+  String get fontGroupEditorial => '编辑风格';
+
+  @override
+  String get fontGroupModern => '现代';
+
+  @override
+  String get fontGroupFriendly => '友好';
+
+  @override
+  String get fontGroupClassic => '经典';
+
+  @override
+  String get settingsConversation => '对话';
+
+  @override
+  String get settingsBubbleStyle => '气泡样式';
+
+  @override
+  String get bubbleStyleClassic => '经典';
+
+  @override
+  String get bubbleStyleModern => '现代';
+
+  @override
+  String get bubbleStyleTail => '尖角';
+
+  @override
+  String get bubbleStyleSoft => '柔和';
+
+  @override
+  String get bubbleStyleNotebook => '笔记本';
+
+  @override
   String get settingsAccount => '账户';
+
+  @override
+  String get newsTitle => '新闻';
+
+  @override
+  String get newsEmpty => '暂无新闻。';
+
+  @override
+  String get newsMarkAllRead => '全部标记为已读';
+
+  @override
+  String get newsUnreadBadge => '未读';
+
+  @override
+  String newsPublishedOn(String date) {
+    return '发布于 $date';
+  }
 
   @override
   String get guardBlockedTitle => '无法发送';
