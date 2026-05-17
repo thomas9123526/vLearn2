@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/app_apis.dart';
+import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
@@ -92,7 +93,12 @@ class HomeScreen extends ConsumerWidget {
                 child: scenarios.when(
                   data: (list) => _ScenarioStrip(scenarios: list.take(4).toList(), locale: locale),
                   loading: () => const _ScenarioStripSkeleton(),
-                  error: (e, _) => _ErrorTile(message: e.toString()),
+                  error: (e, st) {
+                    logRawError('home_screen.scenarios', e, st);
+                    return PoliteBanner(
+                      text: politeMessageFor(e, context: ErrorContext.loadList),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 24),
@@ -347,18 +353,3 @@ class _ScenarioStripSkeleton extends StatelessWidget {
   }
 }
 
-class _ErrorTile extends StatelessWidget {
-  const _ErrorTile({required this.message});
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Text(
-        'Could not load scenarios.\n$message',
-        style: TextStyle(color: Theme.of(context).colorScheme.error),
-      ),
-    );
-  }
-}

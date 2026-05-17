@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/app_apis.dart';
+import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
@@ -126,7 +127,14 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
                       ),
                     ),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Failed to load: $e')),
+              error: (e, st) {
+                logRawError('scenarios_screen', e, st);
+                return PoliteErrorCenter(
+                  error: e,
+                  context: ErrorContext.loadList,
+                  onRetry: () => ref.invalidate(_scenariosListProvider),
+                );
+              },
             ),
           ),
         ],
@@ -162,9 +170,14 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
           );
       final sessionId = session['id'] as String;
       if (mounted) context.push(AppRoute.conversation(sessionId));
-    } on Exception catch (e) {
+    } on Exception catch (e, st) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to start: $e')));
+        showPoliteErrorSnack(
+          context,
+          e,
+          tag: 'scenarios_screen.start',
+          stack: st,
+        );
       }
     }
   }
