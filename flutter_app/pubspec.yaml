@@ -44,7 +44,6 @@ dependencies:
   cupertino_icons: ^1.0.8
   cached_network_image: ^3.3.1
   flutter_svg: ^2.0.10+1
-  google_fonts: ^6.2.1
   fl_chart: ^0.68.0
 
   # Storage
@@ -82,3 +81,70 @@ flutter:
     - assets/images/
     - assets/animations/
     - assets/icons/
+
+  # Bundled font groups (Task 05 — todoList/0517_v2/05_font_groups.md).
+  # Drop the .ttf files listed below into the matching folders and uncomment
+  # the corresponding `fonts:` block. Until then, the code's `fontFamily:`
+  # references fall back to the platform default font (Roboto / SF / Segoe).
+  #
+  # fonts:
+  #   - family: EditorialHeading
+  #     fonts:
+  #       - asset: assets/fonts/editorial/Lora-Regular.ttf
+  #       - asset: assets/fonts/editorial/Lora-Bold.ttf
+  #         weight: 700
+  #   - family: EditorialBody
+  #     fonts:
+  #       - asset: assets/fonts/editorial/Inter-Regular.ttf
+  #       - asset: assets/fonts/editorial/Inter-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/editorial/Inter-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/editorial/Inter-Bold.ttf
+  #         weight: 700
+  #   - family: EditorialMono
+  #     fonts:
+  #       - asset: assets/fonts/editorial/JetBrainsMono-Regular.ttf
+  #   - family: ModernHeading
+  #     fonts:
+  #       - asset: assets/fonts/modern/Inter-Regular.ttf
+  #       - asset: assets/fonts/modern/Inter-Bold.ttf
+  #         weight: 700
+  #   - family: ModernBody
+  #     fonts:
+  #       - asset: assets/fonts/modern/Inter-Regular.ttf
+  #       - asset: assets/fonts/modern/Inter-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/modern/Inter-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/modern/Inter-Bold.ttf
+  #         weight: 700
+  #   - family: ModernMono
+  #     fonts:
+  #       - asset: assets/fonts/modern/JetBrainsMono-Regular.ttf
+  #   - family: FriendlyHeading
+  #     fonts:
+  #       - asset: assets/fonts/friendly/Quicksand-Regular.ttf
+  #       - asset: assets/fonts/friendly/Quicksand-Bold.ttf
+  #         weight: 700
+  #   - family: FriendlyBody
+  #     fonts:
+  #       - asset: assets/fonts/friendly/Nunito-Regular.ttf
+  #       - asset: assets/fonts/friendly/Nunito-Bold.ttf
+  #         weight: 700
+  #   - family: FriendlyMono
+  #     fonts:
+  #       - asset: assets/fonts/friendly/JetBrainsMono-Regular.ttf
+  #   - family: ClassicHeading
+  #     fonts:
+  #       - asset: assets/fonts/classic/PlayfairDisplay-Regular.ttf
+  #       - asset: assets/fonts/classic/PlayfairDisplay-Bold.ttf
+  #         weight: 700
+  #   - family: ClassicBody
+  #     fonts:
+  #       - asset: assets/fonts/classic/SourceSerifPro-Regular.ttf
+  #       - asset: assets/fonts/classic/SourceSerifPro-Bold.ttf
+  #         weight: 700
+  #   - family: ClassicMono
+  #     fonts:
+  #       - asset: assets/fonts/classic/JetBrainsMono-Regular.ttf

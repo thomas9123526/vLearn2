@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_tokens.dart';
+import 'font_group.dart';
 
-/// Builds a [ThemeData] for the given palette key.
+/// Builds a [ThemeData] for the given palette and font-group keys.
+///
+/// Fonts are bundled — `google_fonts` is intentionally not used so the app
+/// never reaches out to the internet for typography.
 class AppTheme {
   AppTheme._();
 
-  static ThemeData build(String paletteKey) {
+  static ThemeData build(String paletteKey, FontGroup fontGroup) {
     final palette = AppPalette.byKey[paletteKey] ?? AppPalette.apricot;
     final isDark = paletteKey == 'obsidian';
     final base = isDark ? ThemeData.dark(useMaterial3: true) : ThemeData.light(useMaterial3: true);
@@ -38,10 +41,7 @@ class AppTheme {
       inversePrimary: palette.primaryDark,
     );
 
-    final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
-      bodyColor: palette.onSurface,
-      displayColor: palette.onSurface,
-    );
+    final textTheme = _buildTextTheme(fontGroup, base.textTheme, palette.onSurface);
 
     return base.copyWith(
       colorScheme: scheme,
@@ -121,6 +121,27 @@ class AppTheme {
         unselectedItemColor: palette.onSurfaceMuted,
         elevation: 0,
       ),
+    );
+  }
+
+  static TextTheme _buildTextTheme(FontGroup group, TextTheme base, Color color) {
+    final f = group.families;
+    return base.copyWith(
+      displayLarge:  base.displayLarge ?.copyWith(fontFamily: f.heading, color: color, fontWeight: FontWeight.w700),
+      displayMedium: base.displayMedium?.copyWith(fontFamily: f.heading, color: color, fontWeight: FontWeight.w700),
+      displaySmall:  base.displaySmall ?.copyWith(fontFamily: f.heading, color: color, fontWeight: FontWeight.w700),
+      headlineLarge: base.headlineLarge?.copyWith(fontFamily: f.heading, color: color, fontWeight: FontWeight.w700),
+      headlineMedium:base.headlineMedium?.copyWith(fontFamily: f.heading, color: color, fontWeight: FontWeight.w700),
+      headlineSmall: base.headlineSmall?.copyWith(fontFamily: f.heading, color: color, fontWeight: FontWeight.w600),
+      titleLarge:    base.titleLarge   ?.copyWith(fontFamily: f.body,    color: color, fontWeight: FontWeight.w600),
+      titleMedium:   base.titleMedium  ?.copyWith(fontFamily: f.body,    color: color, fontWeight: FontWeight.w600),
+      titleSmall:    base.titleSmall   ?.copyWith(fontFamily: f.body,    color: color, fontWeight: FontWeight.w500),
+      bodyLarge:     base.bodyLarge    ?.copyWith(fontFamily: f.body,    color: color),
+      bodyMedium:    base.bodyMedium   ?.copyWith(fontFamily: f.body,    color: color),
+      bodySmall:     base.bodySmall    ?.copyWith(fontFamily: f.body,    color: color),
+      labelLarge:    base.labelLarge   ?.copyWith(fontFamily: f.body,    color: color, fontWeight: FontWeight.w600),
+      labelMedium:   base.labelMedium  ?.copyWith(fontFamily: f.body,    color: color),
+      labelSmall:    base.labelSmall   ?.copyWith(fontFamily: f.body,    color: color),
     );
   }
 }

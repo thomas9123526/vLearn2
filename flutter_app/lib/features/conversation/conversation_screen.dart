@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/app_apis.dart';
 import '../../core/models/models.dart';
+import '../../core/providers/settings_provider.dart';
 import '../../core/router/app_router.dart';
+import 'widgets/chat_bubble.dart';
 
 class _SessionData {
   const _SessionData({required this.session, required this.messages});
@@ -90,6 +92,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   Widget build(BuildContext context) {
     final data = ref.watch(_sessionProvider(widget.sessionId));
     final scheme = Theme.of(context).colorScheme;
+    final bubbleStyle = ref.watch(bubbleStyleProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -117,7 +120,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                       controller: _scroll,
                       padding: const EdgeInsets.all(16),
                       itemCount: d.messages.length,
-                      itemBuilder: (_, i) => _Bubble(message: d.messages[i]),
+                      itemBuilder: (_, i) => ChatBubble(
+                        message: d.messages[i],
+                        style: bubbleStyle,
+                      ),
                     ),
             ),
             SafeArea(
@@ -158,39 +164,3 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   }
 }
 
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message});
-  final ConversationMessage message;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isUser = message.role == 'user';
-    final color = isUser ? scheme.primary : scheme.surfaceContainerHighest;
-    final textColor = isUser ? Colors.white : scheme.onSurface;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.75),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
-                ),
-              ),
-              child: Text(message.content, style: TextStyle(color: textColor, fontSize: 15, height: 1.4)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

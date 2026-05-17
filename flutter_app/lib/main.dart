@@ -15,13 +15,14 @@ class VLearn2App extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeKey = ref.watch(themeKeyProvider);
+    final fontGroup = ref.watch(fontGroupProvider);
     final locale = ref.watch(localeProvider);
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
       title: 'vLearn2',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.build(themeKey),
+      theme: AppTheme.build(themeKey, fontGroup),
       locale: locale,
       supportedLocales: const [
         Locale('en'),

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/theme/bubble_style.dart';
+import '../../core/theme/font_group.dart';
+import '../../features/conversation/widgets/chat_bubble.dart';
+import '../../core/models/models.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -10,6 +14,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
     final settings = ref.watch(appSettingsProvider);
+    final fontGroup = ref.watch(fontGroupProvider);
+    final bubbleStyle = ref.watch(bubbleStyleProvider);
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -27,7 +33,7 @@ class SettingsScreen extends ConsumerWidget {
               subtitle: Text(user.email),
             ),
           const Divider(),
-          const _SectionHeader(text:'Appearance'),
+          const _SectionHeader(text: 'Appearance'),
           ListTile(
             leading: const Icon(Icons.palette_outlined),
             title: const Text('Theme'),
@@ -42,8 +48,24 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickLanguage(context, ref),
           ),
+          const _SectionHeader(text: 'Font'),
+          ListTile(
+            leading: const Icon(Icons.text_fields_outlined),
+            title: const Text('Font group'),
+            subtitle: Text(fontGroup.displayName),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _pickFontGroup(context, ref, fontGroup),
+          ),
+          const _SectionHeader(text: 'Conversation'),
+          ListTile(
+            leading: const Icon(Icons.chat_bubble_outline),
+            title: const Text('Bubble style'),
+            subtitle: Text(bubbleStyle.displayName),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _pickBubbleStyle(context, ref, bubbleStyle),
+          ),
           const Divider(),
-          const _SectionHeader(text:'Network'),
+          const _SectionHeader(text: 'Network'),
           SwitchListTile(
             secondary: const Icon(Icons.compress_outlined),
             title: const Text('Compress large responses'),
@@ -55,7 +77,7 @@ class SettingsScreen extends ConsumerWidget {
                 ref.read(appSettingsProvider.notifier).setCompressionEnabled(v),
           ),
           const Divider(),
-          const _SectionHeader(text:'Account'),
+          const _SectionHeader(text: 'Account'),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
             title: const Text('Sign out'),
@@ -104,6 +126,142 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (picked != null) {
       await ref.read(appSettingsProvider.notifier).setUiLanguage(picked);
+    }
+  }
+
+  Future<void> _pickFontGroup(
+    BuildContext context,
+    WidgetRef ref,
+    FontGroup current,
+  ) async {
+    final picked = await showModalBottomSheet<FontGroup>(
+      context: context,
+      builder: (sheetContext) {
+        final scheme = Theme.of(sheetContext).colorScheme;
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final g in FontGroup.values)
+                ListTile(
+                  title: Text(
+                    g.displayName,
+                    style: TextStyle(
+                      fontFamily: g.families.heading,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                    ),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'The quick brown fox jumps',
+                        style: TextStyle(fontFamily: g.families.body, fontSize: 14),
+                      ),
+                      Text(
+                        'v1.0.0  •  ${g.description}',
+                        style: TextStyle(
+                          fontFamily: g.families.mono,
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: g == current
+                      ? Icon(Icons.check, color: scheme.primary)
+                      : null,
+                  onTap: () => Navigator.pop(sheetContext, g),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked != null) {
+      await ref.read(appSettingsProvider.notifier).setFontGroup(picked);
+    }
+  }
+
+  Future<void> _pickBubbleStyle(
+    BuildContext context,
+    WidgetRef ref,
+    BubbleStyle current,
+  ) async {
+    final scheme = Theme.of(context).colorScheme;
+    final now = DateTime.now();
+    final sampleAssistant = ConversationMessage(
+      id: '_preview_a',
+      role: 'assistant',
+      content: 'Hi! How are you today?',
+      sequence: 0,
+      createdAt: now,
+    );
+    final sampleUser = ConversationMessage(
+      id: '_preview_u',
+      role: 'user',
+      content: "I'm great, thanks!",
+      sequence: 1,
+      createdAt: now,
+    );
+
+    final picked = await showModalBottomSheet<BubbleStyle>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final s in BubbleStyle.values)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: InkWell(
+                    onTap: () => Navigator.pop(sheetContext, s),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: s == current ? scheme.primary : scheme.outline,
+                          width: s == current ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  s.displayName,
+                                  style: Theme.of(sheetContext)
+                                      .textTheme
+                                      .titleMedium,
+                                ),
+                              ),
+                              if (s == current)
+                                Icon(Icons.check_circle,
+                                    color: scheme.primary, size: 20),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ChatBubble(message: sampleAssistant, style: s),
+                          ChatBubble(message: sampleUser, style: s),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked != null) {
+      await ref.read(appSettingsProvider.notifier).setBubbleStyle(picked);
     }
   }
 }
