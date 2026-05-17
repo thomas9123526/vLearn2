@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/errors/polite_error.dart';
 import '../../core/storage/model_registry.dart';
 
 /// First-launch screen shown when the sherpa-onnx model bundle isn't on disk.
@@ -24,8 +25,15 @@ class ModelsNotInstalledScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(24),
           child: snap.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) =>
-                Center(child: Text('Failed to read model directory: $e')),
+            error: (e, st) {
+              logRawError('models_not_installed_screen', e, st);
+              return PoliteErrorCenter(
+                error: e,
+                context: ErrorContext.loadDetail,
+                onRetry: () =>
+                    ref.invalidate(modelRegistrySnapshotProvider),
+              );
+            },
             data: (s) => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

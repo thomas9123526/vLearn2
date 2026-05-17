@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/storage/model_registry.dart';
@@ -284,11 +285,14 @@ class _ModelStorageTile extends ConsumerWidget {
         title: Text('Speech models'),
         subtitle: Text('Checking…'),
       ),
-      error: (e, _) => ListTile(
-        leading: Icon(Icons.storage_outlined, color: scheme.error),
-        title: const Text('Speech models'),
-        subtitle: Text('Error: $e'),
-      ),
+      error: (e, st) {
+        logRawError('settings_screen.model_registry', e, st);
+        return ListTile(
+          leading: Icon(Icons.storage_outlined, color: scheme.onSurfaceVariant),
+          title: const Text('Speech models'),
+          subtitle: Text(politeMessageFor(e, context: ErrorContext.loadDetail)),
+        );
+      },
       data: (s) {
         final okCount = s.verifications
             .where((v) => v.status == FileVerificationStatus.ok)

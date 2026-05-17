@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/app_apis.dart';
+import '../../core/errors/polite_error.dart';
 import '../../core/router/app_router.dart';
 
 final _reportProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, id) async {
@@ -28,7 +29,14 @@ class SessionReportScreen extends ConsumerWidget {
       ),
       body: report.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load: $e')),
+        error: (e, st) {
+          logRawError('session_report_screen', e, st);
+          return PoliteErrorCenter(
+            error: e,
+            context: ErrorContext.loadDetail,
+            onRetry: () => ref.invalidate(_reportProvider(sessionId)),
+          );
+        },
         data: (data) {
           final xpEarned = (data['xpEarned'] as num? ?? 0).toInt();
           final turnCount = (data['turnCount'] as num? ?? 0).toInt();
