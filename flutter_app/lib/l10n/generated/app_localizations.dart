@@ -103,7 +103,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'vLearn2'**
+  /// **'Virtual Foreign Language'**
   String get appTitle;
 
   /// No description provided for @welcomeBack.

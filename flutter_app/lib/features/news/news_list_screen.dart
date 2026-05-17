@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/app_apis.dart';
+import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/settings_provider.dart';
 import 'news_providers.dart';
@@ -19,10 +20,14 @@ class NewsListScreen extends ConsumerWidget {
           const SnackBar(content: Text('Marked all news as read.')),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+        showPoliteErrorSnack(
+          context,
+          e,
+          tag: 'news_list.mark_all_read',
+          stack: st,
+        );
       }
     }
   }
@@ -45,7 +50,14 @@ class NewsListScreen extends ConsumerWidget {
       ),
       body: list.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load: $e')),
+        error: (e, st) {
+          logRawError('news_list_screen', e, st);
+          return PoliteErrorCenter(
+            error: e,
+            context: ErrorContext.loadList,
+            onRetry: () => ref.invalidate(newsListProvider),
+          );
+        },
         data: (items) {
           if (items.isEmpty) {
             return const Center(child: Text('No news yet.'));

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/errors/polite_error.dart';
 import '../../core/providers/settings_provider.dart';
 import 'news_providers.dart';
 
@@ -21,7 +22,14 @@ class NewsDetailScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('News')),
       body: detail.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load: $e')),
+        error: (e, st) {
+          logRawError('news_detail_screen', e, st);
+          return PoliteErrorCenter(
+            error: e,
+            context: ErrorContext.loadDetail,
+            onRetry: () => ref.invalidate(newsDetailProvider(idOrSlug)),
+          );
+        },
         data: (post) {
           final title = post.titleFor(lang);
           final body = post.bodyFor(lang);

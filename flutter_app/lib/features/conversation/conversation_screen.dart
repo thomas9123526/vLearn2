@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/app_apis.dart';
+import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/router/app_router.dart';
@@ -63,9 +64,15 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
           );
         }
       });
-    } on Exception catch (e) {
+    } on Exception catch (e, st) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Send failed: $e')));
+        showPoliteErrorSnack(
+          context,
+          e,
+          tag: 'conversation_screen.send',
+          errorContext: ErrorContext.send,
+          stack: st,
+        );
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -80,9 +87,14 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       if (mounted) {
         context.pushReplacement(AppRoute.report(widget.sessionId));
       }
-    } on Exception catch (e) {
+    } on Exception catch (e, st) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('End failed: $e')));
+        showPoliteErrorSnack(
+          context,
+          e,
+          tag: 'conversation_screen.end',
+          stack: st,
+        );
         setState(() => _ending = false);
       }
     }
@@ -110,7 +122,14 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       ),
       body: data.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load: $e')),
+        error: (e, st) {
+          logRawError('conversation_screen.load', e, st);
+          return PoliteErrorCenter(
+            error: e,
+            context: ErrorContext.loadDetail,
+            onRetry: () => ref.invalidate(_sessionProvider(widget.sessionId)),
+          );
+        },
         data: (d) => Column(
           children: [
             Expanded(
