@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -32,31 +32,35 @@ export class AdminAuthController {
   ) {}
 
   /**
-   * Bootstrap endpoint: PUBLIC only while zero admins exist. First successful
-   * call creates the superadmin and auto-closes the endpoint.
+   * Public admin signup. The first account to sign up becomes the superadmin;
+   * every subsequent account becomes a regular admin ("subadmin"). The
+   * endpoint stays open — invitations are NOT required.
+   *
+   * Note (operator): this is intentionally permissive for the development
+   * flow. If you ever deploy this publicly, gate it (IP allow-list, invite
+   * codes, or auto-close after first signup) before exposing.
    */
   @Public()
   @Post('signup')
   @HttpCode(201)
-  @ApiOperation({ summary: 'Bootstrap the first superadmin (auto-closes after first signup)' })
+  @ApiOperation({
+    summary:
+      'Sign up as an admin. First signup = superadmin, subsequent = admin.',
+  })
   async signup(@Body() dto: AdminSignupDto) {
     const adminCount = await this.users.count({
       where: [{ role: 'admin' }, { role: 'superadmin' }],
     });
-    if (adminCount > 0) {
-      throw new ForbiddenException({
-        i18nKey: 'admin.signup_closed',
-        message: 'Admin sign-up is closed; ask your superadmin to invite you.',
-      });
-    }
+    const role: 'superadmin' | 'admin' =
+      adminCount === 0 ? 'superadmin' : 'admin';
 
     const hash = await bcrypt.hash(dto.password, 10);
-    const user = await this.users.save(
+    await this.users.save(
       this.users.create({
         email: dto.email,
         password_hash: hash,
         display_name: dto.displayName,
-        role: 'superadmin',
+        role,
       }),
     );
 

@@ -22,9 +22,14 @@ npm run dev    # http://localhost:4000
 
 The backend must be running on `http://localhost:3000` (or whatever you set as `NEXT_PUBLIC_API_BASE_URL`).
 
-## Bootstrap signup
+## Admin signup
 
-Before the first admin exists, hit the backend's `POST /api/admin/auth/signup` directly (e.g. via `curl`). After the first admin is created, that endpoint auto-closes and subsequent admin accounts must be created from the **Admins** page in this panel.
+Open `/signup` in the panel. The **first** account to sign up becomes the
+`superadmin`; every account after that becomes a regular `admin` ("subadmin").
+The endpoint stays open — invitations are not required.
+
+> ⚠️ This is a permissive dev default. Before exposing the panel publicly,
+> gate `POST /api/admin/auth/signup` (auto-close, invite codes, or IP allow-list).
 
 ## Auth
 
