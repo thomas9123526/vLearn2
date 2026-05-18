@@ -1,11 +1,11 @@
 ---
-description: Commit after each small completed task with a short work report
+description: Commit after each small task, save conversation to story_claude, work report
 alwaysApply: true
 ---
 
-# Auto-commit after each small task
+# Auto-commit + story log after each small task
 
-When you finish a **small, self-contained task** (one bug fix, one screen change, one config tweak, etc.), **commit before moving on** to the next task or ending your turn.
+When you finish a **small, self-contained task** (one bug fix, one screen change, one config tweak, etc.), **write a story log and commit** before moving on to the next task or ending your turn.
 
 ## What counts as "done"
 
@@ -14,9 +14,54 @@ When you finish a **small, self-contained task** (one bug fix, one screen change
 - Do **not** batch unrelated changes into one commit.
 - Do **not** commit broken, half-finished, or untested work.
 
+## Story log (required before every task commit)
+
+For **every** task commit, create a markdown file under `story_claude/` **before** `git commit`.
+
+### Filename
+
+```
+story_claude/{yymmdd}_{HHmm}_{shorttitle}.md
+```
+
+| Part | Rule |
+|------|------|
+| `yymmdd` | Local date: 2-digit year, month, day (e.g. `260518`) |
+| `HHmm` | Local 24h time, hour + minute (e.g. `1430`). User spec says `hhss`; use **HHmm** to match existing `story_claude/` files in this repo. |
+| `shorttitle` | Lowercase kebab-case abstract of the task/conversation. **Max 50 characters.** Only `a-z`, `0-9`, `-`. |
+
+Example: `story_claude/260518_1430_cursor-story-log-on-commit.md`
+
+If the file already exists (same minute), append `-2`, `-3`, etc. before `.md`.
+
+### File content (template)
+
+```markdown
+# {Human-readable title}
+
+## What this task did
+
+{1–3 short paragraphs: what changed, why, key files.}
+
+## Conversation summary
+
+{Bullet timeline of user asks and your responses in this task/session. Be faithful for recent turns; label older compressed context as reconstruction if needed.}
+
+## Decisions / call-outs
+
+{Optional: tradeoffs, typos interpreted, things left for later.}
+
+## User prompt (verbatim)
+
+> {Paste the user's exact message(s) that triggered this task, verbatim. If multiple prompts in one task, quote each separated by blank lines.}
+```
+
+- **Always** end with `## User prompt (verbatim)` and blockquote the user's prompt(s).
+- Never block the commit if story write fails — warn in the work report and commit code anyway.
+
 ## Commit workflow (required)
 
-After each small task, run in parallel:
+After the story file is written, run in parallel:
 
 1. `git status`
 2. `git diff` (staged + unstaged)
@@ -24,24 +69,25 @@ After each small task, run in parallel:
 
 Then, if there are changes to commit:
 
-1. Stage only files for **this** task (never `.env`, keys, or credentials).
-2. Commit with a message that states **what you did and why** (1–2 sentences). Prefer the repo style (`fix:`, `feat:`, or short imperative sentences like recent commits).
+1. Stage task code **and** the new `story_claude/*.md` file (never `.env`, keys, or credentials).
+2. Commit with a message that states **what you did and why** (1–2 sentences).
 3. Run `git status` to confirm the commit succeeded.
 
 If the commit is rejected by a hook, fix the issue and create a **new** commit (do not amend unless the amend rules in user settings apply).
 
 ## Report to the user
 
-After committing, include a brief **Work report** in your reply:
+After committing, include a brief **Work report**:
 
 ```
 ### Work report
 - **Commit:** `<short hash>` — `<commit subject line>`
+- **Story:** `story_claude/<filename>.md`
 - **Done:** 1–3 bullets on what changed and why
-- **Files:** key paths touched (optional, only if helpful)
+- **Files:** key paths touched (optional)
 ```
 
-If there was nothing to commit, say so and skip the report block.
+If there was nothing to commit, still write the story file if the user asked for work in this turn; say so in the report.
 
 ## Git safety (always)
 
@@ -53,4 +99,4 @@ If there was nothing to commit, say so and skip the report block.
 
 ## Scope
 
-This rule applies to **this repository** for every agent session. Split work into multiple commits when you complete multiple small tasks in one conversation.
+This rule applies to **this repository** for every agent session. One story file + one commit per small task.
