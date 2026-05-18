@@ -1,1 +1,19 @@
-I want extract the following fields from users table and save to another vl_user_info table
+I want extract the following fields from users table and preserve to another vl_user_info table.
+ fields are like the following.
+
+    email character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    avatar_emoji character varying(10) COLLATE pg_catalog."default" DEFAULT '🐣'::character varying,
+    native_language character varying(10) COLLATE pg_catalog."default" DEFAULT 'en'::character varying,
+    ui_language character varying(10) COLLATE pg_catalog."default" DEFAULT 'en'::character varying,
+    current_level smallint DEFAULT 1,
+    xp_total integer DEFAULT 0,
+    streak_days smallint DEFAULT 0,
+    last_active_date date,
+    active_persona_id uuid,
+    active_theme character varying(20) COLLATE pg_catalog."default" DEFAULT 'apricot'::character varying,
+    onboarding_done boolean DEFAULT false,
+    role character varying(20) COLLATE pg_catalog."default" NOT NULL DEFAULT 'user'::character varying,
+    status character varying(20) COLLATE pg_catalog."default" NOT NULL DEFAULT 'active'::character varying,
+    suspended_until timestamp with time zone,
+    suspended_reason text COLLATE pg_catalog."default",
+    leaderboard_opt_in boolean DEFAULT true,
