@@ -26,7 +26,7 @@ export class UsersService {
 
   async updateProfile(id: string, dto: UpdateProfileDto): Promise<UserProfileDto> {
     const user = await this.findById(id);
-    if (dto.displayName !== undefined) user.display_name = dto.displayName;
+    if (dto.displayName !== undefined) user.name = dto.displayName;
     if (dto.avatarEmoji !== undefined) user.avatar_emoji = dto.avatarEmoji;
     if (dto.gender !== undefined) user.gender = dto.gender;
     if (dto.uiLanguage !== undefined) user.ui_language = dto.uiLanguage;
@@ -60,7 +60,7 @@ export class UsersService {
     return {
       id: u.id,
       email: u.email,
-      displayName: u.display_name,
+      displayName: u.name,
       avatarEmoji: u.avatar_emoji,
       gender: u.gender,
       nativeLanguage: u.native_language,

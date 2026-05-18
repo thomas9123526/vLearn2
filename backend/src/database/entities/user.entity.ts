@@ -25,7 +25,13 @@ export class UserEntity {
   password_hash!: string;
 
   @Column({ type: 'varchar', length: 100 })
-  display_name!: string;
+  name!: string;
+
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  cid!: string | null;
+
+  @Column({ type: 'varchar', length: 12, nullable: true })
+  cid_username!: string | null;
 
   @Column({ type: 'varchar', length: 10, default: '🐣' })
   avatar_emoji!: string;

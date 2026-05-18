@@ -54,7 +54,7 @@ export class AdminLeaderboardController {
       .select([
         'u.id',
         'u.email',
-        'u.display_name',
+        'u.name',
         'u.avatar_emoji',
         'u.ui_language',
         'u.xp_total',
@@ -71,7 +71,7 @@ export class AdminLeaderboardController {
       rank: i + 1,
       id: u.id,
       email: u.email,
-      display_name: u.display_name,
+      display_name: u.name,
       avatar_emoji: u.avatar_emoji,
       ui_language: u.ui_language,
       xp_total: u.xp_total,

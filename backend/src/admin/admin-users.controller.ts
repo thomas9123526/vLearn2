@@ -59,7 +59,7 @@ export class AdminUsersController {
       .skip(off)
       .take(lim);
     if (q) {
-      qb.andWhere(`(u.email ILIKE :q OR u.display_name ILIKE :q)`, { q: `%${q}%` });
+      qb.andWhere(`(u.email ILIKE :q OR u.name ILIKE :q)`, { q: `%${q}%` });
     }
     if (status) qb.andWhere('u.status = :s', { s: status });
     const [items, total] = await qb.getManyAndCount();
@@ -67,7 +67,7 @@ export class AdminUsersController {
       items: items.map((u) => ({
         id: u.id,
         email: u.email,
-        display_name: u.display_name,
+        display_name: u.name,
         status: u.status,
         suspended_until: u.suspended_until,
         suspended_reason: u.suspended_reason,

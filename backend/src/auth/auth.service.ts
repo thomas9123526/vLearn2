@@ -49,7 +49,7 @@ export class AuthService {
       this.users.create({
         email: dto.email,
         password_hash: passwordHash,
-        display_name: dto.displayName,
+        name: dto.displayName,
         ui_language: dto.uiLanguage ?? 'en',
         native_language: dto.uiLanguage ?? 'en',
         role: 'user',
@@ -70,7 +70,7 @@ export class AuthService {
         'id',
         'email',
         'password_hash',
-        'display_name',
+        'name',
         'role',
         'status',
         'suspended_until',
@@ -135,7 +135,7 @@ export class AuthService {
       ...pair,
       userId: user.id,
       email: user.email,
-      displayName: user.display_name,
+      displayName: user.name,
       role: user.role,
     };
   }
