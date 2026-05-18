@@ -149,10 +149,35 @@ final ttsServiceProvider = Provider<TextToSpeechService>((ref) {
   return PlaceholderTtsService();
 });
 
-/// `true` only when both STT and TTS report ready. UI mic buttons should
-/// gate visibility on this.
+/// `true` when the on-disk model bundle passed manifest + SHA-256 checks.
+/// Sherpa services lazy-init native engines on first [SpeechToTextService.transcribe]
+/// / [TextToSpeechService.speak] — do **not** gate on [SpeechToTextService.isAvailable]
+/// before that, or tutor mode falsely reports "models not installed".
 final speechReadyProvider = Provider<bool>((ref) {
-  final stt = ref.watch(sttServiceProvider);
-  final tts = ref.watch(ttsServiceProvider);
-  return stt.isAvailable && tts.isAvailable;
+  final snap = ref.watch(modelRegistrySnapshotProvider).valueOrNull;
+  return snap?.isReady ?? false;
 });
+
+/// User-facing explanation when [speechReadyProvider] is false.
+String speechModelsStatusMessage(ModelRegistrySnapshot? snap) {
+  if (snap == null) {
+    return 'Speech models are still being checked. Try again in a moment.';
+  }
+  switch (snap.status) {
+    case ModelRegistryStatus.ready:
+      return 'Speech models are ready.';
+    case ModelRegistryStatus.manifestMissing:
+      return 'manifest.json was not found in:\n${snap.modelRoot}\n'
+          'Copy your model files there, run tools/build-manifest.py on that folder, '
+          'then open Settings → Storage → Re-verify all.';
+    case ModelRegistryStatus.corrupt:
+      final bad = snap.verifications
+          .where((v) => v.status != FileVerificationStatus.ok)
+          .length;
+      return 'Speech model verification failed ($bad file(s)). '
+          'Open Settings → Storage to see which files are missing or mismatched, '
+          'then tap Re-verify all.';
+    case ModelRegistryStatus.notReady:
+      return 'Speech models are not ready yet. See Settings → Storage.';
+  }
+}

@@ -7,6 +7,7 @@ import '../../../core/errors/polite_error.dart';
 import '../../../core/models/models.dart';
 import '../../../core/speech/audio_recorder.dart';
 import '../../../core/speech/speech_service.dart';
+import '../../../core/storage/model_registry.dart';
 import 'tutor_avatar.dart';
 
 /// Face-to-face Tutor mode. Renders the animated [TutorAvatar] centered on
@@ -133,8 +134,8 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     _lastSpokenId = last.id;
     setState(() => _liveCaption = last.content);
 
+    if (!ref.read(speechReadyProvider)) return; // text-only — caption only
     final tts = ref.read(ttsServiceProvider);
-    if (!tts.isAvailable) return; // text-only mode — just show the caption
     final voiceId = widget.persona.voiceId ??
         (tts.capabilities.availableVoices.isNotEmpty
             ? tts.capabilities.availableVoices.first
@@ -180,17 +181,17 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     setState(() => _mood = TutorMood.idle);
     if (capture == null) return;
 
-    final stt = ref.read(sttServiceProvider);
-    if (!stt.isAvailable) {
+    if (!ref.read(speechReadyProvider)) {
+      final snap = ref.read(modelRegistrySnapshotProvider).valueOrNull;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Speech models aren\'t installed — switch to chat mode or ask your admin.',
-          ),
+        SnackBar(
+          content: Text(speechModelsStatusMessage(snap)),
+          duration: const Duration(seconds: 6),
         ),
       );
       return;
     }
+    final stt = ref.read(sttServiceProvider);
     try {
       final result = await stt.transcribe(capture.pcm, language: 'en');
       final text = result.text.trim();
