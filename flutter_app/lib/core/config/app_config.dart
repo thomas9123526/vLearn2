@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Application-wide runtime configuration loaded from the on-disk config file
 /// on first launch. See [ConfigFileService] for the path resolution.
@@ -94,6 +95,12 @@ class ConfigFileService {
 
   /// Resolves the absolute config-file path. Creates any missing intermediate
   /// directories on the way down.
+  ///
+  /// On Android, the preferred location is `/storage/emulated/0/룡마/가상외국어회화/`
+  /// which requires `MANAGE_EXTERNAL_STORAGE` on Android 11+. If that permission
+  /// has not been granted, falls back to the app-scoped external dir and
+  /// migrates the file to the public path automatically on the next launch
+  /// after the user grants the permission.
   Future<File> resolveConfigFile() async {
     if (_overridePath != null) {
       final f = File(_overridePath);
@@ -101,45 +108,58 @@ class ConfigFileService {
       return f;
     }
 
-    String path;
     if (Platform.isAndroid) {
-      // Public storage root first (`/storage/emulated/0`); falls back to
-      // app-scoped external storage if that isn't accessible.
-      final publicRoot = Directory('/storage/emulated/0');
-      Directory base;
-      if (publicRoot.existsSync()) {
-        base = publicRoot;
-      } else {
-        final ext = await getExternalStorageDirectory();
-        base = ext ?? await getApplicationSupportDirectory();
-      }
-      path = p.join(base.path, '룡마', '가상외국어회화', _fileName);
+      return _resolveAndroid();
     } else if (Platform.isWindows) {
       // Same folder as the running .exe.
-      path = p.join(File(Platform.resolvedExecutable).parent.path, _fileName);
+      return File(
+        p.join(File(Platform.resolvedExecutable).parent.path, _fileName),
+      );
     } else {
       final dir = await getApplicationSupportDirectory();
-      path = p.join(dir.path, _fileName);
+      return File(p.join(dir.path, _fileName));
+    }
+  }
+
+  Future<File> _resolveAndroid() async {
+    final publicDir =
+        Directory('/storage/emulated/0/룡마/가상외국어회화');
+    final extBase =
+        await getExternalStorageDirectory() ??
+            await getApplicationSupportDirectory();
+    final fallbackDir = Directory(p.join(extBase.path, '룡마', '가상외국어회화'));
+
+    final hasPermission =
+        await Permission.manageExternalStorage.isGranted;
+
+    if (hasPermission) {
+      // Create the public folder if it doesn't exist.
+      try {
+        if (!publicDir.existsSync()) {
+          publicDir.createSync(recursive: true);
+        }
+        // If a fallback file from a previous run exists, migrate it.
+        final fallbackFile = File(p.join(fallbackDir.path, _fileName));
+        final publicFile = File(p.join(publicDir.path, _fileName));
+        if (!publicFile.existsSync() && fallbackFile.existsSync()) {
+          await fallbackFile.copy(publicFile.path);
+          try {
+            await fallbackFile.delete();
+          } catch (_) {/* best-effort */}
+        }
+        return publicFile;
+      } on FileSystemException {
+        // Permission shown as granted but write still failed (rare). Fall
+        // through to the app-scoped path.
+      }
     }
 
-    final file = File(path);
-    try {
-      file.parent.createSync(recursive: true);
-    } on FileSystemException {
-      // MANAGE_EXTERNAL_STORAGE not yet granted (Android 11+). Fall back to
-      // the app-scoped external dir which is always writable. The preferred
-      // public path will be used automatically on the next launch once the
-      // user grants the permission from the Settings prompt.
-      if (!Platform.isAndroid) rethrow;
-      final fallback = await getExternalStorageDirectory() ??
-          await getApplicationSupportDirectory();
-      final fallbackFile = File(
-        p.join(fallback.path, '룡마', '가상외국어회화', _fileName),
-      );
-      fallbackFile.parent.createSync(recursive: true);
-      return fallbackFile;
+    // No permission yet — write to app-scoped storage. Next launch (after the
+    // user grants MANAGE_EXTERNAL_STORAGE in Settings) will migrate this file.
+    if (!fallbackDir.existsSync()) {
+      fallbackDir.createSync(recursive: true);
     }
-    return file;
+    return File(p.join(fallbackDir.path, _fileName));
   }
 
   /// Reads the config from disk. If the file is missing it's created with
