@@ -5,7 +5,8 @@ import { ConfigService } from '@nestjs/config';
 
 export interface JwtPayload {
   sub: string;
-  email: string;
+  cidUsername?: string;
+  email?: string; // legacy — present on admin tokens, absent on user tokens
   role: 'user' | 'admin' | 'superadmin';
   permissions: string[];
   /**

@@ -15,14 +15,11 @@ class SignInScreen extends ConsumerStatefulWidget {
 
 class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
+  final _cidUsernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
   bool _rememberMe = true;
 
-  /// Polite, user-facing version of whatever blew up. Translated from the
-  /// raw auth-provider error in [ref.listen] below; never displays a
-  /// DioException toString. Cleared on the next submit attempt.
   String? _politeError;
 
   @override
@@ -37,14 +34,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     if (!mounted) return;
     setState(() {
       _rememberMe = creds.enabled;
-      if (creds.email != null) _emailCtrl.text = creds.email!;
+      if (creds.cidUsername != null) _cidUsernameCtrl.text = creds.cidUsername!;
       if (creds.password != null) _passwordCtrl.text = creds.password!;
     });
   }
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
+    _cidUsernameCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
@@ -53,7 +50,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _politeError = null);
     await ref.read(authProvider.notifier).signIn(
-          email: _emailCtrl.text.trim(),
+          cidUsername: _cidUsernameCtrl.text.trim(),
           password: _passwordCtrl.text,
           rememberMe: _rememberMe,
         );
@@ -65,9 +62,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final isLoading = auth.status == AuthStatus.checking;
     final scheme = Theme.of(context).colorScheme;
 
-    // React to auth state changes from this screen's submit only. Translates
-    // the raw provider error into the polite local one and logs the raw
-    // version to the debug console.
     ref.listen<AuthState>(authProvider, (prev, next) {
       final raw = next.error;
       if (next.status == AuthStatus.signedOut &&
@@ -113,16 +107,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 ),
                 const SizedBox(height: 32),
                 TextFormField(
-                  controller: _emailCtrl,
+                  controller: _cidUsernameCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
+                    labelText: 'Username (CID username)',
+                    prefixIcon: Icon(Icons.badge_outlined),
                   ),
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
+                  keyboardType: TextInputType.text,
+                  autofillHints: const [AutofillHints.username],
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Email is required';
-                    if (!v.contains('@')) return 'Please enter a valid email';
+                    if (v == null || v.trim().isEmpty) return 'Username is required';
                     return null;
                   },
                 ),

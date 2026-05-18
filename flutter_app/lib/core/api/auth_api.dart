@@ -7,7 +7,8 @@ class AuthApi {
   final Dio _dio;
 
   Future<Map<String, dynamic>> signUp({
-    required String email,
+    required String cid,
+    required String cidUsername,
     required String password,
     required String displayName,
     String? uiLanguage,
@@ -15,7 +16,8 @@ class AuthApi {
     final res = await _dio.post<Map<String, dynamic>>(
       '/auth/signup',
       data: <String, Object?>{
-        'email': email,
+        'cid': cid,
+        'cidUsername': cidUsername,
         'password': password,
         'displayName': displayName,
         'uiLanguage': uiLanguage,
@@ -26,12 +28,12 @@ class AuthApi {
   }
 
   Future<Map<String, dynamic>> signIn({
-    required String email,
+    required String cidUsername,
     required String password,
   }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '/auth/signin',
-      data: {'email': email, 'password': password},
+      data: {'cidUsername': cidUsername, 'password': password},
       options: Options(extra: const {'skipAuth': true}),
     );
     return res.data!;

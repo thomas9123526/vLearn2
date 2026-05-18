@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsEmail,
   IsIn,
   IsOptional,
   IsString,
@@ -10,9 +9,16 @@ import {
 } from 'class-validator';
 
 export class SignUpDto {
-  @ApiProperty({ example: 'learner@example.com' })
-  @IsEmail()
-  email!: string;
+  @ApiProperty({ example: 'A1234567', description: 'National ID / citizen ID (max 10 chars)' })
+  @IsString()
+  @MaxLength(10)
+  cid!: string;
+
+  @ApiProperty({ example: 'alex_kr', description: 'Login username (max 12 chars)' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(12)
+  cidUsername!: string;
 
   @ApiProperty({ example: 'StrongP@ssw0rd' })
   @IsString()
@@ -36,9 +42,9 @@ export class SignUpDto {
 }
 
 export class SignInDto {
-  @ApiProperty({ example: 'learner@example.com' })
-  @IsEmail()
-  email!: string;
+  @ApiProperty({ example: 'alex_kr', description: 'Login username (cid_username)' })
+  @IsString()
+  cidUsername!: string;
 
   @ApiProperty({ example: 'StrongP@ssw0rd' })
   @IsString()
@@ -67,7 +73,7 @@ export class AuthResponseDto extends TokenPairDto {
   userId!: string;
 
   @ApiProperty()
-  email!: string;
+  cidUsername!: string;
 
   @ApiProperty()
   displayName!: string;

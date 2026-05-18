@@ -44,16 +44,17 @@ export class AuthService {
 
   // ─── Sign-up (regular user) ─────────────────────────────
   async signUp(dto: SignUpDto): Promise<AuthResponseDto> {
-    const existing = await this.userInfos.findOne({ where: { email: dto.email } });
-    if (existing) throw new ConflictException({ i18nKey: 'auth.email_taken' });
+    const existing = await this.users.findOne({ where: { cid_username: dto.cidUsername } });
+    if (existing) throw new ConflictException({ i18nKey: 'auth.cid_username_taken' });
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     const user = await this.users.save(
       this.users.create({
         password_hash: passwordHash,
         name: dto.displayName,
+        cid: dto.cid,
+        cid_username: dto.cidUsername,
         info: this.userInfos.create({
-          email: dto.email,
           ui_language: dto.uiLanguage ?? 'en',
           native_language: dto.uiLanguage ?? 'en',
           role: 'user',
@@ -69,33 +70,35 @@ export class AuthService {
 
   // ─── Sign-in ────────────────────────────────────────────
   async signIn(dto: SignInDto): Promise<AuthResponseDto> {
-    const info = await this.userInfos.findOne({ where: { email: dto.email } });
-    if (!info) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
+    // eager loading populates user.info (status, role, suspension fields)
+    const user = await this.users.findOne({ where: { cid_username: dto.cidUsername } });
+    if (!user) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
 
-    if (info.status === 'deleted') {
+    if (user.info.status === 'deleted') {
       throw new ForbiddenException({ i18nKey: 'account.deleted' });
     }
-    if (info.status === 'suspended') {
-      const stillSuspended = !info.suspended_until || info.suspended_until > new Date();
+    if (user.info.status === 'suspended') {
+      const stillSuspended =
+        !user.info.suspended_until || user.info.suspended_until > new Date();
       if (stillSuspended) {
         throw new ForbiddenException({
           i18nKey: 'account.suspended',
-          suspendedUntil: info.suspended_until,
-          reason: info.suspended_reason,
+          suspendedUntil: user.info.suspended_until,
+          reason: user.info.suspended_reason,
         });
       }
     }
 
     const userWithHash = await this.users.findOne({
-      where: { id: info.user_id },
-      select: ['id', 'password_hash', 'name'],
+      where: { id: user.id },
+      select: ['id', 'password_hash', 'name', 'cid', 'cid_username'],
     });
     if (!userWithHash) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
 
     const ok = await bcrypt.compare(dto.password, userWithHash.password_hash);
     if (!ok) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
 
-    userWithHash.info = info;
+    userWithHash.info = user.info;
     return this.issueTokensAndShape(userWithHash);
   }
 
@@ -107,11 +110,9 @@ export class AuthService {
     });
     if (!stored) throw new UnauthorizedException({ i18nKey: 'auth.invalid_refresh' });
 
-    // eager loading populates user.info automatically
     const user = await this.users.findOne({ where: { id: stored.user_id } });
     if (!user) throw new UnauthorizedException();
 
-    // Rotation: delete the used refresh token and issue new pair
     await this.refreshTokens.delete({ id: stored.id });
     return this.issueTokens(user);
   }
@@ -134,7 +135,7 @@ export class AuthService {
     return {
       ...pair,
       userId: user.id,
-      email: user.info.email,
+      cidUsername: user.cid_username ?? '',
       displayName: user.name,
       role: user.info.role,
     };
@@ -144,7 +145,7 @@ export class AuthService {
     const permissions = await this.resolvePermissions(user);
     const payload: JwtPayload = {
       sub: user.id,
-      email: user.info.email,
+      cidUsername: user.cid_username ?? undefined,
       role: user.info.role,
       permissions,
       actor: 'user' as const,

@@ -51,26 +51,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final profile = await _ref.read(usersApiProvider).profile();
       state = AuthState.signedIn(UserProfile.fromJson(profile));
     } on Exception {
-      // Token invalid or backend unreachable — sign out cleanly.
       await tokenStore.clear();
       state = AuthState.signedOut();
     }
   }
 
   Future<void> signIn({
-    required String email,
+    required String cidUsername,
     required String password,
     bool rememberMe = true,
   }) async {
     state = AuthState.checking();
     try {
-      final tokens = await _ref.read(authApiProvider).signIn(email: email, password: password);
+      final tokens = await _ref.read(authApiProvider).signIn(
+            cidUsername: cidUsername,
+            password: password,
+          );
       await _persistAndFetch(tokens);
-      // Save / clear remembered credentials only after the server accepted the
-      // login — we don't want to "remember" wrong credentials.
       final creds = _ref.read(rememberedCredentialsStoreProvider);
       if (rememberMe) {
-        await creds.save(email: email, password: password);
+        await creds.save(cidUsername: cidUsername, password: password);
       } else {
         await creds.setEnabled(false);
       }
@@ -80,7 +80,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signUp({
-    required String email,
+    required String cid,
+    required String cidUsername,
     required String password,
     required String displayName,
     String? uiLanguage,
@@ -88,7 +89,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = AuthState.checking();
     try {
       final tokens = await _ref.read(authApiProvider).signUp(
-            email: email,
+            cid: cid,
+            cidUsername: cidUsername,
             password: password,
             displayName: displayName,
             uiLanguage: uiLanguage,
@@ -117,17 +119,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Even if the server rejects, clear local state.
     }
     await tokenStore.clear();
-    // Wipe remembered credentials on explicit sign-out so the next user
-    // (e.g. shared device, family install) doesn't see the previous email
-    // pre-filled. If the user just wants to log out temporarily and come
-    // back, that's what `forceSignOut` + auto-restore handles.
     await _ref.read(rememberedCredentialsStoreProvider).clear();
     state = AuthState.signedOut();
   }
 
-  /// Drop local session without hitting the server. Used by [AuthInterceptor]
-  /// when token refresh definitively fails — calling /auth/signout would
-  /// require a valid bearer we no longer have, and would just 401 again.
   Future<void> forceSignOut() async {
     if (state.status == AuthStatus.signedOut) return;
     await _ref.read(tokenStoreProvider).clear();
