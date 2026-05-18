@@ -1,4 +1,1 @@
-I want simple view for Admins tab of admin panel.
-It shows many checkboxes for "Initial permissions", So I want show simple list view that list all the admins.
-Item view will be like card view.
-and If the sueradmin tap cardview, it uncollapsed to show full details like checkboxes for "Initial permissions".
+I want extract the following fields from users table and save to another vl_user_info table

@@ -26,8 +26,8 @@ Don't ask me anything. Go automatically without my choice or answer. You do it b
 You have many times. take it easy.
 Quality is important.
 
-For from files xx-xx inside todoList\0518_v2 folder, read it and do what they said.
-After you have done task, produce report what you have done and save as md format to "todoList_report\0518_v2" folder.
+For from files xx-xx inside todoList\0518_v3 folder, read it and do what they said.
+After you have done task, produce report what you have done and save as md format to "todoList_report\0518_v3" folder.
 md filename can be xxx.md where xxx means the current todo file name.
 You are an expert fullstack developer
 Don't ask me anything. Go automatically without my choice or answer. You do it by yourself and by your desicion.
