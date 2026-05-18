@@ -1,4 +1,4 @@
-package com.vlearn2.flutter_app
+package com.ryongma.vfls
 
 import io.flutter.embedding.android.FlutterActivity
 

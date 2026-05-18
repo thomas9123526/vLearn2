@@ -102,15 +102,20 @@ class ModelRegistry {
   ///
   /// Android: app-scoped external storage (`getExternalStorageDirectory()`)
   /// — survives uninstalls if the user moves to `/sdcard/Android/data/...`.
-  /// Windows: `getApplicationSupportDirectory()` resolves to
-  /// `%APPDATA%\<app>\` which is what the spec calls out.
+  /// Windows: hardcoded `%APPDATA%\VLearn2\models` so the path is stable
+  /// across rebuilds and doesn't depend on Flutter's `package_info_plus` →
+  /// `path_provider_windows` resolution (which varies with VERSIONINFO
+  /// fields and was making the expected location hard to communicate).
   Future<Directory> resolveModelRoot() async {
     if (_overrideRoot != null) return _overrideRoot;
     Directory? root;
     if (Platform.isAndroid) {
       root = await getExternalStorageDirectory();
-    } else {
-      root = await getApplicationSupportDirectory();
+    } else if (Platform.isWindows) {
+      final appData = Platform.environment['APPDATA'];
+      if (appData != null && appData.isNotEmpty) {
+        root = Directory(p.join(appData, 'VLearn2'));
+      }
     }
     root ??= await getApplicationSupportDirectory();
     final modelsDir = Directory(p.join(root.path, 'models'));

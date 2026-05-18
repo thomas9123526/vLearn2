@@ -90,18 +90,6 @@ class SettingsScreen extends ConsumerWidget {
           const _SectionHeader(text: 'Storage'),
           const _ModelStorageTile(),
           const Divider(),
-          const _SectionHeader(text: 'Network'),
-          SwitchListTile(
-            secondary: const Icon(Icons.compress_outlined),
-            title: const Text('Compress large responses'),
-            subtitle: const Text(
-              'Save bandwidth by compressing responses larger than 100 KB.',
-            ),
-            value: settings.compressionEnabled,
-            onChanged: (v) =>
-                ref.read(appSettingsProvider.notifier).setCompressionEnabled(v),
-          ),
-          const Divider(),
           const _SectionHeader(text: 'Account'),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),

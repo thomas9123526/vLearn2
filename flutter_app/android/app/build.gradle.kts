@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.vlearn2.flutter_app"
+    namespace = "com.ryongma.vfls"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.vlearn2.flutter_app"
+        applicationId = "com.ryongma.vfls"
         minSdk = 24            // sqlite3_flutter_libs + flutter_secure_storage require API 24+
         targetSdk = 35
         versionCode = flutter.versionCode

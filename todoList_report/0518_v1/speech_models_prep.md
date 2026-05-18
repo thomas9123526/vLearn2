@@ -34,7 +34,7 @@ Path resolution is per-platform. Open the app once, navigate to **Settings → S
 | Platform | Path |
 |----------|------|
 | Android  | `/storage/emulated/0/룡마/가상외국어회화/models/` (or app-scoped external storage as fallback) |
-| Windows  | `%APPDATA%\flutter_app\models\` |
+| Windows  | `%APPDATA%\VLearn2\models\` (literally `C:\Users\<you>\AppData\Roaming\VLearn2\models`) |
 
 For Android you might need to use ADB or a file-manager app (Files by Google works) — the app's own `getExternalStorageDirectory()` path is in the public-ish `/sdcard/Android/data/...` zone, not the system root.
 
@@ -126,9 +126,9 @@ If `/sdcard/` rejects the Korean folder name due to your shell encoding, run `ad
 
 ### Windows
 
-Easiest: open Explorer, navigate to `%APPDATA%\flutter_app\` (paste that into the address bar), create a `models` folder if it doesn't exist, and copy the files in.
+Easiest: open Explorer, paste `%APPDATA%\VLearn2\` into the address bar, create a `models` folder if it doesn't exist, and copy the files in. The resolved path is hardcoded by [model_registry.dart](../../flutter_app/lib/core/storage/model_registry.dart) on Windows — it doesn't depend on Flutter's `package_info_plus` lookup, so this path is stable.
 
-If the app shows the actual resolved path under Settings → Storage → Model folder, copy that exact path verbatim.
+The Settings → Storage → Model folder tile shows the exact path the app is using; if Explorer reports a different path, that one wins.
 
 ## Step 5 — Verify
 

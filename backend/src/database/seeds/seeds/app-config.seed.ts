@@ -76,7 +76,7 @@ const CATALOG: ConfigSeed[] = [
   // ── System ───────────────────────────────────────────────
   { key: 'system.maintenance_banner',    value: { enabled: false, message_i18n_key: null }, value_type: 'object', category: 'system', description: 'App-wide maintenance banner' },
   { key: 'system.min_app_version',       value: '1.0.0', value_type: 'string', category: 'system', description: 'Minimum app version (forces upgrade if older)' },
-  { key: 'system.gzip_enabled',          value: true,    value_type: 'boolean', category: 'system', description: 'Server compresses responses larger than the threshold' },
+  { key: 'system.gzip_enabled',          value: true,    value_type: 'boolean', category: 'system', description: 'Server compresses responses larger than the threshold', is_visible_to_app: true },
 ];
 
 export async function seedAppConfig(ds: DataSource): Promise<void> {

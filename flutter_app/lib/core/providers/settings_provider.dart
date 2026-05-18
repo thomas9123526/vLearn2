@@ -11,7 +11,6 @@ class AppSettingsState {
   const AppSettingsState({
     required this.theme,
     required this.uiLanguage,
-    required this.compressionEnabled,
     required this.fontGroup,
     required this.bubbleStyle,
     required this.textOnlyAcknowledged,
@@ -20,7 +19,6 @@ class AppSettingsState {
 
   final String theme;
   final String uiLanguage;
-  final bool compressionEnabled;
   final String fontGroup;
   final String bubbleStyle;
 
@@ -39,7 +37,6 @@ class AppSettingsState {
   AppSettingsState copyWith({
     String? theme,
     String? uiLanguage,
-    bool? compressionEnabled,
     String? fontGroup,
     String? bubbleStyle,
     bool? textOnlyAcknowledged,
@@ -47,7 +44,6 @@ class AppSettingsState {
   }) => AppSettingsState(
         theme: theme ?? this.theme,
         uiLanguage: uiLanguage ?? this.uiLanguage,
-        compressionEnabled: compressionEnabled ?? this.compressionEnabled,
         fontGroup: fontGroup ?? this.fontGroup,
         bubbleStyle: bubbleStyle ?? this.bubbleStyle,
         textOnlyAcknowledged: textOnlyAcknowledged ?? this.textOnlyAcknowledged,
@@ -58,7 +54,6 @@ class AppSettingsState {
   static const initial = AppSettingsState(
     theme: 'apricot',
     uiLanguage: 'en',
-    compressionEnabled: true,
     fontGroup: 'editorial',
     bubbleStyle: 'classic',
     textOnlyAcknowledged: false,
@@ -73,7 +68,6 @@ class AppSettingsNotifier extends StateNotifier<AppSettingsState> {
 
   static const _kTheme = 'settings.theme';
   static const _kLanguage = 'settings.ui_language';
-  static const _kCompression = 'settings.compression_enabled';
   static const _kFontGroup = 'appearance.font_group';
   static const _kBubbleStyle = 'appearance.bubble_style';
   static const _kTextOnly = 'speech.text_only_acknowledged';
@@ -84,7 +78,6 @@ class AppSettingsNotifier extends StateNotifier<AppSettingsState> {
     state = AppSettingsState(
       theme: prefs.getString(_kTheme) ?? AppSettingsState.initial.theme,
       uiLanguage: prefs.getString(_kLanguage) ?? AppSettingsState.initial.uiLanguage,
-      compressionEnabled: prefs.getBool(_kCompression) ?? AppSettingsState.initial.compressionEnabled,
       fontGroup: prefs.getString(_kFontGroup) ?? AppSettingsState.initial.fontGroup,
       bubbleStyle: prefs.getString(_kBubbleStyle) ?? AppSettingsState.initial.bubbleStyle,
       textOnlyAcknowledged:
@@ -121,12 +114,6 @@ class AppSettingsNotifier extends StateNotifier<AppSettingsState> {
     await prefs.setString(_kLanguage, lang);
   }
 
-  Future<void> setCompressionEnabled(bool enabled) async {
-    state = state.copyWith(compressionEnabled: enabled);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kCompression, enabled);
-  }
-
   Future<void> setFontGroup(FontGroup group) async {
     state = state.copyWith(fontGroup: group.name);
     final prefs = await SharedPreferences.getInstance();
@@ -155,10 +142,6 @@ final appSettingsProvider =
 
 /// Convenience selectors for hot-path code that wants a synchronous read
 /// without subscribing to the whole settings object.
-final compressionEnabledProvider = Provider<bool>(
-  (ref) => ref.watch(appSettingsProvider.select((s) => s.compressionEnabled)),
-);
-
 final themeKeyProvider = Provider<String>(
   (ref) => ref.watch(appSettingsProvider.select((s) => s.theme)),
 );
