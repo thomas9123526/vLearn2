@@ -15,6 +15,7 @@ class AppSettingsState {
     required this.fontGroup,
     required this.bubbleStyle,
     required this.textOnlyAcknowledged,
+    required this.defaultConversationMode,
   });
 
   final String theme;
@@ -22,6 +23,12 @@ class AppSettingsState {
   final bool compressionEnabled;
   final String fontGroup;
   final String bubbleStyle;
+
+  /// `'face'` (tutor) or `'chat'`. Determines which mode a new conversation
+  /// session starts in — replaces the bottom-sheet picker that used to fire
+  /// from the scenarios screen. Toggled inside the conversation screen via
+  /// the AppBar icon button without ending the session.
+  final String defaultConversationMode;
 
   /// `true` once the user dismissed the "Models not installed" setup screen
   /// with the "Continue in text-only mode" button. The router uses this to
@@ -36,6 +43,7 @@ class AppSettingsState {
     String? fontGroup,
     String? bubbleStyle,
     bool? textOnlyAcknowledged,
+    String? defaultConversationMode,
   }) => AppSettingsState(
         theme: theme ?? this.theme,
         uiLanguage: uiLanguage ?? this.uiLanguage,
@@ -43,6 +51,8 @@ class AppSettingsState {
         fontGroup: fontGroup ?? this.fontGroup,
         bubbleStyle: bubbleStyle ?? this.bubbleStyle,
         textOnlyAcknowledged: textOnlyAcknowledged ?? this.textOnlyAcknowledged,
+        defaultConversationMode:
+            defaultConversationMode ?? this.defaultConversationMode,
       );
 
   static const initial = AppSettingsState(
@@ -52,6 +62,7 @@ class AppSettingsState {
     fontGroup: 'editorial',
     bubbleStyle: 'classic',
     textOnlyAcknowledged: false,
+    defaultConversationMode: 'face',
   );
 }
 
@@ -66,6 +77,7 @@ class AppSettingsNotifier extends StateNotifier<AppSettingsState> {
   static const _kFontGroup = 'appearance.font_group';
   static const _kBubbleStyle = 'appearance.bubble_style';
   static const _kTextOnly = 'speech.text_only_acknowledged';
+  static const _kDefaultMode = 'conversation.default_mode';
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -77,6 +89,8 @@ class AppSettingsNotifier extends StateNotifier<AppSettingsState> {
       bubbleStyle: prefs.getString(_kBubbleStyle) ?? AppSettingsState.initial.bubbleStyle,
       textOnlyAcknowledged:
           prefs.getBool(_kTextOnly) ?? AppSettingsState.initial.textOnlyAcknowledged,
+      defaultConversationMode: prefs.getString(_kDefaultMode) ??
+          AppSettingsState.initial.defaultConversationMode,
     );
   }
 
@@ -124,6 +138,14 @@ class AppSettingsNotifier extends StateNotifier<AppSettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kBubbleStyle, style.name);
   }
+
+  /// `'face'` (tutor) or `'chat'`. Anything else is normalised to `'face'`.
+  Future<void> setDefaultConversationMode(String mode) async {
+    final normalised = (mode == 'chat') ? 'chat' : 'face';
+    state = state.copyWith(defaultConversationMode: normalised);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kDefaultMode, normalised);
+  }
 }
 
 final appSettingsProvider =
@@ -155,4 +177,10 @@ final bubbleStyleProvider = Provider<BubbleStyle>(
   (ref) => BubbleStyleExt.fromKey(
     ref.watch(appSettingsProvider.select((s) => s.bubbleStyle)),
   ),
+);
+
+/// The mode a new conversation session starts in (`'face'` or `'chat'`).
+final defaultConversationModeProvider = Provider<String>(
+  (ref) =>
+      ref.watch(appSettingsProvider.select((s) => s.defaultConversationMode)),
 );

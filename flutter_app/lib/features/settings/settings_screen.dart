@@ -61,6 +61,25 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const _SectionHeader(text: 'Conversation'),
           ListTile(
+            leading: Icon(
+              settings.defaultConversationMode == 'face'
+                  ? Icons.face_retouching_natural
+                  : Icons.chat_bubble_outline,
+            ),
+            title: const Text('Default mode'),
+            subtitle: Text(
+              settings.defaultConversationMode == 'face'
+                  ? 'Tutor mode (face-to-face)'
+                  : 'Chat mode',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _pickDefaultMode(
+              context,
+              ref,
+              settings.defaultConversationMode,
+            ),
+          ),
+          ListTile(
             leading: const Icon(Icons.chat_bubble_outline),
             title: const Text('Bubble style'),
             subtitle: Text(bubbleStyle.displayName),
@@ -187,6 +206,53 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (picked != null) {
       await ref.read(appSettingsProvider.notifier).setFontGroup(picked);
+    }
+  }
+
+  Future<void> _pickDefaultMode(
+    BuildContext context,
+    WidgetRef ref,
+    String current,
+  ) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) {
+        final scheme = Theme.of(sheetCtx).colorScheme;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.face_retouching_natural),
+                title: const Text('Tutor mode (face-to-face)'),
+                subtitle: const Text(
+                  'Speak with the animated tutor. The tutor speaks back.',
+                ),
+                trailing: current == 'face'
+                    ? Icon(Icons.check, color: scheme.primary)
+                    : null,
+                onTap: () => Navigator.pop(sheetCtx, 'face'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.chat_bubble_outline),
+                title: const Text('Chat mode'),
+                subtitle: const Text('Type back and forth with the tutor.'),
+                trailing: current == 'chat'
+                    ? Icon(Icons.check, color: scheme.primary)
+                    : null,
+                onTap: () => Navigator.pop(sheetCtx, 'chat'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked != null) {
+      await ref
+          .read(appSettingsProvider.notifier)
+          .setDefaultConversationMode(picked);
     }
   }
 

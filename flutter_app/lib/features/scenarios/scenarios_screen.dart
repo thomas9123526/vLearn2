@@ -162,10 +162,10 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
       personaId = personas.first.id;
     }
 
-    // Two-step launch: pick mode, then start. Saves a round-trip versus
-    // starting in one mode and switching inside the screen.
-    final mode = await _pickMode();
-    if (mode == null) return;
+    // Mode comes from settings (default 'face' = tutor). The conversation
+    // screen exposes an AppBar toggle to switch chat/tutor without ending
+    // the session, so picking up-front would just be extra friction.
+    final mode = ref.read(defaultConversationModeProvider);
 
     try {
       final session = await ref.read(conversationsApiProvider).startSession(
@@ -187,37 +187,6 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
     }
   }
 
-  /// Bottom sheet that asks the user to pick Chat or Tutor mode before the
-  /// session is created. Returns the chosen mode key (`'chat'` or
-  /// `'face'`) or null if dismissed.
-  Future<String?> _pickMode() async {
-    return showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetCtx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: const Text('Chat mode'),
-              subtitle: const Text('Type back and forth with the tutor.'),
-              onTap: () => Navigator.pop(sheetCtx, 'chat'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.face_retouching_natural),
-              title: const Text('Tutor mode (face-to-face)'),
-              subtitle: const Text(
-                'Speak with the animated tutor. Hold the mic to talk, tutor will speak back.',
-              ),
-              onTap: () => Navigator.pop(sheetCtx, 'face'),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _Chip extends StatelessWidget {
