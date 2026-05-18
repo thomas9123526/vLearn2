@@ -13,6 +13,7 @@ export type AppTab =
   | 'progress'
   | 'settings'
   | 'report'
+  | 'navigation'
   | 'system';
 
 export interface FlagDescriptor {
@@ -29,6 +30,7 @@ export const APP_TABS: { id: AppTab; label: string; hint: string }[] = [
   { id: 'progress', label: 'Progress', hint: 'CEFR card, weekly chart, skills, completions.' },
   { id: 'settings', label: 'Settings', hint: 'Profile, theme, tutor, network, storage.' },
   { id: 'report', label: 'Report', hint: 'Post-session evaluation screen.' },
+  { id: 'navigation', label: 'Navigation', hint: 'Show or hide the bottom navigation tabs.' },
   { id: 'system', label: 'System', hint: 'App-wide overrides (gzip, maintenance banner).' },
 ];
 
@@ -82,6 +84,12 @@ export const FLAG_CATALOG: FlagDescriptor[] = [
   { key: 'evaluation.report.improvements', label: 'Improvements list', tier: 'fine', tab: 'report' },
   { key: 'evaluation.report.confetti', label: 'Confetti burst', tier: 'fine', tab: 'report' },
   { key: 'evaluation.report.share_button', label: 'Share button', tier: 'fine', tab: 'report' },
+
+  // ── Navigation tabs ─────────────────────────────────────────────────────
+  { key: 'tabs.home',      label: 'Home tab',      tier: 'big', tab: 'navigation' },
+  { key: 'tabs.scenarios', label: 'Scenarios tab', tier: 'big', tab: 'navigation' },
+  { key: 'tabs.progress',  label: 'Progress tab',  tier: 'big', tab: 'navigation' },
+  { key: 'tabs.settings',  label: 'Settings tab',  tier: 'big', tab: 'navigation' },
 
   // ── System (always shown last; advanced-only by default) ───────────────
   { key: 'system.gzip_enabled', label: 'Gzip response compression', tier: 'big', tab: 'system' },

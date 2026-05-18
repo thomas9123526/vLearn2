@@ -73,6 +73,12 @@ const CATALOG: ConfigSeed[] = [
   { key: 'settings.storage_section',     value: true, value_type: 'boolean', category: 'settings', description: 'Model storage status' },
   { key: 'settings.about_section',       value: true, value_type: 'boolean', category: 'settings', description: 'About / Terms / Privacy' },
 
+  // ── Navigation tabs ──────────────────────────────────────
+  { key: 'tabs.home',      value: true, value_type: 'boolean', category: 'system', description: 'Show Home tab in the bottom nav bar', is_visible_to_app: true },
+  { key: 'tabs.scenarios', value: true, value_type: 'boolean', category: 'system', description: 'Show Scenarios tab in the bottom nav bar', is_visible_to_app: true },
+  { key: 'tabs.progress',  value: true, value_type: 'boolean', category: 'system', description: 'Show Progress tab in the bottom nav bar', is_visible_to_app: true },
+  { key: 'tabs.settings',  value: true, value_type: 'boolean', category: 'system', description: 'Show Settings tab in the bottom nav bar', is_visible_to_app: true },
+
   // ── System ───────────────────────────────────────────────
   { key: 'system.maintenance_banner',    value: { enabled: false, message_i18n_key: null }, value_type: 'object', category: 'system', description: 'App-wide maintenance banner' },
   { key: 'system.min_app_version',       value: '1.0.0', value_type: 'string', category: 'system', description: 'Minimum app version (forces upgrade if older)' },

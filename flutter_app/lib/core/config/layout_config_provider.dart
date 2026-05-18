@@ -36,6 +36,10 @@ class LayoutConfigNotifier extends AsyncNotifier<LayoutConfig> {
     'conversation.mode_toggle': true,
     'settings.theme_selector': true,
     'settings.tutor_carousel': true,
+    'tabs.home': true,
+    'tabs.scenarios': true,
+    'tabs.progress': true,
+    'tabs.settings': true,
   };
 
   @override

@@ -14,16 +14,30 @@
 // provider (the on-disk config) before the first widget tree builds. This
 // avoids a flash of fallback config during cold start.
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'core/config/app_config.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
+/// Requests MANAGE_EXTERNAL_STORAGE on Android 11+ so the app can create
+/// the public 룡마/가상외국어회화 config folder. On Android ≤ 9 the legacy
+/// WRITE_EXTERNAL_STORAGE manifest entry is sufficient.
+Future<void> _requestAndroidStorage() async {
+  if (await Permission.manageExternalStorage.isDenied) {
+    await Permission.manageExternalStorage.request();
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Request external storage permission before reading the config file so
+  // that ConfigFileService can create the public 룡마/가상외국어회화 directory.
+  if (Platform.isAndroid) await _requestAndroidStorage();
   // Resolve the on-disk config (creating it with defaults if missing) so the
   // Dio client and any other config-dependent provider sees the real values
   // on its first read. Without this, the first request would race the file

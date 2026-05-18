@@ -2,10 +2,19 @@
     <!-- Required for sherpa-onnx STT mic capture (task 01). Requested at
          first mic-button tap via permission_handler, not at app launch. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- External storage: legacy READ/WRITE covers Android ≤ 9 / ≤ 12;
+         MANAGE_EXTERNAL_STORAGE (runtime Settings intent) covers Android 11+
+         so the app can create the public 룡마/가상외국어회화 config folder. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29"/>
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
     <application
         android:label="Virtual Foreign Language"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

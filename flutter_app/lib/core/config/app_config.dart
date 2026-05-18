@@ -123,7 +123,20 @@ class ConfigFileService {
     }
 
     final file = File(path);
-    file.parent.createSync(recursive: true);
+    try {
+      file.parent.createSync(recursive: true);
+    } on FileSystemException {
+      // MANAGE_EXTERNAL_STORAGE not yet granted (Android 11+). Fall back to
+      // the app-scoped external dir which is always writable. The preferred
+      // public path will be used automatically on the next launch once the
+      // user grants the permission from the Settings prompt.
+      if (!Platform.isAndroid) rethrow;
+      final fallback = await getExternalStorageDirectory() ??
+          await getApplicationSupportDirectory();
+      final fallbackFile = File(p.join(fallback.path, _fileName));
+      fallbackFile.parent.createSync(recursive: true);
+      return fallbackFile;
+    }
     return file;
   }
 
