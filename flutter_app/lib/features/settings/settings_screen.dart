@@ -10,6 +10,7 @@ import '../../core/theme/bubble_style.dart';
 import '../../core/theme/font_group.dart';
 import '../../features/conversation/widgets/chat_bubble.dart';
 import '../../core/models/models.dart';
+import 'change_password_dialog.dart';
 import 'edit_profile_dialog.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -95,6 +96,12 @@ class SettingsScreen extends ConsumerWidget {
           const _ModelStorageTile(),
           const Divider(),
           const _SectionHeader(text: 'Account'),
+          ListTile(
+            leading: const Icon(Icons.lock_outline),
+            title: const Text('Change password'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => showChangePasswordDialog(context),
+          ),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
             title: const Text('Sign out'),

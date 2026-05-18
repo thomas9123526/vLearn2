@@ -6,14 +6,8 @@ import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
 
 /// Profile-edit dialog shown when the user taps the profile tile in Settings.
-/// Lets the user change:
-///   * display name
-///   * avatar emoji (we don't host avatar uploads yet — emoji is the design)
-///   * gender (male / female / nonbinary / unspecified)
-///   * password (requires current password as proof-of-control)
-///
-/// Three sections live inside one scrollable dialog so the user doesn't have
-/// to dig through nested screens just to flip their gender.
+/// Lets the user change display name, avatar emoji, and gender.
+/// Password changes use the separate showChangePasswordDialog.
 Future<void> showEditProfileDialog(BuildContext context) {
   return showDialog<void>(
     context: context,
@@ -40,9 +34,6 @@ class _EditProfileBody extends ConsumerStatefulWidget {
 class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
   final _nameCtrl = TextEditingController();
   final _avatarCtrl = TextEditingController();
-  final _currentPwCtrl = TextEditingController();
-  final _newPwCtrl = TextEditingController();
-  final _confirmPwCtrl = TextEditingController();
 
   String _gender = 'unspecified';
   bool _saving = false;
@@ -75,9 +66,6 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
   void dispose() {
     _nameCtrl.dispose();
     _avatarCtrl.dispose();
-    _currentPwCtrl.dispose();
-    _newPwCtrl.dispose();
-    _confirmPwCtrl.dispose();
     super.dispose();
   }
 
@@ -97,32 +85,6 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
     }
     if (_gender != user.gender) {
       patch['gender'] = _gender;
-    }
-    final wantsPasswordChange = _newPwCtrl.text.isNotEmpty;
-    if (wantsPasswordChange) {
-      if (_currentPwCtrl.text.isEmpty) {
-        setState(() {
-          _error = 'Enter your current password to change it.';
-          _saving = false;
-        });
-        return;
-      }
-      if (_newPwCtrl.text.length < 8) {
-        setState(() {
-          _error = 'New password must be at least 8 characters.';
-          _saving = false;
-        });
-        return;
-      }
-      if (_newPwCtrl.text != _confirmPwCtrl.text) {
-        setState(() {
-          _error = 'New passwords don\'t match.';
-          _saving = false;
-        });
-        return;
-      }
-      patch['currentPassword'] = _currentPwCtrl.text;
-      patch['newPassword'] = _newPwCtrl.text;
     }
     if (patch.isEmpty) {
       // Nothing to do — just close the dialog quietly.
@@ -267,48 +229,6 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
                     title: Text(g.$2),
                   ),
               ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          const _SectionLabel('Change password'),
-          const SizedBox(height: 4),
-          Text(
-            'Leave blank to keep your current password.',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _currentPwCtrl,
-            enabled: !_saving,
-            obscureText: true,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              isDense: true,
-              labelText: 'Current password',
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _newPwCtrl,
-            enabled: !_saving,
-            obscureText: true,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              isDense: true,
-              labelText: 'New password (≥ 8 chars)',
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _confirmPwCtrl,
-            enabled: !_saving,
-            obscureText: true,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              isDense: true,
-              labelText: 'Confirm new password',
             ),
           ),
           if (_error != null) ...[
