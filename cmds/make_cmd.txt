@@ -26,3 +26,8 @@ give me cmds/build_backend_debug.bat which build backend service and start debug
 
 give me cmds/build_backend_release.bat which build release version of backend api.
 
+
+
+pm2 start npm --name "vfls-admin" -- run start:dev
+
+pm2 start npm --name "vfls-backend" -- run start:dev
