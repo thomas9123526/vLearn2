@@ -64,7 +64,7 @@ export default function ConfigPage() {
         <h1 className="text-2xl font-semibold">Layout flags</h1>
         <p className="text-sm text-muted-foreground">
           Show or hide big sections of the app, one screen at a time. Changes
-          take effect on the user's next app launch.
+          take effect on the user&apos;s next app launch.
         </p>
       </div>
 
@@ -166,7 +166,7 @@ export default function ConfigPage() {
             ))}
           </div>
           <p className="bg-amber-50/50 px-4 py-2 text-xs text-amber-900/80">
-            These keys exist on the backend but aren't in the admin catalog
+            These keys exist on the backend but aren&apos;t in the admin catalog
             yet. Add them to <code>flag-catalog.ts</code> to give them a label
             and a tab.
           </p>

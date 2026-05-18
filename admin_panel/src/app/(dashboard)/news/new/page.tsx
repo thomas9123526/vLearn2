@@ -146,7 +146,7 @@ export default function NewNewsPostPage() {
           <CardContent className="space-y-3">
             <p className="text-xs text-muted-foreground">
               Short hook shown in the home strip and news list. If left blank
-              the body's first line is used.
+              the body&apos;s first line is used.
             </p>
             <Field label="English">
               <Input {...register('summary.en')} />
