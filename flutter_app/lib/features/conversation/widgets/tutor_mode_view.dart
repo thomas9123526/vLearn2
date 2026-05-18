@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,16 +7,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/errors/polite_error.dart';
 import '../../../core/models/models.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../core/speech/audio_recorder.dart';
 import '../../../core/speech/speech_service.dart';
 import '../../../core/storage/model_registry.dart';
-import '../../../core/theme/bubble_style.dart';
-import 'chat_bubble.dart';
 import 'tutor_avatar.dart';
 
-/// Fullscreen tutor mode: large stage, **one** latest tutor bubble + **one**
-/// latest user bubble (no scroll history), dock for mic / type.
+/// Fullscreen voice-only tutor mode. Flexible layout (no fixed % heights),
+/// large avatar, compact latest-speech cards, hold-to-talk mic dock.
 class TutorModeView extends ConsumerStatefulWidget {
   const TutorModeView({
     required this.sessionId,
@@ -45,17 +43,11 @@ class TutorModeView extends ConsumerStatefulWidget {
 }
 
 class _TutorModeViewState extends ConsumerState<TutorModeView> {
-  /// Stage uses most of the screen; bubbles + dock sit below.
-  static const _stageHeightFraction = 0.62;
-
   TutorMood _mood = TutorMood.idle;
   String? _idleSuggestion;
   Timer? _idleTimer;
   StreamSubscription<bool>? _ttsSub;
   String? _lastSpokenId;
-  final _typedInput = TextEditingController();
-  bool _typedSending = false;
-  bool _showTypeBar = false;
 
   @override
   void initState() {
@@ -79,7 +71,6 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
   void dispose() {
     _idleTimer?.cancel();
     _ttsSub?.cancel();
-    _typedInput.dispose();
     super.dispose();
   }
 
@@ -88,18 +79,6 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
       if (widget.messages[i].role == role) return widget.messages[i];
     }
     return null;
-  }
-
-  Future<void> _sendTyped() async {
-    final text = _typedInput.text.trim();
-    if (text.isEmpty || _typedSending) return;
-    setState(() => _typedSending = true);
-    try {
-      await widget.onSendText(text);
-      _typedInput.clear();
-    } finally {
-      if (mounted) setState(() => _typedSending = false);
-    }
   }
 
   void _resetIdleTimer() {
@@ -136,10 +115,9 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     });
   }
 
-  String? get _highlightedAssistantId {
-    if (_mood != TutorMood.speaking) return null;
-    return _latestForRole('assistant')?.id;
-  }
+  bool get _tutorSpeaking =>
+      _mood == TutorMood.speaking &&
+      _latestForRole('assistant') != null;
 
   Future<void> _startRecording() async {
     final recorder = ref.read(audioRecorderProvider);
@@ -204,95 +182,67 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     setState(() => _mood = TutorMood.idle);
   }
 
-  String _stageStatusLabel() => switch (_mood) {
-        TutorMood.listening => 'Listening…',
-        TutorMood.speaking => 'Speaking…',
-        TutorMood.encouraging => 'Take your turn',
-        TutorMood.praising => 'Nice work!',
-        TutorMood.disappointed => 'Let\'s try again',
-        TutorMood.idle => widget.messages.isEmpty
-            ? 'Tap and hold the mic to talk'
-            : 'Hold mic to reply',
-      };
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final bubbleStyle = ref.watch(bubbleStyleProvider);
-    final suggestion = _idleSuggestion;
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     final latestTutor = _latestForRole('assistant');
     final latestUser = _latestForRole('user');
+    final recording = _mood == TutorMood.listening;
 
     return ColoredBox(
       color: scheme.surface,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final stageHeight = (constraints.maxHeight * _stageHeightFraction)
-              .clamp(240.0, constraints.maxHeight - 120);
-
-          return Column(
-            children: [
-              SizedBox(
-                height: stageHeight,
-                width: double.infinity,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _TutorStage(
-                      persona: widget.persona,
-                      mood: _mood,
-                      statusLabel: _stageStatusLabel(),
-                      stageHeight: stageHeight,
-                    ),
-                    _TutorTopBar(
-                      turnCount: widget.turnCount,
-                      ending: widget.ending,
-                      onBack: () => context.pop(),
-                      onSwitchToChat: widget.onSwitchToChat,
-                      onEnd: widget.onEnd,
-                    ),
-                  ],
+      child: Column(
+        children: [
+          _TutorTopBar(
+            turnCount: widget.turnCount,
+            ending: widget.ending,
+            onBack: () => context.pop(),
+            onSwitchToChat: widget.onSwitchToChat,
+            onEnd: widget.onEnd,
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(
+                  child: _AvatarStage(
+                    persona: widget.persona,
+                    mood: _mood,
+                  ),
                 ),
-              ),
-              _LatestBubblesPane(
-                latestTutor: latestTutor,
-                latestUser: latestUser,
-                personaName: widget.persona.name,
-                bubbleStyle: bubbleStyle,
-                highlightedAssistantId: _highlightedAssistantId,
-                suggestion: suggestion,
-                onSendSuggestion: suggestion == null
-                    ? null
-                    : () async {
-                        setState(() {
-                          _idleSuggestion = null;
-                          _mood = TutorMood.idle;
-                        });
-                        await widget.onSendText(suggestion);
-                      },
-              ),
-              _TutorDock(
-                showTypeBar: _showTypeBar || keyboardOpen,
-                typedInput: _typedInput,
-                typedSending: _typedSending,
-                recording: _mood == TutorMood.listening,
-                onToggleType: () => setState(() => _showTypeBar = !_showTypeBar),
-                onSendTyped: _sendTyped,
-                onPressStart: _startRecording,
-                onPressEnd: _stopRecording,
-                onCancel: _cancelRecording,
-                hideMic: keyboardOpen,
-              ),
-            ],
-          );
-        },
+                _SpeechStrip(
+                  personaName: widget.persona.name,
+                  latestTutor: latestTutor,
+                  latestUser: latestUser,
+                  tutorSpeaking: _tutorSpeaking,
+                  suggestion: _idleSuggestion,
+                  onSendSuggestion: _idleSuggestion == null
+                      ? null
+                      : () async {
+                          final line = _idleSuggestion!;
+                          setState(() {
+                            _idleSuggestion = null;
+                            _mood = TutorMood.idle;
+                          });
+                          await widget.onSendText(line);
+                        },
+                ),
+              ],
+            ),
+          ),
+          _RecordDock(
+            recording: recording,
+            mood: _mood,
+            onPressStart: _startRecording,
+            onPressEnd: _stopRecording,
+            onCancel: _cancelRecording,
+            onOpenChat: widget.onSwitchToChat,
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Floating chrome over the stage (fullscreen — no scaffold app bar).
 class _TutorTopBar extends StatelessWidget {
   const _TutorTopBar({
     required this.turnCount,
@@ -311,111 +261,116 @@ class _TutorTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              color: scheme.onSurface,
-              onPressed: onBack,
-            ),
-            Expanded(
-              child: Text(
-                'Turn $turnCount',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+    return Material(
+      color: scheme.surface,
+      elevation: 0,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 56,
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: onBack,
               ),
-            ),
-            IconButton(
-              tooltip: 'Chat mode',
-              icon: const Icon(Icons.chat_bubble_outline),
-              onPressed: onSwitchToChat,
-            ),
-            TextButton.icon(
-              onPressed: ending ? null : onEnd,
-              icon: ending
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: scheme.primary,
+              Expanded(
+                child: Text(
+                  'Turn $turnCount',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
-                    )
-                  : const Icon(Icons.flag_outlined, size: 18),
-              label: const Text('End'),
-            ),
-          ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Chat mode (typing)',
+                icon: const Icon(Icons.chat_bubble_outline),
+                onPressed: onSwitchToChat,
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: TextButton(
+                  onPressed: ending ? null : onEnd,
+                  child: ending
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: scheme.primary,
+                          ),
+                        )
+                      : const Text('End'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _TutorStage extends StatelessWidget {
-  const _TutorStage({
-    required this.persona,
-    required this.mood,
-    required this.statusLabel,
-    required this.stageHeight,
-  });
+/// Avatar fills whatever vertical space remains — no fixed height %.
+class _AvatarStage extends StatelessWidget {
+  const _AvatarStage({required this.persona, required this.mood});
 
   final Persona persona;
   final TutorMood mood;
-  final String statusLabel;
-  final double stageHeight;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final topInset = MediaQuery.paddingOf(context).top + 48;
-    final avatarSize =
-        (stageHeight - topInset - 72).clamp(180.0, 340.0);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            scheme.primaryContainer.withValues(alpha: 0.4),
-            scheme.surface,
-          ],
-        ),
-      ),
-      child: Column(
-        children: [
-          SizedBox(height: topInset),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                TutorAvatar(persona: persona, mood: mood, size: avatarSize),
-                const SizedBox(height: 10),
-                Text(
-                  persona.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 6),
-                _StatusChip(label: statusLabel, mood: mood),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final side = math.min(constraints.maxWidth, constraints.maxHeight);
+        final avatarSize = (side * 0.72).clamp(140.0, 280.0);
+
+        final statusLabel = switch (mood) {
+          TutorMood.listening => 'Listening…',
+          TutorMood.speaking => 'Speaking…',
+          TutorMood.encouraging => 'Your turn',
+          _ => 'Hold the mic below to speak',
+        };
+
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                scheme.primary.withValues(alpha: 0.06),
+                scheme.surface,
               ],
             ),
           ),
-        ],
-      ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TutorAvatar(persona: persona, mood: mood, size: avatarSize),
+                const SizedBox(height: 12),
+                Text(
+                  persona.name,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                _StatusPill(label: statusLabel, mood: mood),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.label, required this.mood});
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.mood});
 
   final String label;
   final TutorMood mood;
@@ -429,17 +384,13 @@ class _StatusChip extends StatelessWidget {
       TutorMood.speaking => (
           scheme.primaryContainer,
           scheme.onPrimaryContainer,
-          Icons.volume_up_rounded
+          Icons.graphic_eq_rounded,
         ),
-      _ => (
-          scheme.surfaceContainerHighest,
-          scheme.onSurfaceVariant,
-          Icons.record_voice_over_outlined
-        ),
+      _ => (scheme.surfaceContainerHigh, scheme.onSurfaceVariant, Icons.mic_none),
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(999),
@@ -447,11 +398,14 @@ class _StatusChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: fg),
-          const SizedBox(width: 6),
+          Icon(icon, size: 18, color: fg),
+          const SizedBox(width: 8),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(color: fg),
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ],
       ),
@@ -459,146 +413,130 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// At most one tutor line + one user line — current turn only, no scrolling.
-class _LatestBubblesPane extends StatelessWidget {
-  const _LatestBubblesPane({
+/// Compact latest lines — bounded height, no scroll, no overflow.
+class _SpeechStrip extends StatelessWidget {
+  const _SpeechStrip({
+    required this.personaName,
     required this.latestTutor,
     required this.latestUser,
-    required this.personaName,
-    required this.bubbleStyle,
-    required this.highlightedAssistantId,
+    required this.tutorSpeaking,
     required this.suggestion,
     required this.onSendSuggestion,
   });
 
+  final String personaName;
   final ConversationMessage? latestTutor;
   final ConversationMessage? latestUser;
-  final String personaName;
-  final BubbleStyle bubbleStyle;
-  final String? highlightedAssistantId;
+  final bool tutorSpeaking;
   final String? suggestion;
   final Future<void> Function()? onSendSuggestion;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final hasBubbles = latestTutor != null || latestUser != null;
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!hasBubbles && suggestion == null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Your latest lines appear here.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
           if (latestTutor != null)
-            _TranscriptTurn(
+            _SpeechCard(
               label: personaName,
-              icon: Icons.smart_toy_outlined,
-              alignEnd: false,
-              highlighted: latestTutor!.id == highlightedAssistantId,
-              child: ChatBubble(message: latestTutor!, style: bubbleStyle),
+              text: latestTutor!.content,
+              isUser: false,
+              active: tutorSpeaking,
             ),
+          if (latestTutor != null && latestUser != null) const SizedBox(height: 6),
           if (latestUser != null)
-            _TranscriptTurn(
+            _SpeechCard(
               label: 'You',
-              icon: Icons.mic_none_outlined,
-              alignEnd: true,
-              highlighted: false,
-              child: ChatBubble(message: latestUser!, style: bubbleStyle),
+              text: latestUser!.content,
+              isUser: true,
+              active: false,
             ),
-          if (suggestion != null)
-            _SuggestedReplyCard(
-              text: suggestion!,
-              onSend: onSendSuggestion!,
-            ),
+          if (suggestion != null) ...[
+            if (latestTutor != null || latestUser != null) const SizedBox(height: 6),
+            _SuggestionChip(text: suggestion!, onSend: onSendSuggestion!),
+          ],
         ],
       ),
     );
   }
 }
 
-class _TranscriptTurn extends StatelessWidget {
-  const _TranscriptTurn({
+class _SpeechCard extends StatelessWidget {
+  const _SpeechCard({
     required this.label,
-    required this.icon,
-    required this.alignEnd,
-    required this.highlighted,
-    required this.child,
+    required this.text,
+    required this.isUser,
+    required this.active,
   });
 
   final String label;
-  final IconData icon;
-  final bool alignEnd;
-  final bool highlighted;
-  final Widget child;
+  final String text;
+  final bool isUser;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Column(
-        crossAxisAlignment:
-            alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, right: 4, bottom: 2),
-            child: Row(
+    final bg = isUser ? scheme.primaryContainer : scheme.surfaceContainerHighest;
+    final fg = isUser ? scheme.onPrimaryContainer : scheme.onSurface;
+    final border = active
+        ? Border.all(color: scheme.primary, width: 2)
+        : Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5));
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.88,
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isUser ? 16 : 4),
+              bottomRight: Radius.circular(isUser ? 4 : 16),
+            ),
+            border: border,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 14, color: scheme.onSurfaceVariant),
-                const SizedBox(width: 4),
                 Text(
-                  label,
+                  label.toUpperCase(),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
+                        color: fg.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
                       ),
                 ),
-                if (highlighted) ...[
-                  const SizedBox(width: 6),
-                  Icon(Icons.graphic_eq, size: 14, color: scheme.primary),
-                ],
+                const SizedBox(height: 4),
+                Text(
+                  text,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: fg,
+                        height: 1.35,
+                      ),
+                ),
               ],
             ),
           ),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: highlighted
-                ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: scheme.primary, width: 2),
-                  )
-                : null,
-            child: ClipRect(
-              child: Align(
-                alignment: alignEnd
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
-                heightFactor: 1,
-                child: child,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _SuggestedReplyCard extends StatelessWidget {
-  const _SuggestedReplyCard({required this.text, required this.onSend});
+class _SuggestionChip extends StatelessWidget {
+  const _SuggestionChip({required this.text, required this.onSend});
 
   final String text;
   final Future<void> Function() onSend;
@@ -606,40 +544,41 @@ class _SuggestedReplyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 4),
-      child: Material(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: scheme.outlineVariant),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onSend,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                Icon(Icons.lightbulb_outline, size: 16, color: scheme.tertiary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    text,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-                Text(
-                  'Send',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-              ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onSend,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: scheme.tertiary.withValues(alpha: 0.5),
+              width: 1,
             ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.lightbulb_outline, size: 16, color: scheme.tertiary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              Text(
+                'Use',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: scheme.tertiary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
           ),
         ),
       ),
@@ -647,98 +586,70 @@ class _SuggestedReplyCard extends StatelessWidget {
   }
 }
 
-class _TutorDock extends StatelessWidget {
-  const _TutorDock({
-    required this.showTypeBar,
-    required this.typedInput,
-    required this.typedSending,
+/// Voice-only dock — large hold-to-talk control.
+class _RecordDock extends StatelessWidget {
+  const _RecordDock({
     required this.recording,
-    required this.onToggleType,
-    required this.onSendTyped,
+    required this.mood,
     required this.onPressStart,
     required this.onPressEnd,
     required this.onCancel,
-    required this.hideMic,
+    required this.onOpenChat,
   });
 
-  final bool showTypeBar;
-  final TextEditingController typedInput;
-  final bool typedSending;
   final bool recording;
-  final VoidCallback onToggleType;
-  final Future<void> Function() onSendTyped;
+  final TutorMood mood;
   final Future<void> Function() onPressStart;
   final Future<void> Function() onPressEnd;
   final Future<void> Function() onCancel;
-  final bool hideMic;
+  final VoidCallback onOpenChat;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final hint = recording
+        ? 'Release to send'
+        : mood == TutorMood.speaking
+            ? 'Wait for tutor to finish…'
+            : 'Hold to speak';
 
     return Material(
-      elevation: 6,
       color: scheme.surfaceContainerLow,
+      elevation: 8,
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (showTypeBar)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: typedInput,
-                        minLines: 1,
-                        maxLines: 2,
-                        enabled: !typedSending,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => onSendTyped(),
-                        decoration: const InputDecoration(
-                          hintText: 'Type your reply…',
-                          isDense: true,
-                          filled: true,
-                        ),
-                      ),
+              Text(
+                hint,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: recording
+                          ? scheme.error
+                          : scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      onPressed: typedSending ? null : onSendTyped,
-                      icon: typedSending
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.send),
-                    ),
-                  ],
-                ),
-              if (showTypeBar) const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (!hideMic) ...[
-                    _MicButton(
-                      recording: recording,
-                      onPressStart: onPressStart,
-                      onPressEnd: onPressEnd,
-                      onCancel: onCancel,
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  TextButton.icon(
-                    onPressed: onToggleType,
-                    icon: Icon(
-                      showTypeBar ? Icons.mic : Icons.keyboard_outlined,
-                    ),
-                    label: Text(showTypeBar ? 'Mic' : 'Type'),
+              ),
+              const SizedBox(height: 12),
+              _MicButton(
+                recording: recording,
+                enabled: mood != TutorMood.speaking,
+                onPressStart: onPressStart,
+                onPressEnd: onPressEnd,
+                onCancel: onCancel,
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: onOpenChat,
+                child: Text(
+                  'Need to type? Switch to chat',
+                  style: TextStyle(
+                    color: scheme.primary,
+                    fontSize: 13,
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -751,12 +662,14 @@ class _TutorDock extends StatelessWidget {
 class _MicButton extends StatelessWidget {
   const _MicButton({
     required this.recording,
+    required this.enabled,
     required this.onPressStart,
     required this.onPressEnd,
     required this.onCancel,
   });
 
   final bool recording;
+  final bool enabled;
   final Future<void> Function() onPressStart;
   final Future<void> Function() onPressEnd;
   final Future<void> Function() onCancel;
@@ -764,31 +677,35 @@ class _MicButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onLongPressStart: (_) => onPressStart(),
-      onLongPressEnd: (_) => onPressEnd(),
-      onLongPressCancel: onCancel,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: recording ? 72 : 60,
-        height: recording ? 72 : 60,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: recording ? scheme.errorContainer : scheme.primaryContainer,
-          boxShadow: [
-            if (recording)
+    final active = enabled || recording;
+
+    return Opacity(
+      opacity: active ? 1 : 0.45,
+      child: GestureDetector(
+        onLongPressStart: active ? (_) => onPressStart() : null,
+        onLongPressEnd: active ? (_) => onPressEnd() : null,
+        onLongPressCancel: active ? onCancel : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          width: recording ? 88 : 76,
+          height: recording ? 88 : 76,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: recording ? scheme.error : scheme.primary,
+            boxShadow: [
               BoxShadow(
-                color: scheme.error.withValues(alpha: 0.45),
-                blurRadius: 18,
-                spreadRadius: 3,
+                color: (recording ? scheme.error : scheme.primary)
+                    .withValues(alpha: recording ? 0.45 : 0.28),
+                blurRadius: recording ? 28 : 16,
+                spreadRadius: recording ? 4 : 0,
               ),
-          ],
-        ),
-        child: Icon(
-          recording ? Icons.stop : Icons.mic,
-          size: recording ? 30 : 26,
-          color:
-              recording ? scheme.onErrorContainer : scheme.onPrimaryContainer,
+            ],
+          ),
+          child: Icon(
+            recording ? Icons.stop_rounded : Icons.mic_rounded,
+            size: recording ? 40 : 34,
+            color: recording ? scheme.onError : scheme.onPrimary,
+          ),
         ),
       ),
     );
