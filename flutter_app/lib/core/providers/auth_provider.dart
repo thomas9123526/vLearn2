@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../api/auth_api.dart';
 import '../api/app_apis.dart';
+import '../auth/remembered_credentials.dart';
 import '../models/models.dart';
 
 class AuthState {
@@ -53,11 +54,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> signIn({required String email, required String password}) async {
+  Future<void> signIn({
+    required String email,
+    required String password,
+    bool rememberMe = true,
+  }) async {
     state = AuthState.checking();
     try {
       final tokens = await _ref.read(authApiProvider).signIn(email: email, password: password);
       await _persistAndFetch(tokens);
+      // Save / clear remembered credentials only after the server accepted the
+      // login — we don't want to "remember" wrong credentials.
+      final creds = _ref.read(rememberedCredentialsStoreProvider);
+      if (rememberMe) {
+        await creds.save(email: email, password: password);
+      } else {
+        await creds.setEnabled(false);
+      }
     } on Exception catch (e) {
       state = AuthState.error(e.toString());
     }
@@ -101,6 +114,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Even if the server rejects, clear local state.
     }
     await tokenStore.clear();
+    // Wipe remembered credentials on explicit sign-out so the next user
+    // (e.g. shared device, family install) doesn't see the previous email
+    // pre-filled. If the user just wants to log out temporarily and come
+    // back, that's what `forceSignOut` + auto-restore handles.
+    await _ref.read(rememberedCredentialsStoreProvider).clear();
     state = AuthState.signedOut();
   }
 

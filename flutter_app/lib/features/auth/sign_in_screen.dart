@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/auth/remembered_credentials.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/router/app_router.dart';
@@ -17,11 +18,29 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
+  bool _rememberMe = true;
 
   /// Polite, user-facing version of whatever blew up. Translated from the
   /// raw auth-provider error in [ref.listen] below; never displays a
   /// DioException toString. Cleared on the next submit attempt.
   String? _politeError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRemembered();
+  }
+
+  Future<void> _loadRemembered() async {
+    final creds =
+        await ref.read(rememberedCredentialsStoreProvider).load();
+    if (!mounted) return;
+    setState(() {
+      _rememberMe = creds.enabled;
+      if (creds.email != null) _emailCtrl.text = creds.email!;
+      if (creds.password != null) _passwordCtrl.text = creds.password!;
+    });
+  }
 
   @override
   void dispose() {
@@ -36,6 +55,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     await ref.read(authProvider.notifier).signIn(
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
+          rememberMe: _rememberMe,
         );
   }
 
@@ -120,6 +140,28 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   obscureText: _obscure,
                   autofillHints: const [AutofillHints.password],
                   validator: (v) => v == null || v.isEmpty ? 'Password is required' : null,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      onChanged: isLoading
+                          ? null
+                          : (v) => setState(() => _rememberMe = v ?? false),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: isLoading
+                            ? null
+                            : () => setState(() => _rememberMe = !_rememberMe),
+                        child: Text(
+                          'Remember me on this device',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 if (_politeError != null) ...[
                   const SizedBox(height: 16),
