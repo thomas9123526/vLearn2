@@ -24,10 +24,22 @@ import 'core/providers/settings_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
-/// Requests MANAGE_EXTERNAL_STORAGE on Android 11+ so the app can create
-/// the public 룡마/가상외국어회화 config folder. On Android ≤ 9 the legacy
-/// WRITE_EXTERNAL_STORAGE manifest entry is sufficient.
+/// Requests storage permissions so the app can create the public
+/// 룡마/가상외국어회화 config folder under `/storage/emulated/0/`.
+///
+/// Two paths, depending on Android version:
+///   * **Android ≤ 12**: `READ_EXTERNAL_STORAGE` + `WRITE_EXTERNAL_STORAGE`
+///     (`Permission.storage`). Standard runtime prompt.
+///   * **Android 11+ (preferred on 13+)**: `MANAGE_EXTERNAL_STORAGE`.
+///     Special permission — opens a Settings page the user must toggle.
+///
+/// Both are requested; whichever the OS honours grants the necessary write
+/// access. Manifest `maxSdkVersion` guards keep the legacy entries from
+/// being requested on Androids where they're a no-op.
 Future<void> _requestAndroidStorage() async {
+  if (await Permission.storage.isDenied) {
+    await Permission.storage.request();
+  }
   if (await Permission.manageExternalStorage.isDenied) {
     await Permission.manageExternalStorage.request();
   }

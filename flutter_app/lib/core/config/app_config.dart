@@ -129,8 +129,12 @@ class ConfigFileService {
             await getApplicationSupportDirectory();
     final fallbackDir = Directory(p.join(extBase.path, '룡마', '가상외국어회화'));
 
+    // Either path grants write access to the public storage root:
+    //   * legacy storage (Android ≤ 12)
+    //   * MANAGE_EXTERNAL_STORAGE (Android 11+)
     final hasPermission =
-        await Permission.manageExternalStorage.isGranted;
+        await Permission.manageExternalStorage.isGranted ||
+            await Permission.storage.isGranted;
 
     if (hasPermission) {
       // Create the public folder if it doesn't exist.
