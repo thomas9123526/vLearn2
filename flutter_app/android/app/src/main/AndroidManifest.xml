@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Required for sherpa-onnx STT mic capture (task 01). Requested at
          first mic-button tap via permission_handler, not at app launch. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- External storage: legacy READ/WRITE covers Android ≤ 9 / ≤ 12;
          MANAGE_EXTERNAL_STORAGE (runtime Settings intent) covers Android 11+
@@ -14,7 +15,8 @@
         android:label="Virtual Foreign Language"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:requestLegacyExternalStorage="true">
+        android:requestLegacyExternalStorage="true"
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"
