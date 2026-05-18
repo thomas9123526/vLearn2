@@ -1,0 +1,6 @@
+I want know current conversation flow.
+So when the user enter conversation screen, what information is sent to ai server?
+And What information gets from ai server?
+And how the tip or recommendation generated? Is it comes from ai or application it self.
+describe me in details.
+I need to plan conversation format based on the details.

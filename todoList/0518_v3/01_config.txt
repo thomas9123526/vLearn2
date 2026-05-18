@@ -1,0 +1,2 @@
+I can't see config file when i run android app on device.
+There should be folder like "룡마/가상외국어회화" and config files should be located in it.
