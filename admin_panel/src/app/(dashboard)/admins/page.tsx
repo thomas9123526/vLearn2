@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ShieldCheck, ShieldOff, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, ShieldCheck, ShieldOff, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -67,50 +67,117 @@ export default function AdminsPage() {
 
       <div className="space-y-3">
         {(admins ?? []).map((a) => (
-          <Card key={a.id}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">{a.display_name}</CardTitle>
-                  <CardDescription>
-                    {a.email} · {a.role} · {a.status}
-                  </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  {canSuspend && a.role !== 'superadmin' && a.status === 'active' && (
-                    <Button size="sm" variant="destructive" onClick={() => suspend.mutate(a.id)}>
-                      <ShieldOff className="h-4 w-4" /> Suspend
-                    </Button>
-                  )}
-                  {canSuspend && a.status === 'suspended' && (
-                    <Button size="sm" variant="outline" onClick={() => restore.mutate(a.id)}>
-                      Restore
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {a.role === 'superadmin' ? (
-                <p className="text-sm text-muted-foreground">
-                  Superadmin has all permissions implicitly.
-                </p>
-              ) : (
-                <PermissionGrid
-                  catalog={catalog ?? []}
-                  granted={a.permissions ?? []}
-                  disabled={!canGrant}
-                  onChange={(next) => replacePerms.mutate({ id: a.id, permissions: next })}
-                />
-              )}
-            </CardContent>
-          </Card>
+          <AdminCard
+            key={a.id}
+            admin={a}
+            catalog={catalog ?? []}
+            canGrant={canGrant}
+            canSuspend={canSuspend}
+            onSuspend={() => suspend.mutate(a.id)}
+            onRestore={() => restore.mutate(a.id)}
+            onChangePerms={(next) => replacePerms.mutate({ id: a.id, permissions: next })}
+          />
         ))}
         {(admins ?? []).length === 0 && (
           <p className="text-sm text-muted-foreground">No sub-admins yet.</p>
         )}
       </div>
     </div>
+  );
+}
+
+function AdminCard({
+  admin,
+  catalog,
+  canGrant,
+  canSuspend,
+  onSuspend,
+  onRestore,
+  onChangePerms,
+}: {
+  admin: SubAdmin;
+  catalog: PermissionDef[];
+  canGrant: boolean;
+  canSuspend: boolean;
+  onSuspend: () => void;
+  onRestore: () => void;
+  onChangePerms: (next: string[]) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const statusColor =
+    admin.status === 'active'
+      ? 'text-green-600'
+      : admin.status === 'suspended'
+        ? 'text-yellow-600'
+        : 'text-muted-foreground';
+
+  const roleLabel = admin.role === 'superadmin' ? 'Superadmin' : 'Admin';
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base">{admin.display_name}</CardTitle>
+            <CardDescription className="flex flex-wrap items-center gap-x-2">
+              <span>{admin.email}</span>
+              <span>·</span>
+              <span>{roleLabel}</span>
+              <span>·</span>
+              <span className={statusColor}>{admin.status}</span>
+            </CardDescription>
+          </div>
+
+          <div className="ml-3 flex shrink-0 items-center gap-2">
+            {canSuspend && admin.role !== 'superadmin' && admin.status === 'active' && (
+              <Button size="sm" variant="destructive" onClick={onSuspend}>
+                <ShieldOff className="h-4 w-4" /> Suspend
+              </Button>
+            )}
+            {canSuspend && admin.status === 'suspended' && (
+              <Button size="sm" variant="outline" onClick={onRestore}>
+                Restore
+              </Button>
+            )}
+            {/* Expand toggle — only shown if there's something worth expanding */}
+            {(canGrant || admin.role === 'superadmin') && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setExpanded((v) => !v)}
+                aria-expanded={expanded}
+              >
+                {expanded ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+
+      {expanded && (
+        <CardContent className="pt-0">
+          <div className="border-t border-border pt-4">
+            {admin.role === 'superadmin' ? (
+              <p className="text-sm text-muted-foreground">
+                Superadmin has all permissions implicitly.
+              </p>
+            ) : (
+              <PermissionGrid
+                catalog={catalog}
+                granted={admin.permissions ?? []}
+                disabled={!canGrant}
+                onChange={onChangePerms}
+              />
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
   );
 }
 

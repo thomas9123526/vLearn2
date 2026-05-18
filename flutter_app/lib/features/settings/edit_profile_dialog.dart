@@ -35,15 +35,13 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
   final _nameCtrl = TextEditingController();
   final _avatarCtrl = TextEditingController();
 
-  String _gender = 'unspecified';
+  String _gender = 'female';
   bool _saving = false;
   String? _error;
 
   static const _genders = [
     ('female', 'Female'),
     ('male', 'Male'),
-    ('nonbinary', 'Non-binary'),
-    ('unspecified', 'Prefer not to say'),
   ];
   static const _avatarChoices = [
     '🐣', '🦊', '🐯', '🐼', '🦁', '🐸',
@@ -58,7 +56,8 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
     if (user != null) {
       _nameCtrl.text = user.displayName;
       _avatarCtrl.text = user.avatarEmoji;
-      _gender = user.gender.isEmpty ? 'unspecified' : user.gender;
+      final g = user.gender;
+      _gender = (g == 'male' || g == 'female') ? g : 'female';
     }
   }
 
