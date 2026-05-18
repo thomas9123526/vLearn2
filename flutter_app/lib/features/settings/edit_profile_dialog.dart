@@ -141,7 +141,7 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
           ),
           const SizedBox(height: 8),
           Text(
-            user.email,
+            user.email ?? '',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),

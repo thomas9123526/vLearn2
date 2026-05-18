@@ -36,7 +36,7 @@ class SettingsScreen extends ConsumerWidget {
                 child: Text(user.avatarEmoji, style: const TextStyle(fontSize: 20)),
               ),
               title: Text(user.displayName),
-              subtitle: Text(user.email),
+              subtitle: Text(user.email ?? ''),
               trailing: const Icon(Icons.edit_outlined),
               onTap: () => showEditProfileDialog(context),
             ),

@@ -3,7 +3,7 @@ import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validato
 
 export class UserProfileDto {
   @ApiProperty() id!: string;
-  @ApiProperty() email!: string;
+  @ApiProperty({ nullable: true }) email!: string | null;
   @ApiProperty() displayName!: string;
   @ApiProperty() avatarEmoji!: string;
   @ApiProperty() gender!: string;

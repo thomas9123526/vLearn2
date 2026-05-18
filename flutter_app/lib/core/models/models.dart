@@ -4,7 +4,7 @@
 class UserProfile {
   const UserProfile({
     required this.id,
-    required this.email,
+    this.email,
     required this.displayName,
     required this.avatarEmoji,
     required this.gender,
@@ -21,7 +21,7 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
         id: j['id'] as String,
-        email: j['email'] as String,
+        email: j['email'] as String?,
         displayName: j['displayName'] as String,
         avatarEmoji: j['avatarEmoji'] as String? ?? '🐣',
         gender: j['gender'] as String? ?? 'unspecified',
@@ -37,7 +37,7 @@ class UserProfile {
       );
 
   final String id;
-  final String email;
+  final String? email;
   final String displayName;
   final String avatarEmoji;
   final String gender;
