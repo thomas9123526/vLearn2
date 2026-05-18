@@ -17,6 +17,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME ?? 'vlearn2',
   entities: ALL_ENTITIES,
   migrations: [join(__dirname, 'migrations', '*.{ts,js}').replace(/\\/g, '/')],
+  migrationsTableName: 'vl_migrations',
   synchronize: false, // never true — migrations are the source of truth
   logging: process.env.DB_LOGGING === 'true' ? ['query', 'error'] : ['error'],
 });

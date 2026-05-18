@@ -18,6 +18,7 @@ export const typeormConfigFactory = (
   database: config.get<string>('DB_NAME') ?? 'vlearn2',
   entities: ALL_ENTITIES,
   migrations: [join(__dirname, 'migrations', '*.{ts,js}').replace(/\\/g, '/')],
+  migrationsTableName: 'vl_migrations',
   migrationsRun: false,
   synchronize: false,
   logging: config.get<string>('DB_LOGGING') === 'true' ? ['error', 'query'] : ['error'],
