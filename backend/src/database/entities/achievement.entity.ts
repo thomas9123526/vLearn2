@@ -7,7 +7,7 @@ import {
 } from 'typeorm';
 import type { I18nText } from './scenario.entity';
 
-@Entity({ name: 'achievements' })
+@Entity({ name: 'vl_achievements' })
 export class AchievementEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -34,7 +34,7 @@ export class AchievementEntity {
   condition_value!: number;
 }
 
-@Entity({ name: 'user_achievements' })
+@Entity({ name: 'vl_user_achievements' })
 export class UserAchievementEntity {
   @PrimaryColumn({ type: 'uuid' })
   user_id!: string;

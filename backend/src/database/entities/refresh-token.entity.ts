@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-@Entity({ name: 'refresh_tokens' })
+@Entity({ name: 'vl_refresh_tokens' })
 @Index(['user_id'])
 export class RefreshTokenEntity {
   @PrimaryGeneratedColumn('uuid')

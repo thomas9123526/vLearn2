@@ -6,7 +6,7 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 
-@Entity({ name: 'admin_permissions' })
+@Entity({ name: 'vl_admin_permissions' })
 @Index(['user_id'])
 @Index(['permission'])
 export class AdminPermissionEntity {

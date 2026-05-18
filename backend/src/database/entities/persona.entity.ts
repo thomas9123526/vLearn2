@@ -13,7 +13,7 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
  *   * `rive_asset` is the .riv file dropped under assets/animations/ in
  *     the Flutter app (only the filename, not the full path).
  */
-@Entity({ name: 'personas' })
+@Entity({ name: 'vl_personas' })
 export class PersonaEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

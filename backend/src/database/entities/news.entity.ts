@@ -11,7 +11,7 @@ import type { I18nText } from './scenario.entity';
 
 export type NewsStatus = 'draft' | 'published' | 'archived';
 
-@Entity({ name: 'news_posts' })
+@Entity({ name: 'vl_news_posts' })
 @Index(['status', 'published_at'])
 @Index(['pinned', 'published_at'])
 export class NewsPostEntity {
@@ -55,7 +55,7 @@ export class NewsPostEntity {
   updated_at!: Date;
 }
 
-@Entity({ name: 'news_read_status' })
+@Entity({ name: 'vl_news_read_status' })
 @Index(['user_id'])
 export class NewsReadStatusEntity {
   @PrimaryColumn({ type: 'uuid' })

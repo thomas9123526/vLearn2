@@ -10,7 +10,7 @@ export type ConversationMode = 'chat' | 'face';
 export type SessionStatus = 'active' | 'completed' | 'abandoned';
 export type MessageRole = 'user' | 'assistant';
 
-@Entity({ name: 'conversation_sessions' })
+@Entity({ name: 'vl_conversation_sessions' })
 @Index(['user_id'])
 @Index(['started_at'])
 export class ConversationSessionEntity {
@@ -51,7 +51,7 @@ export class ConversationSessionEntity {
   xp_earned!: number;
 }
 
-@Entity({ name: 'conversation_messages' })
+@Entity({ name: 'vl_conversation_messages' })
 @Index(['session_id'])
 export class ConversationMessageEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -76,7 +76,7 @@ export class ConversationMessageEntity {
   created_at!: Date;
 }
 
-@Entity({ name: 'session_scores' })
+@Entity({ name: 'vl_session_scores' })
 export class SessionScoreEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

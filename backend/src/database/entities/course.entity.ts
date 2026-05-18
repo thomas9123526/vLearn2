@@ -8,7 +8,7 @@ import type { I18nText } from './scenario.entity';
 
 export type CourseStatus = 'draft' | 'published' | 'archived';
 
-@Entity({ name: 'courses' })
+@Entity({ name: 'vl_courses' })
 @Index(['status'])
 export class CourseEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -42,7 +42,7 @@ export class CourseEntity {
   published_at!: Date | null;
 }
 
-@Entity({ name: 'course_scenarios' })
+@Entity({ name: 'vl_course_scenarios' })
 @Index(['course_id', 'order_index'])
 export class CourseScenarioEntity {
   @PrimaryGeneratedColumn('uuid')

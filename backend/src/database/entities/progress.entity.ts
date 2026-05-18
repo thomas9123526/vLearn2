@@ -8,7 +8,7 @@ import {
   Unique,
 } from 'typeorm';
 
-@Entity({ name: 'skill_snapshots' })
+@Entity({ name: 'vl_skill_snapshots' })
 @Unique(['user_id', 'snapshot_date'])
 @Index(['user_id', 'snapshot_date'])
 export class SkillSnapshotEntity {
@@ -43,7 +43,7 @@ export class SkillSnapshotEntity {
   confidence!: number;
 }
 
-@Entity({ name: 'user_progress' })
+@Entity({ name: 'vl_user_progress' })
 export class UserProgressEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -82,7 +82,7 @@ export class UserProgressEntity {
   updated_at!: Date;
 }
 
-@Entity({ name: 'user_scenario_completions' })
+@Entity({ name: 'vl_user_scenario_completions' })
 @Index(['user_id'])
 export class UserScenarioCompletionEntity {
   @PrimaryGeneratedColumn('uuid')

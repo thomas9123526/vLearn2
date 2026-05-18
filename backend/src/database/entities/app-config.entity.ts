@@ -22,7 +22,7 @@ export type AppConfigValueType =
   | 'object'
   | 'array';
 
-@Entity({ name: 'app_config' })
+@Entity({ name: 'vl_app_config' })
 @Index(['category'])
 export class AppConfigEntity {
   @PrimaryColumn({ type: 'varchar', length: 100 })

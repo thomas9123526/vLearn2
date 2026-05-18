@@ -9,7 +9,7 @@ import {
 export type GuardSeverity = 'block' | 'warn';
 export type GuardSource = 'client' | 'server';
 
-@Entity({ name: 'guard_violations' })
+@Entity({ name: 'vl_guard_violations' })
 @Index(['user_id', 'created_at'])
 @Index(['severity', 'created_at'])
 export class GuardViolationEntity {

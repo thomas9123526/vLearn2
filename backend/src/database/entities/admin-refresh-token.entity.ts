@@ -10,7 +10,7 @@ import {
  * Admin-side refresh tokens. Separate from `refresh_tokens` (users) so admin
  * sessions can be revoked independently of user sessions.
  */
-@Entity({ name: 'admin_refresh_tokens' })
+@Entity({ name: 'vl_admin_refresh_tokens' })
 @Index(['admin_id'])
 export class AdminRefreshTokenEntity {
   @PrimaryGeneratedColumn('uuid')

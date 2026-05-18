@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-@Entity({ name: 'uploaded_files' })
+@Entity({ name: 'vl_uploaded_files' })
 @Index(['content_hash'])
 @Index(['uploader_id', 'created_at'])
 export class UploadedFileEntity {

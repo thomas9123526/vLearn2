@@ -19,7 +19,7 @@ export type AdminStatus = 'active' | 'suspended' | 'deleted';
  * superadmin)` so existing `admin_permissions` / `admin_audit_log` rows still
  * line up.
  */
-@Entity({ name: 'admins' })
+@Entity({ name: 'vl_admins' })
 export class AdminEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

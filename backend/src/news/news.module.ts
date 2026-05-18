@@ -116,8 +116,8 @@ export class NewsService {
   async markAllRead(userId: string) {
     // Insert read rows for every currently-published post the user hasn't read yet.
     await this.reads.query(
-      `INSERT INTO news_read_status (user_id, news_post_id)
-         SELECT $1, p.id FROM news_posts p
+      `INSERT INTO vl_news_read_status (user_id, news_post_id)
+         SELECT $1, p.id FROM vl_news_posts p
           WHERE p.status = 'published'
        ON CONFLICT DO NOTHING`,
       [userId],
@@ -128,8 +128,8 @@ export class NewsService {
   async unreadCount(userId: string): Promise<{ count: number }> {
     const row = await this.reads.query(
       `SELECT COUNT(*)::int AS count
-         FROM news_posts p
-         LEFT JOIN news_read_status r
+         FROM vl_news_posts p
+         LEFT JOIN vl_news_read_status r
            ON r.news_post_id = p.id AND r.user_id = $1
         WHERE p.status = 'published' AND r.user_id IS NULL`,
       [userId],

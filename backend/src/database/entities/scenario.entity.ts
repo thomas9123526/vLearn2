@@ -31,7 +31,7 @@ export interface KeyPhrase {
   translation_zh?: string;
 }
 
-@Entity({ name: 'scenarios' })
+@Entity({ name: 'vl_scenarios' })
 @Index(['status'])
 @Index(['category'])
 @Index(['difficulty'])

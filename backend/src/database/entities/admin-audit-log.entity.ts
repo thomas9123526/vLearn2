@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-@Entity({ name: 'admin_audit_log' })
+@Entity({ name: 'vl_admin_audit_log' })
 @Index(['user_id', 'created_at'])
 @Index(['target_type', 'target_id', 'created_at'])
 @Index(['action', 'created_at'])
