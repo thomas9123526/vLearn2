@@ -9,6 +9,7 @@ import '../../features/auth/sign_up_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/scenarios/scenarios_screen.dart';
+import '../../features/scenarios/scenario_brief_screen.dart';
 import '../../features/conversation/conversation_screen.dart';
 import '../../features/news/news_detail_screen.dart';
 import '../../features/news/news_list_screen.dart';
@@ -35,6 +36,7 @@ class AppRoute {
   static String conversation(String sessionId) => '/conversation/$sessionId';
   static String report(String sessionId) => '/report/$sessionId';
   static String course(String idOrSlug) => '/courses/$idOrSlug';
+  static String scenarioBrief(String idOrSlug) => '/scenarios/$idOrSlug/brief';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -117,6 +119,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/setup/models',
         builder: (_, _) => const ModelsNotInstalledScreen(),
+      ),
+      GoRoute(
+        path: '/scenarios/:idOrSlug/brief',
+        builder: (_, s) =>
+            ScenarioBriefScreen(scenarioId: s.pathParameters['idOrSlug']!),
       ),
       GoRoute(path: '/news', builder: (_, _) => const NewsListScreen()),
       GoRoute(

@@ -59,6 +59,12 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
   /// from re-speaking the same line when the parent rebuilds.
   String? _lastSpokenId;
 
+  /// Tutor mode also accepts typed input now — useful when the user can't
+  /// speak out loud (public place, broken mic, sherpa-onnx not installed).
+  /// The avatar still animates and TTS still speaks each assistant reply.
+  final TextEditingController _typedInput = TextEditingController();
+  bool _typedSending = false;
+
   @override
   void initState() {
     super.initState();
@@ -85,7 +91,20 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
   void dispose() {
     _idleTimer?.cancel();
     _ttsSub?.cancel();
+    _typedInput.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendTyped() async {
+    final text = _typedInput.text.trim();
+    if (text.isEmpty || _typedSending) return;
+    setState(() => _typedSending = true);
+    try {
+      await widget.onSendText(text);
+      _typedInput.clear();
+    } finally {
+      if (mounted) setState(() => _typedSending = false);
+    }
   }
 
   /// 20s of silence → ping the parent for a suggestion to show.
@@ -235,6 +254,40 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
                 ),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _typedInput,
+                      minLines: 1,
+                      maxLines: 3,
+                      enabled: !_typedSending,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendTyped(),
+                      decoration: const InputDecoration(
+                        hintText: 'Or type if you can\'t talk…',
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    onPressed: _typedSending ? null : _sendTyped,
+                    icon: _typedSending
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send, size: 18),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             _MicButton(
               recording: _mood == TutorMood.listening,
               onPressStart: _startRecording,

@@ -1,0 +1,13 @@
+1. in admin panel, On news tab. "New Post" is not working.
+admin can post news with title and description.
+
+2. At the "Config flags" tab on admin panel , you put all the possible visibility flags.
+This is complex for me.
+
+I want construct visible flags for big layouts in applications screen.
+I want visible flags for all tabs.
+and Inside the each tabs, put flags for big layout for its tab.
+
+3. at settings screen of application.
+There should be edit profile function to change user's gender,password, photo, etc.
+I want show dialog when the user tap profile item on settings screen.

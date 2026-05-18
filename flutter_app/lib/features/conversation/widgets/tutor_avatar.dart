@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:rive/rive.dart' as rive;
 
 import '../../../core/models/models.dart';
+import 'cartoon_face.dart';
 
 /// Visual state the tutor avatar is currently in. Drives both the body
 /// animation and the floating emotion icons around the avatar.
@@ -165,17 +166,10 @@ class _TutorAvatarState extends State<TutorAvatar>
                             'assets/animations/$asset',
                             fit: BoxFit.cover,
                           )
-                        : Center(
-                            child: Text(
-                              widget.persona.name.isNotEmpty
-                                  ? widget.persona.name[0].toUpperCase()
-                                  : '?',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: widget.size * 0.4,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+                        : CartoonFace(
+                            persona: widget.persona,
+                            mood: widget.mood,
+                            size: widget.size,
                           ),
                   ),
                 ),

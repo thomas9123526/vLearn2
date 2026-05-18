@@ -6,8 +6,44 @@ import '../../core/errors/polite_error.dart';
 import '../../core/router/app_router.dart';
 
 final _reportProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, id) async {
-  return ref.read(conversationsApiProvider).getSession(id);
+  final data = await ref.read(conversationsApiProvider).getSession(id);
+  // Submit an app-side heuristic snapshot for the Progress tab the first
+  // time a session report is opened. We don't await it on the UI path —
+  // the report is interesting on its own and the snapshot is a side-effect.
+  unawaited(_maybeSubmitSnapshot(ref, data));
+  return data;
 });
+
+Future<void> _maybeSubmitSnapshot(
+  Ref ref,
+  Map<String, dynamic> session,
+) async {
+  final turnCount = (session['turnCount'] as num? ?? 0).toInt();
+  final wordCount = (session['wordCount'] as num? ?? 0).toInt();
+  if (turnCount < 2 || wordCount < 10) return; // too short to score
+  // Crude heuristics — these are placeholders until the AI evaluator lands.
+  // Idea: a longer back-and-forth implies engagement (proxy for fluency);
+  // more total words implies vocabulary exposure; turn count implies grammar
+  // exercise. Pronunciation we leave to the on-device STT confidence later.
+  final fluency = (40 + (wordCount / turnCount).clamp(2, 30) * 1.5).clamp(40, 95).toInt();
+  final vocabulary = (45 + (wordCount / 8).clamp(0, 50)).clamp(45, 95).toInt();
+  final grammar = (50 + turnCount.clamp(0, 30)).clamp(50, 95).toInt();
+  try {
+    await ref.read(progressApiProvider).submitSnapshot(
+          fluency: fluency,
+          vocabulary: vocabulary,
+          grammar: grammar,
+        );
+  } catch (_) {
+    // Don't surface — snapshot upload is best-effort.
+  }
+}
+
+/// Tiny shim so callers can fire-and-forget the snapshot upload without
+/// having to import `dart:async`.
+void unawaited(Future<void> f) {
+  f.ignore();
+}
 
 class SessionReportScreen extends ConsumerWidget {
   const SessionReportScreen({required this.sessionId, super.key});

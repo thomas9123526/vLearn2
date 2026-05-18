@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/api/app_apis.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
-import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/router/app_router.dart';
 
@@ -15,11 +14,6 @@ final _scenariosListProvider = FutureProvider.family<List<Scenario>, _Filters>((
         q: f.query,
       );
   return raw.map(Scenario.fromJson).toList();
-});
-
-final _personasProvider = FutureProvider<List<Persona>>((ref) async {
-  final raw = await ref.read(personasApiProvider).list();
-  return raw.map(Persona.fromJson).toList();
 });
 
 class _Filters {
@@ -123,7 +117,9 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
                       itemBuilder: (_, i) => _ScenarioTile(
                         scenario: list[i],
                         locale: locale,
-                        onStart: () => _startSession(list[i]),
+                        onStart: () => context.push(
+                          AppRoute.scenarioBrief(list[i].id),
+                        ),
                       ),
                     ),
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -143,50 +139,6 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
   }
 
   String _capitalize(String s) => s[0].toUpperCase() + s.substring(1);
-
-  Future<void> _startSession(Scenario scenario) async {
-    final user = ref.read(authProvider).user;
-    if (user == null) return;
-
-    String personaId = user.activePersonaId ?? '';
-    if (personaId.isEmpty) {
-      final personas = await ref.read(_personasProvider.future);
-      if (personas.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No personas available')),
-          );
-        }
-        return;
-      }
-      personaId = personas.first.id;
-    }
-
-    // Mode comes from settings (default 'face' = tutor). The conversation
-    // screen exposes an AppBar toggle to switch chat/tutor without ending
-    // the session, so picking up-front would just be extra friction.
-    final mode = ref.read(defaultConversationModeProvider);
-
-    try {
-      final session = await ref.read(conversationsApiProvider).startSession(
-            personaId: personaId,
-            scenarioId: scenario.id,
-            mode: mode,
-          );
-      final sessionId = session['id'] as String;
-      if (mounted) context.push(AppRoute.conversation(sessionId));
-    } on Exception catch (e, st) {
-      if (mounted) {
-        showPoliteErrorSnack(
-          context,
-          e,
-          tag: 'scenarios_screen.start',
-          stack: st,
-        );
-      }
-    }
-  }
-
 }
 
 class _Chip extends StatelessWidget {

@@ -167,6 +167,30 @@ class ProgressApi {
     final res = await _dio.get<List<dynamic>>('/progress/completions');
     return res.data!.cast<Map<String, dynamic>>();
   }
+
+  /// Submit (or refine) today's snapshot. The backend running-averages new
+  /// scores into the existing row so values smooth out across sessions.
+  Future<Map<String, dynamic>> submitSnapshot({
+    int? pronunciation,
+    int? fluency,
+    int? vocabulary,
+    int? grammar,
+    int? listening,
+    int? confidence,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/progress/snapshots',
+      data: <String, Object?>{
+        'pronunciation': pronunciation,
+        'fluency': fluency,
+        'vocabulary': vocabulary,
+        'grammar': grammar,
+        'listening': listening,
+        'confidence': confidence,
+      }..removeWhere((_, v) => v == null),
+    );
+    return res.data!;
+  }
 }
 
 // ─── News ───────────────────────────────────────────────────
