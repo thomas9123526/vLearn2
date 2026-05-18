@@ -278,7 +278,7 @@ class _ScenarioCard extends StatelessWidget {
     return SizedBox(
       width: 240,
       child: InkWell(
-        onTap: () => context.go(AppRoute.scenarios),
+        onTap: () => context.push(AppRoute.scenarioBrief(scenario.id)),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(16),
