@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import {
   ConversationSessionEntity,
   ConversationMessageEntity,
+  SessionStatus,
 } from '../database/entities/conversation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
@@ -78,12 +79,11 @@ export class ConversationsService {
     scenarioId?: string,
     status?: string,
   ): Promise<SessionDto[]> {
+    const where: FindOptionsWhere<ConversationSessionEntity> = { user_id: userId };
+    if (scenarioId) where.scenario_id = scenarioId;
+    if (status) where.status = status as SessionStatus;
     const rows = await this.sessions.find({
-      where: {
-        user_id: userId,
-        ...(scenarioId ? { scenario_id: scenarioId } : {}),
-        ...(status ? { status } : {}),
-      },
+      where,
       order: { started_at: 'DESC' },
       take: limit,
     });

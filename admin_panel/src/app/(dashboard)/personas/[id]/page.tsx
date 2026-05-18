@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -12,11 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 
-/**
- * `id` comes from the dynamic route — Next 15 turns it into a Promise so it
- * has to be unwrapped with `use()` inside the client component.
- */
-type RouteParams = Promise<{ id: string }>;
 
 const schema = z.object({
   slug: z.string().min(2).max(50),
@@ -43,8 +38,8 @@ interface Persona extends FormValues {
   is_active: boolean;
 }
 
-export default function EditPersonaPage({ params }: { params: RouteParams }) {
-  const { id } = use(params);
+export default function EditPersonaPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const qc = useQueryClient();
   const [imageFile, setImageFile] = useState<File | null>(null);
