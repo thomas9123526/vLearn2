@@ -6,6 +6,7 @@ export class UserProfileDto {
   @ApiProperty() email!: string;
   @ApiProperty() displayName!: string;
   @ApiProperty() avatarEmoji!: string;
+  @ApiProperty() gender!: string;
   @ApiProperty() nativeLanguage!: string;
   @ApiProperty() uiLanguage!: string;
   @ApiProperty() currentLevel!: number;
@@ -27,6 +28,10 @@ export class UpdateProfileDto {
   @ApiProperty({ required: false })
   avatarEmoji?: string;
 
+  @IsOptional() @IsIn(['male', 'female', 'nonbinary', 'unspecified'])
+  @ApiProperty({ required: false, enum: ['male', 'female', 'nonbinary', 'unspecified'] })
+  gender?: string;
+
   @IsOptional() @IsIn(['en', 'ko', 'zh'])
   @ApiProperty({ required: false, enum: ['en', 'ko', 'zh'] })
   uiLanguage?: string;
@@ -42,4 +47,16 @@ export class UpdateProfileDto {
   @IsOptional()
   @ApiProperty({ required: false })
   onboardingDone?: boolean;
+
+  /// Plain-text new password. Server hashes it before storing.
+  /// Validated against the current password for safety.
+  @IsOptional() @IsString() @MinLength(8) @MaxLength(128)
+  @ApiProperty({ required: false })
+  newPassword?: string;
+
+  /// Required when `newPassword` is set — proves the caller controls the
+  /// account, not just the access token (which a stolen device could have).
+  @IsOptional() @IsString()
+  @ApiProperty({ required: false })
+  currentPassword?: string;
 }

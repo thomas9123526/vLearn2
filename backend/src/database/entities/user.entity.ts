@@ -30,6 +30,12 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 10, default: '🐣' })
   avatar_emoji!: string;
 
+  /// `'male' | 'female' | 'nonbinary' | 'unspecified'`. Surfaced in the
+  /// Settings profile-edit dialog. We don't make the app render anything
+  /// gender-specific yet — it's purely user-facing self-id for now.
+  @Column({ type: 'varchar', length: 20, default: 'unspecified' })
+  gender!: string;
+
   @Column({ type: 'varchar', length: 10, default: 'en' })
   native_language!: string;
 

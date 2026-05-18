@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/app_apis.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../shared/widgets/layout_visibility.dart';
 
 /// Aggregated `/progress` payload. Backend shape (see ProgressService):
 /// `{ ...UserProgressEntity, latestSnapshot: SkillSnapshotEntity | null }`.
@@ -52,19 +53,31 @@ class ProgressScreen extends ConsumerWidget {
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                _CefrCard(currentLevel: user?.currentLevel ?? 1),
-                const SizedBox(height: 16),
-                _ActivityCard(
-                  minutesTotal: (p['minutes_spoken_total'] as num? ?? 0).toInt(),
-                  minutesWeek: (p['minutes_spoken_this_week'] as num? ?? 0).toInt(),
-                  sessionsTotal: (p['sessions_total'] as num? ?? 0).toInt(),
-                  sessionsWeek: (p['sessions_this_week'] as num? ?? 0).toInt(),
-                  snapshotsAsync: snapshots,
+                LayoutVisibility(
+                  configKey: 'progress.level_badge',
+                  child: _CefrCard(currentLevel: user?.currentLevel ?? 1),
                 ),
                 const SizedBox(height: 16),
-                _SkillBreakdown(latest: latest),
+                LayoutVisibility(
+                  configKey: 'progress.weekly_chart',
+                  child: _ActivityCard(
+                    minutesTotal: (p['minutes_spoken_total'] as num? ?? 0).toInt(),
+                    minutesWeek: (p['minutes_spoken_this_week'] as num? ?? 0).toInt(),
+                    sessionsTotal: (p['sessions_total'] as num? ?? 0).toInt(),
+                    sessionsWeek: (p['sessions_this_week'] as num? ?? 0).toInt(),
+                    snapshotsAsync: snapshots,
+                  ),
+                ),
                 const SizedBox(height: 16),
-                _CompletionsCard(async: completions),
+                LayoutVisibility(
+                  configKey: 'progress.skill_radar',
+                  child: _SkillBreakdown(latest: latest),
+                ),
+                const SizedBox(height: 16),
+                LayoutVisibility(
+                  configKey: 'progress.achievements',
+                  child: _CompletionsCard(async: completions),
+                ),
               ],
             );
           },

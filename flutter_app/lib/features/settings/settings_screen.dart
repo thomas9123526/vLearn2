@@ -9,6 +9,7 @@ import '../../core/theme/bubble_style.dart';
 import '../../core/theme/font_group.dart';
 import '../../features/conversation/widgets/chat_bubble.dart';
 import '../../core/models/models.dart';
+import 'edit_profile_dialog.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -34,6 +35,8 @@ class SettingsScreen extends ConsumerWidget {
               ),
               title: Text(user.displayName),
               subtitle: Text(user.email),
+              trailing: const Icon(Icons.edit_outlined),
+              onTap: () => showEditProfileDialog(context),
             ),
           const Divider(),
           const _SectionHeader(text: 'Appearance'),

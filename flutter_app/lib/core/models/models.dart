@@ -7,6 +7,7 @@ class UserProfile {
     required this.email,
     required this.displayName,
     required this.avatarEmoji,
+    required this.gender,
     required this.uiLanguage,
     required this.currentLevel,
     required this.xpTotal,
@@ -23,6 +24,7 @@ class UserProfile {
         email: j['email'] as String,
         displayName: j['displayName'] as String,
         avatarEmoji: j['avatarEmoji'] as String? ?? '🐣',
+        gender: j['gender'] as String? ?? 'unspecified',
         uiLanguage: j['uiLanguage'] as String? ?? 'en',
         currentLevel: (j['currentLevel'] as num).toInt(),
         xpTotal: (j['xpTotal'] as num).toInt(),
@@ -38,6 +40,7 @@ class UserProfile {
   final String email;
   final String displayName;
   final String avatarEmoji;
+  final String gender;
   final String uiLanguage;
   final int currentLevel;
   final int xpTotal;
