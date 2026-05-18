@@ -78,7 +78,7 @@ class AppConfig {
 /// Locates, reads, and writes the JSON config file.
 ///
 /// Platform paths:
-/// - **Android**: `<ROOT>/룡마/가상외국어회화/config/app_config.json`
+/// - **Android**: `<ROOT>/룡마/가상외국어회화/app_config.json`
 ///   where `<ROOT>` is the public storage root (`/storage/emulated/0`) when
 ///   available, otherwise the app-scoped external dir from `path_provider`.
 /// - **Windows**: `<exe dir>/app_config.json` — same folder as the running
@@ -113,7 +113,7 @@ class ConfigFileService {
         final ext = await getExternalStorageDirectory();
         base = ext ?? await getApplicationSupportDirectory();
       }
-      path = p.join(base.path, '룡마', '가상외국어회화', 'config', _fileName);
+      path = p.join(base.path, '룡마', '가상외국어회화', _fileName);
     } else if (Platform.isWindows) {
       // Same folder as the running .exe.
       path = p.join(File(Platform.resolvedExecutable).parent.path, _fileName);
@@ -133,7 +133,9 @@ class ConfigFileService {
       if (!Platform.isAndroid) rethrow;
       final fallback = await getExternalStorageDirectory() ??
           await getApplicationSupportDirectory();
-      final fallbackFile = File(p.join(fallback.path, _fileName));
+      final fallbackFile = File(
+        p.join(fallback.path, '룡마', '가상외국어회화', _fileName),
+      );
       fallbackFile.parent.createSync(recursive: true);
       return fallbackFile;
     }
