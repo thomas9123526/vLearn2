@@ -93,6 +93,15 @@ class ConfigFileService {
 
   static const _fileName = 'app_config.json';
 
+  /// ─── Code-side toggle ────────────────────────────────────────────────
+  /// `true`  → `write()` saves the file as base64-encoded JSON.
+  /// `false` → `write()` saves plain JSON (human-readable).
+  ///
+  /// Reads accept either format regardless of this flag, so flipping it
+  /// won't break existing config files — the next write will re-save in
+  /// whichever format you picked.
+  static const bool encodeAsBase64 = true;
+
   /// Resolves the absolute config-file path. Creates any missing intermediate
   /// directories on the way down.
   ///
@@ -191,7 +200,9 @@ class ConfigFileService {
   Future<void> write(AppConfig config, {File? file}) async {
     final target = file ?? await resolveConfigFile();
     final jsonStr = const JsonEncoder.withIndent('  ').convert(config.toJson());
-    await target.writeAsString(base64Encode(utf8.encode(jsonStr)));
+    final payload =
+        encodeAsBase64 ? base64Encode(utf8.encode(jsonStr)) : jsonStr;
+    await target.writeAsString(payload);
   }
 
   /// Decodes the file content. Accepts both base64 (new format) and plain
