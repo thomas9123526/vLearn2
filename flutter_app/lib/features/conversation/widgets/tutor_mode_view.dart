@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/errors/polite_error.dart';
 import '../../../core/models/models.dart';
@@ -13,38 +14,45 @@ import '../../../core/theme/bubble_style.dart';
 import 'chat_bubble.dart';
 import 'tutor_avatar.dart';
 
-/// Tutor (face) mode: large **stage** (avatar + status), scrollable **transcript**
-/// (tutor / you bubbles + optional suggestion), and a bottom **dock** (mic + type).
+/// Fullscreen tutor mode: large stage, **one** latest tutor bubble + **one**
+/// latest user bubble (no scroll history), dock for mic / type.
 class TutorModeView extends ConsumerStatefulWidget {
   const TutorModeView({
     required this.sessionId,
     required this.persona,
     required this.messages,
+    required this.turnCount,
     required this.onSendText,
     required this.onIdleSuggestion,
+    required this.onSwitchToChat,
+    required this.onEnd,
+    required this.ending,
     super.key,
   });
 
   final String sessionId;
   final Persona persona;
   final List<ConversationMessage> messages;
-
+  final int turnCount;
   final Future<void> Function(String text) onSendText;
   final Future<String?> Function() onIdleSuggestion;
+  final VoidCallback onSwitchToChat;
+  final VoidCallback onEnd;
+  final bool ending;
 
   @override
   ConsumerState<TutorModeView> createState() => _TutorModeViewState();
 }
 
 class _TutorModeViewState extends ConsumerState<TutorModeView> {
-  static const _stageHeightFraction = 0.65;
+  /// Stage uses most of the screen; bubbles + dock sit below.
+  static const _stageHeightFraction = 0.62;
 
   TutorMood _mood = TutorMood.idle;
   String? _idleSuggestion;
   Timer? _idleTimer;
   StreamSubscription<bool>? _ttsSub;
   String? _lastSpokenId;
-  final _transcriptScroll = ScrollController();
   final _typedInput = TextEditingController();
   bool _typedSending = false;
   bool _showTypeBar = false;
@@ -65,9 +73,6 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     super.didUpdateWidget(old);
     _maybeSpeakLatestAssistantReply();
     _resetIdleTimer();
-    if (widget.messages.length != old.messages.length) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollTranscriptToEnd());
-    }
   }
 
   @override
@@ -75,17 +80,14 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     _idleTimer?.cancel();
     _ttsSub?.cancel();
     _typedInput.dispose();
-    _transcriptScroll.dispose();
     super.dispose();
   }
 
-  void _scrollTranscriptToEnd() {
-    if (!_transcriptScroll.hasClients) return;
-    _transcriptScroll.animateTo(
-      _transcriptScroll.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-    );
+  ConversationMessage? _latestForRole(String role) {
+    for (var i = widget.messages.length - 1; i >= 0; i--) {
+      if (widget.messages[i].role == role) return widget.messages[i];
+    }
+    return null;
   }
 
   Future<void> _sendTyped() async {
@@ -114,7 +116,6 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     final s = await widget.onIdleSuggestion();
     if (!mounted) return;
     setState(() => _idleSuggestion = s);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollTranscriptToEnd());
   }
 
   void _maybeSpeakLatestAssistantReply() {
@@ -137,10 +138,7 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
 
   String? get _highlightedAssistantId {
     if (_mood != TutorMood.speaking) return null;
-    for (var i = widget.messages.length - 1; i >= 0; i--) {
-      if (widget.messages[i].role == 'assistant') return widget.messages[i].id;
-    }
-    return null;
+    return _latestForRole('assistant')?.id;
   }
 
   Future<void> _startRecording() async {
@@ -223,45 +221,56 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     final bubbleStyle = ref.watch(bubbleStyleProvider);
     final suggestion = _idleSuggestion;
     final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final latestTutor = _latestForRole('assistant');
+    final latestUser = _latestForRole('user');
 
     return ColoredBox(
       color: scheme.surface,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final stageHeight = (constraints.maxHeight * _stageHeightFraction)
-              .clamp(220.0, constraints.maxHeight - 140);
+              .clamp(240.0, constraints.maxHeight - 120);
 
           return Column(
             children: [
               SizedBox(
                 height: stageHeight,
                 width: double.infinity,
-                child: _TutorStage(
-                  persona: widget.persona,
-                  mood: _mood,
-                  statusLabel: _stageStatusLabel(),
-                  stageHeight: stageHeight,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _TutorStage(
+                      persona: widget.persona,
+                      mood: _mood,
+                      statusLabel: _stageStatusLabel(),
+                      stageHeight: stageHeight,
+                    ),
+                    _TutorTopBar(
+                      turnCount: widget.turnCount,
+                      ending: widget.ending,
+                      onBack: () => context.pop(),
+                      onSwitchToChat: widget.onSwitchToChat,
+                      onEnd: widget.onEnd,
+                    ),
+                  ],
                 ),
               ),
-              Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.5)),
-              Expanded(
-                child: _TutorTranscript(
-                  scrollController: _transcriptScroll,
-                  messages: widget.messages,
-                  personaName: widget.persona.name,
-                  bubbleStyle: bubbleStyle,
-                  highlightedAssistantId: _highlightedAssistantId,
-                  suggestion: suggestion,
-                  onSendSuggestion: suggestion == null
-                      ? null
-                      : () async {
-                          setState(() {
-                            _idleSuggestion = null;
-                            _mood = TutorMood.idle;
-                          });
-                          await widget.onSendText(suggestion);
-                        },
-                ),
+              _LatestBubblesPane(
+                latestTutor: latestTutor,
+                latestUser: latestUser,
+                personaName: widget.persona.name,
+                bubbleStyle: bubbleStyle,
+                highlightedAssistantId: _highlightedAssistantId,
+                suggestion: suggestion,
+                onSendSuggestion: suggestion == null
+                    ? null
+                    : () async {
+                        setState(() {
+                          _idleSuggestion = null;
+                          _mood = TutorMood.idle;
+                        });
+                        await widget.onSendText(suggestion);
+                      },
               ),
               _TutorDock(
                 showTypeBar: _showTypeBar || keyboardOpen,
@@ -283,7 +292,71 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
   }
 }
 
-/// Top ~65% — large avatar, persona name, live status (no duplicate caption).
+/// Floating chrome over the stage (fullscreen — no scaffold app bar).
+class _TutorTopBar extends StatelessWidget {
+  const _TutorTopBar({
+    required this.turnCount,
+    required this.ending,
+    required this.onBack,
+    required this.onSwitchToChat,
+    required this.onEnd,
+  });
+
+  final int turnCount;
+  final bool ending;
+  final VoidCallback onBack;
+  final VoidCallback onSwitchToChat;
+  final VoidCallback onEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              color: scheme.onSurface,
+              onPressed: onBack,
+            ),
+            Expanded(
+              child: Text(
+                'Turn $turnCount',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Chat mode',
+              icon: const Icon(Icons.chat_bubble_outline),
+              onPressed: onSwitchToChat,
+            ),
+            TextButton.icon(
+              onPressed: ending ? null : onEnd,
+              icon: ending
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: scheme.primary,
+                      ),
+                    )
+                  : const Icon(Icons.flag_outlined, size: 18),
+              label: const Text('End'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TutorStage extends StatelessWidget {
   const _TutorStage({
     required this.persona,
@@ -300,7 +373,9 @@ class _TutorStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final avatarSize = (stageHeight * 0.52).clamp(160.0, 300.0);
+    final topInset = MediaQuery.paddingOf(context).top + 48;
+    final avatarSize =
+        (stageHeight - topInset - 72).clamp(180.0, 340.0);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -308,28 +383,32 @@ class _TutorStage extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            scheme.primaryContainer.withValues(alpha: 0.35),
+            scheme.primaryContainer.withValues(alpha: 0.4),
             scheme.surface,
           ],
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TutorAvatar(persona: persona, mood: mood, size: avatarSize),
-            const SizedBox(height: 12),
-            Text(
-              persona.name,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+      child: Column(
+        children: [
+          SizedBox(height: topInset),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TutorAvatar(persona: persona, mood: mood, size: avatarSize),
+                const SizedBox(height: 10),
+                Text(
+                  persona.name,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                _StatusChip(label: statusLabel, mood: mood),
+              ],
             ),
-            const SizedBox(height: 8),
-            _StatusChip(label: statusLabel, mood: mood),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -345,9 +424,18 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (Color bg, Color fg, IconData icon) = switch (mood) {
-      TutorMood.listening => (scheme.errorContainer, scheme.onErrorContainer, Icons.mic),
-      TutorMood.speaking => (scheme.primaryContainer, scheme.onPrimaryContainer, Icons.volume_up_rounded),
-      _ => (scheme.surfaceContainerHighest, scheme.onSurfaceVariant, Icons.record_voice_over_outlined),
+      TutorMood.listening =>
+        (scheme.errorContainer, scheme.onErrorContainer, Icons.mic),
+      TutorMood.speaking => (
+          scheme.primaryContainer,
+          scheme.onPrimaryContainer,
+          Icons.volume_up_rounded
+        ),
+      _ => (
+          scheme.surfaceContainerHighest,
+          scheme.onSurfaceVariant,
+          Icons.record_voice_over_outlined
+        ),
     };
 
     return Container(
@@ -361,18 +449,21 @@ class _StatusChip extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: fg),
           const SizedBox(width: 6),
-          Text(label, style: Theme.of(context).textTheme.labelLarge?.copyWith(color: fg)),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(color: fg),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Scrollable tutor / you bubbles plus optional suggestion card.
-class _TutorTranscript extends StatelessWidget {
-  const _TutorTranscript({
-    required this.scrollController,
-    required this.messages,
+/// At most one tutor line + one user line — current turn only, no scrolling.
+class _LatestBubblesPane extends StatelessWidget {
+  const _LatestBubblesPane({
+    required this.latestTutor,
+    required this.latestUser,
     required this.personaName,
     required this.bubbleStyle,
     required this.highlightedAssistantId,
@@ -380,8 +471,8 @@ class _TutorTranscript extends StatelessWidget {
     required this.onSendSuggestion,
   });
 
-  final ScrollController scrollController;
-  final List<ConversationMessage> messages;
+  final ConversationMessage? latestTutor;
+  final ConversationMessage? latestUser;
   final String personaName;
   final BubbleStyle bubbleStyle;
   final String? highlightedAssistantId;
@@ -391,46 +482,48 @@ class _TutorTranscript extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final itemCount = messages.length + (suggestion != null ? 1 : 0);
+    final hasBubbles = latestTutor != null || latestUser != null;
 
-    if (itemCount == 0) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'Your conversation will appear here.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-          ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        if (index < messages.length) {
-          final msg = messages[index];
-          final isUser = msg.role == 'user';
-          final highlighted =
-              !isUser && msg.id == highlightedAssistantId;
-          return _TranscriptTurn(
-            label: isUser ? 'You' : personaName,
-            icon: isUser ? Icons.mic_none_outlined : Icons.smart_toy_outlined,
-            alignEnd: isUser,
-            highlighted: highlighted,
-            child: ChatBubble(message: msg, style: bubbleStyle),
-          );
-        }
-        return _SuggestedReplyCard(
-          text: suggestion!,
-          onSend: onSendSuggestion!,
-        );
-      },
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!hasBubbles && suggestion == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Your latest lines appear here.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+          if (latestTutor != null)
+            _TranscriptTurn(
+              label: personaName,
+              icon: Icons.smart_toy_outlined,
+              alignEnd: false,
+              highlighted: latestTutor!.id == highlightedAssistantId,
+              child: ChatBubble(message: latestTutor!, style: bubbleStyle),
+            ),
+          if (latestUser != null)
+            _TranscriptTurn(
+              label: 'You',
+              icon: Icons.mic_none_outlined,
+              alignEnd: true,
+              highlighted: false,
+              child: ChatBubble(message: latestUser!, style: bubbleStyle),
+            ),
+          if (suggestion != null)
+            _SuggestedReplyCard(
+              text: suggestion!,
+              onSend: onSendSuggestion!,
+            ),
+        ],
+      ),
     );
   }
 }
@@ -454,13 +547,13 @@ class _TranscriptTurn extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Column(
         crossAxisAlignment:
             alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 4, right: 4, bottom: 4),
+            padding: const EdgeInsets.only(left: 4, right: 4, bottom: 2),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -488,7 +581,15 @@ class _TranscriptTurn extends StatelessWidget {
                     border: Border.all(color: scheme.primary, width: 2),
                   )
                 : null,
-            child: child,
+            child: ClipRect(
+              child: Align(
+                alignment: alignEnd
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                heightFactor: 1,
+                child: child,
+              ),
+            ),
           ),
         ],
       ),
@@ -506,52 +607,36 @@ class _SuggestedReplyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
       child: Material(
-        color: scheme.surface,
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: scheme.outline,
-            width: 1,
-            style: BorderStyle.solid,
-          ),
+          side: BorderSide(color: scheme.outlineVariant),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onSend,
           child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.lightbulb_outline,
-                        size: 16, color: scheme.tertiary),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Suggested reply',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: scheme.tertiary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Tap to send',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
+                Icon(Icons.lightbulb_outline, size: 16, color: scheme.tertiary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    text,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
-                const SizedBox(height: 8),
                 Text(
-                  text,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  'Send',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
               ],
             ),
@@ -592,12 +677,12 @@ class _TutorDock extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Material(
-      elevation: 8,
+      elevation: 6,
       color: scheme.surfaceContainerLow,
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -609,7 +694,7 @@ class _TutorDock extends StatelessWidget {
                       child: TextField(
                         controller: typedInput,
                         minLines: 1,
-                        maxLines: 3,
+                        maxLines: 2,
                         enabled: !typedSending,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => onSendTyped(),
@@ -633,7 +718,7 @@ class _TutorDock extends StatelessWidget {
                     ),
                   ],
                 ),
-              if (showTypeBar) const SizedBox(height: 8),
+              if (showTypeBar) const SizedBox(height: 6),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -644,12 +729,14 @@ class _TutorDock extends StatelessWidget {
                       onPressEnd: onPressEnd,
                       onCancel: onCancel,
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                   ],
                   TextButton.icon(
                     onPressed: onToggleType,
-                    icon: Icon(showTypeBar ? Icons.mic : Icons.keyboard_outlined),
-                    label: Text(showTypeBar ? 'Use mic' : 'Type instead'),
+                    icon: Icon(
+                      showTypeBar ? Icons.mic : Icons.keyboard_outlined,
+                    ),
+                    label: Text(showTypeBar ? 'Mic' : 'Type'),
                   ),
                 ],
               ),
@@ -683,8 +770,8 @@ class _MicButton extends StatelessWidget {
       onLongPressCancel: onCancel,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: recording ? 76 : 64,
-        height: recording ? 76 : 64,
+        width: recording ? 72 : 60,
+        height: recording ? 72 : 60,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: recording ? scheme.errorContainer : scheme.primaryContainer,
@@ -692,15 +779,16 @@ class _MicButton extends StatelessWidget {
             if (recording)
               BoxShadow(
                 color: scheme.error.withValues(alpha: 0.45),
-                blurRadius: 20,
-                spreadRadius: 4,
+                blurRadius: 18,
+                spreadRadius: 3,
               ),
           ],
         ),
         child: Icon(
           recording ? Icons.stop : Icons.mic,
-          size: recording ? 32 : 28,
-          color: recording ? scheme.onErrorContainer : scheme.onPrimaryContainer,
+          size: recording ? 30 : 26,
+          color:
+              recording ? scheme.onErrorContainer : scheme.onPrimaryContainer,
         ),
       ),
     );

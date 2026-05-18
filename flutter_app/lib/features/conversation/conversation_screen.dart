@@ -131,40 +131,36 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     final data = ref.watch(_sessionProvider(widget.sessionId));
     final scheme = Theme.of(context).colorScheme;
     final bubbleStyle = ref.watch(bubbleStyleProvider);
+    final isTutorMode = data.maybeWhen(
+      data: (d) => (_viewMode ?? d.session.mode) == 'face',
+      orElse: () => false,
+    );
 
     return Scaffold(
-      appBar: AppBar(
-        title: data.maybeWhen(
-          data: (d) => Text('Turn ${d.session.turnCount}'),
-          orElse: () => const Text('Conversation'),
-        ),
-        actions: [
-          // Mode toggle — flips between the text-bubble (chat) view and the
-          // big-avatar tutor view without ending the session.
-          data.maybeWhen(
-            data: (d) {
-              final mode = _viewMode ?? d.session.mode;
-              return IconButton(
-                tooltip: mode == 'face' ? 'Chat mode' : 'Tutor mode',
-                icon: Icon(
-                  mode == 'face' ? Icons.chat_bubble_outline : Icons.face_retouching_natural,
+      // Tutor mode is fullscreen — chrome lives inside [TutorModeView].
+      appBar: isTutorMode
+          ? null
+          : AppBar(
+              title: data.maybeWhen(
+                data: (d) => Text('Turn ${d.session.turnCount}'),
+                orElse: () => const Text('Conversation'),
+              ),
+              actions: [
+                data.maybeWhen(
+                  data: (_) => IconButton(
+                    tooltip: 'Tutor mode',
+                    icon: const Icon(Icons.face_retouching_natural),
+                    onPressed: () => setState(() => _viewMode = 'face'),
+                  ),
+                  orElse: () => const SizedBox.shrink(),
                 ),
-                onPressed: () {
-                  setState(() {
-                    _viewMode = mode == 'face' ? 'chat' : 'face';
-                  });
-                },
-              );
-            },
-            orElse: () => const SizedBox.shrink(),
-          ),
-          TextButton.icon(
-            onPressed: _ending ? null : _end,
-            icon: const Icon(Icons.flag_outlined),
-            label: const Text('End'),
-          ),
-        ],
-      ),
+                TextButton.icon(
+                  onPressed: _ending ? null : _end,
+                  icon: const Icon(Icons.flag_outlined),
+                  label: const Text('End'),
+                ),
+              ],
+            ),
       body: data.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, st) {
@@ -182,8 +178,12 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               sessionId: widget.sessionId,
               personaId: d.session.personaId,
               messages: d.messages,
+              turnCount: d.session.turnCount,
               onSendText: _send,
               onIdleSuggestion: _fetchSuggestion,
+              onSwitchToChat: () => setState(() => _viewMode = 'chat'),
+              onEnd: _end,
+              ending: _ending,
             );
           }
           return _ChatModeBody(
@@ -283,15 +283,23 @@ class _TutorModeWrapper extends ConsumerWidget {
     required this.sessionId,
     required this.personaId,
     required this.messages,
+    required this.turnCount,
     required this.onSendText,
     required this.onIdleSuggestion,
+    required this.onSwitchToChat,
+    required this.onEnd,
+    required this.ending,
   });
 
   final String sessionId;
   final String personaId;
   final List<ConversationMessage> messages;
+  final int turnCount;
   final Future<void> Function(String text) onSendText;
   final Future<String?> Function() onIdleSuggestion;
+  final VoidCallback onSwitchToChat;
+  final VoidCallback onEnd;
+  final bool ending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -312,8 +320,12 @@ class _TutorModeWrapper extends ConsumerWidget {
           sessionId: sessionId,
           persona: p,
           messages: messages,
+          turnCount: turnCount,
           onSendText: onSendText,
           onIdleSuggestion: onIdleSuggestion,
+          onSwitchToChat: onSwitchToChat,
+          onEnd: onEnd,
+          ending: ending,
         );
       },
     );
