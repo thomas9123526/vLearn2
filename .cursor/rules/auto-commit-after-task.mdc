@@ -1,0 +1,56 @@
+---
+description: Commit after each small completed task with a short work report
+alwaysApply: true
+---
+
+# Auto-commit after each small task
+
+When you finish a **small, self-contained task** (one bug fix, one screen change, one config tweak, etc.), **commit before moving on** to the next task or ending your turn.
+
+## What counts as "done"
+
+- A single user request is fully addressed (build passes / lints clean if you changed code).
+- You would naturally pause and report results to the user.
+- Do **not** batch unrelated changes into one commit.
+- Do **not** commit broken, half-finished, or untested work.
+
+## Commit workflow (required)
+
+After each small task, run in parallel:
+
+1. `git status`
+2. `git diff` (staged + unstaged)
+3. `git log -5 --oneline` (match existing message style)
+
+Then, if there are changes to commit:
+
+1. Stage only files for **this** task (never `.env`, keys, or credentials).
+2. Commit with a message that states **what you did and why** (1–2 sentences). Prefer the repo style (`fix:`, `feat:`, or short imperative sentences like recent commits).
+3. Run `git status` to confirm the commit succeeded.
+
+If the commit is rejected by a hook, fix the issue and create a **new** commit (do not amend unless the amend rules in user settings apply).
+
+## Report to the user
+
+After committing, include a brief **Work report** in your reply:
+
+```
+### Work report
+- **Commit:** `<short hash>` — `<commit subject line>`
+- **Done:** 1–3 bullets on what changed and why
+- **Files:** key paths touched (optional, only if helpful)
+```
+
+If there was nothing to commit, say so and skip the report block.
+
+## Git safety (always)
+
+- Never update git config.
+- Never force-push to `main`/`master`.
+- Never skip hooks unless the user explicitly asks.
+- Never push unless the user explicitly asks.
+- Never commit secrets.
+
+## Scope
+
+This rule applies to **this repository** for every agent session. Split work into multiple commits when you complete multiple small tasks in one conversation.
