@@ -1,0 +1,8 @@
+I want analyze current conversation history.
+So When the user enter conversation with tap one scenario, the user discuss with the tutor.
+Some time later after the user exits normally or unexpectedly like app crashes or by going home screen, the user can visit app again.
+And the user tap the same scenario, and the conversation begins with new context.
+
+So How the conversation history is constructed now?
+And what can you suggest or recommend to how the user feels his past conversations, or the choice to continue last conversation.
+Please analyze the structure based on the current database and application and give me best answer to match our conversation application.
