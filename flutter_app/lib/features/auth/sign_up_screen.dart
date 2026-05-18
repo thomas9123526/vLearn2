@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/services/cid_fetch_service.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
@@ -19,6 +20,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _nameCtrl = TextEditingController();
   String _language = 'en';
   bool _obscure = true;
+  bool _cidSyncing = false;
 
   String? _politeError;
 
@@ -29,6 +31,22 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     _passwordCtrl.dispose();
     _nameCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncCid() async {
+    setState(() => _cidSyncing = true);
+    try {
+      final cid = await ref.read(cidFetchServiceProvider).fetchCid();
+      if (mounted) setState(() => _cidCtrl.text = cid);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not fetch CID. Please enter it manually.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cidSyncing = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -100,10 +118,24 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _cidCtrl,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'CID (National ID)',
-                    prefixIcon: Icon(Icons.credit_card_outlined),
+                    prefixIcon: const Icon(Icons.credit_card_outlined),
                     helperText: 'Up to 10 characters',
+                    suffixIcon: _cidSyncing
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            tooltip: 'Sync CID from network',
+                            icon: const Icon(Icons.sync),
+                            onPressed: isLoading ? null : _syncCid,
+                          ),
                   ),
                   keyboardType: TextInputType.text,
                   validator: (v) {

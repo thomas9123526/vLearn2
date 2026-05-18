@@ -5,6 +5,7 @@ import '../../core/auth/remembered_credentials.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/router/app_router.dart';
+import '../../core/services/cid_fetch_service.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -15,10 +16,12 @@ class SignInScreen extends ConsumerStatefulWidget {
 
 class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _cidCtrl = TextEditingController();
   final _cidUsernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
   bool _rememberMe = true;
+  bool _cidSyncing = false;
 
   String? _politeError;
 
@@ -41,9 +44,26 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   @override
   void dispose() {
+    _cidCtrl.dispose();
     _cidUsernameCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncCid() async {
+    setState(() => _cidSyncing = true);
+    try {
+      final cid = await ref.read(cidFetchServiceProvider).fetchCid();
+      if (mounted) setState(() => _cidCtrl.text = cid);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not fetch CID. Please enter it manually.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cidSyncing = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -106,6 +126,29 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       ),
                 ),
                 const SizedBox(height: 32),
+                TextFormField(
+                  controller: _cidCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'CID (National ID)',
+                    prefixIcon: const Icon(Icons.credit_card_outlined),
+                    suffixIcon: _cidSyncing
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            tooltip: 'Sync CID from network',
+                            icon: const Icon(Icons.sync),
+                            onPressed: isLoading ? null : _syncCid,
+                          ),
+                  ),
+                  keyboardType: TextInputType.text,
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _cidUsernameCtrl,
                   decoration: const InputDecoration(
