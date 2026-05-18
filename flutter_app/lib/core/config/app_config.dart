@@ -39,7 +39,7 @@ class AppConfig {
   /// The bundled default used when no config file exists. The file will be
   /// auto-created with these values on first launch.
   static AppConfig get defaults => AppConfig(
-        backendBaseUrl: 'http://$_defaultBackendHost:3000/api',
+        backendBaseUrl: 'http://$_defaultBackendHost:5100/api',
         requestTimeout: 30,
         topicSyncInterval: 60,
         environment: 'dev',
