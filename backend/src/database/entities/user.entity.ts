@@ -25,7 +25,7 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 10, nullable: true })
   cid!: string | null;
 
-  @Column({ type: 'varchar', length: 12, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   cid_username!: string | null;
 
   /// `'male' | 'female' | 'nonbinary' | 'unspecified'`. Surfaced in the

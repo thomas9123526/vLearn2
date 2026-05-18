@@ -150,14 +150,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   decoration: const InputDecoration(
                     labelText: 'CID Username',
                     prefixIcon: Icon(Icons.badge_outlined),
-                    helperText: '2–12 characters, used to sign in',
+                    helperText: 'At least 2 characters, used to sign in',
                   ),
                   keyboardType: TextInputType.text,
                   autofillHints: const [AutofillHints.newUsername],
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'CID username is required';
                     if (v.trim().length < 2) return 'At least 2 characters';
-                    if (v.trim().length > 12) return 'Max 12 characters';
                     return null;
                   },
                 ),

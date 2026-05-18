@@ -17,7 +17,7 @@ export class SignUpDto {
   @ApiProperty({ example: 'alex_kr', description: 'Login username (max 12 chars)' })
   @IsString()
   @MinLength(2)
-  @MaxLength(12)
+  @MaxLength(50)
   cidUsername!: string;
 
   @ApiProperty({ example: 'StrongP@ssw0rd' })
