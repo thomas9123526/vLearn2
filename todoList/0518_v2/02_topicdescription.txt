@@ -1,0 +1,1 @@
+Before enter conversation screen, there should be scenario description screen.

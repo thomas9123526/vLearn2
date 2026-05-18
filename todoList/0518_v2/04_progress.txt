@@ -1,0 +1,6 @@
+Progress tab have no content, why is it?
+What do i have to do to make progress tab show the user english progress.
+you can find some details from "C:\project\vLearn2\vLearn2Spec\design_handoff_freetalk"
+If there's missing backend api for it, plz make it on backend api. you can create new tables for it and put some logics based on based on your decision.
+I think some evaluation values should be provided from the application part.
+So implement this logic also on application part.

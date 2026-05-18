@@ -1,0 +1,1 @@
+1. I want enable typing text mode also on conversation tutor mode.

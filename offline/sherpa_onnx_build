@@ -1,0 +1,133 @@
+Hi! How can I help with the sherpa-onnx workspace today?
+
+I want build sherpa-onnx for android and windows , can you give me instructions?
+
+I’ll look through the repo’s build docs first so the Android and Windows steps match this checkout instead of giving generic CMake advice.
+
+I found platform-specific build scripts and CI workflows in the repo; I’m checking those next because they usually contain the exact supported CMake flags and environment assumptions.
+
+Yes. This repo already has build scripts/workflows for both.
+
+Android
+Recommended: build Android from WSL/Linux or Git Bash, not plain PowerShell, because the repo scripts are .sh.
+
+Prerequisites
+Install:
+
+Android Studio
+Android SDK + NDK
+CMake
+Ninja or Make
+Git Bash/WSL tools: bash, wget, unzip, tar
+Find your NDK path, usually like:
+
+C:\Users\aaa\AppData\Local\Android\Sdk\ndk\<version>
+In Git Bash/WSL, set it:
+
+export ANDROID_NDK=/c/Users/aaa/AppData/Local/Android/Sdk/ndk/<version>
+From repo root:
+
+cd /e/dataToExport/vtran/fromshc/sherpa-onnx-master
+Build Android libraries
+For common Android ABIs:
+
+export ANDROID_NDK=/c/Users/aaa/AppData/Local/Android/Sdk/ndk/<version>
+export SHERPA_ONNX_ENABLE_C_API=ON
+./build-android-arm64-v8a.sh
+./build-android-armv7-eabi.sh
+./build-android-x86-64.sh
+./build-android-x86.sh
+Outputs are under:
+
+build-android-arm64-v8a/install/lib
+build-android-armv7-eabi/install/lib
+build-android-x86-64/install/lib
+build-android-x86/install/lib
+For Android Studio JNI usage, copy the .so files into:
+
+app/src/main/jniLibs/arm64-v8a/
+app/src/main/jniLibs/armeabi-v7a/
+app/src/main/jniLibs/x86_64/
+app/src/main/jniLibs/x86/
+Important: with the default shared build, copy both:
+
+libsherpa-onnx-jni.so
+libonnxruntime.so
+If you want a single JNI library with ONNX Runtime linked statically:
+
+export BUILD_SHARED_LIBS=OFF
+./build-android-arm64-v8a.sh
+Then you mostly need:
+
+libsherpa-onnx-jni.so
+Build Android AAR
+The CI builds an AAR from:
+
+android/SherpaOnnxAar
+After building/copying jniLibs, run:
+
+cd android/SherpaOnnxAar
+./gradlew :sherpa_onnx:assembleRelease
+Output:
+
+android/SherpaOnnxAar/sherpa_onnx/build/outputs/aar/sherpa_onnx-release.aar
+Windows
+Use Developer PowerShell for Visual Studio 2022 or x64 Native Tools Command Prompt.
+
+Prerequisites
+Install:
+
+Visual Studio 2022 with “Desktop development with C++”
+CMake
+Git
+From repo root:
+
+cd e:\dataToExport\vtran\fromshc\sherpa-onnx-master
+mkdir build
+cd build
+Windows x64 Release build
+cmake -A x64 `
+  -DSHERPA_ONNX_ENABLE_TTS=ON `
+  -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF `
+  -DBUILD_SHARED_LIBS=ON `
+  -DSHERPA_ONNX_USE_STATIC_CRT=OFF `
+  -DBUILD_ESPEAK_NG_EXE=OFF `
+  -DCMAKE_INSTALL_PREFIX=./install `
+  ..
+cmake --build . --config Release -- /m:2
+cmake --build . --config Release --target install -- /m:2
+Output:
+
+build\install\bin
+build\install\lib
+build\install\include
+Main executable:
+
+build\install\bin\sherpa-onnx.exe
+Windows ARM64 or x86
+Only change the -A value:
+
+-A ARM64
+or:
+
+-A Win32
+Static library build
+For static libs:
+
+-DBUILD_SHARED_LIBS=OFF
+For static MSVC runtime:
+
+
+-DSHERPA_ONNX_USE_STATIC_CRT=ON
+My Suggested Starting Point
+For Android, start with only:
+
+export SHERPA_ONNX_ENABLE_C_API=ON
+./build-android-arm64-v8a.sh
+For Windows, start with:
+
+-A x64
+-DBUILD_SHARED_LIBS=ON
+-DSHERPA_ONNX_ENABLE_TTS=ON
+That gives you the most common Android ABI and a normal Windows x64 package first.
+
