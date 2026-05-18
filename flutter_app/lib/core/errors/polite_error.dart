@@ -42,6 +42,9 @@ enum ErrorContext {
   /// Sign-in attempt specifically.
   signIn,
 
+  /// Sign-up / registration attempt.
+  signUp,
+
   /// Anything else.
   generic,
 }
@@ -49,6 +52,10 @@ enum ErrorContext {
 /// Returns a single short, polite sentence describing the failure.
 /// Never returns a DioException toString.
 String politeMessageFor(Object error, {ErrorContext context = ErrorContext.generic}) {
+  if (error is ApiException && error.isNetwork) {
+    return "Couldn't reach the server. Check your connection and try again.";
+  }
+
   // ── Network-class errors (the user actually can't reach us) ─────────
   if (error is DioException) {
     switch (error.type) {
@@ -112,6 +119,8 @@ String politeMessageFor(Object error, {ErrorContext context = ErrorContext.gener
       return "That didn't work. Please try again.";
     case ErrorContext.signIn:
       return "Sign in didn't work. Please try again.";
+    case ErrorContext.signUp:
+      return "Couldn't create your account. Please try again.";
     case ErrorContext.generic:
       return "Something didn't work. Please try again.";
   }

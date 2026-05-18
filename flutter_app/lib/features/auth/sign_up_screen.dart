@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
@@ -18,6 +19,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   String _language = 'en';
   bool _obscure = true;
 
+  /// Polite, user-facing version of the last sign-up failure. Never shows a
+  /// raw DioException string. Cleared on the next submit attempt.
+  String? _politeError;
+
   @override
   void dispose() {
     _emailCtrl.dispose();
@@ -28,6 +33,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _politeError = null);
     await ref.read(authProvider.notifier).signUp(
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
@@ -40,6 +46,25 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final isLoading = auth.status == AuthStatus.checking;
+
+    ref.listen<AuthState>(authProvider, (prev, next) {
+      final raw = next.error;
+      if (next.status == AuthStatus.signedOut &&
+          raw != null &&
+          raw != prev?.error) {
+        logRawError('sign_up_screen', raw);
+        if (mounted) {
+          setState(() {
+            _politeError = politeMessageFor(raw, context: ErrorContext.signUp);
+          });
+        }
+      } else if (next.status == AuthStatus.checking ||
+          next.status == AuthStatus.signedIn) {
+        if (_politeError != null && mounted) {
+          setState(() => _politeError = null);
+        }
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(leading: IconButton(
@@ -121,12 +146,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   ],
                   onChanged: (v) => setState(() => _language = v ?? 'en'),
                 ),
-                if (auth.errorMessage != null) ...[
+                if (_politeError != null) ...[
                   const SizedBox(height: 16),
-                  Text(
-                    auth.errorMessage!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
+                  PoliteBanner(text: _politeError!),
                 ],
                 const SizedBox(height: 24),
                 FilledButton(

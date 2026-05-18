@@ -69,10 +69,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     // the raw provider error into the polite local one and logs the raw
     // version to the debug console.
     ref.listen<AuthState>(authProvider, (prev, next) {
-      final raw = next.errorMessage;
+      final raw = next.error;
       if (next.status == AuthStatus.signedOut &&
           raw != null &&
-          raw != prev?.errorMessage) {
+          raw != prev?.error) {
         logRawError('sign_in_screen', raw);
         if (mounted) {
           setState(() {

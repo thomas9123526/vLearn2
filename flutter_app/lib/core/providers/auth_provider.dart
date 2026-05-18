@@ -9,7 +9,7 @@ class AuthState {
   const AuthState({
     required this.status,
     this.user,
-    this.errorMessage,
+    this.error,
     this.errorI18nKey,
   });
 
@@ -17,12 +17,15 @@ class AuthState {
   factory AuthState.checking() => const AuthState(status: AuthStatus.checking);
   factory AuthState.signedIn(UserProfile user) =>
       AuthState(status: AuthStatus.signedIn, user: user);
-  factory AuthState.error(String message, {String? i18nKey}) =>
-      AuthState(status: AuthStatus.signedOut, errorMessage: message, errorI18nKey: i18nKey);
+  factory AuthState.error(Object error, {String? i18nKey}) =>
+      AuthState(status: AuthStatus.signedOut, error: error, errorI18nKey: i18nKey);
 
   final AuthStatus status;
   final UserProfile? user;
-  final String? errorMessage;
+
+  /// Raw failure from the last sign-in / sign-up attempt. Screens translate
+  /// this via [politeMessageFor]; never show it directly to the user.
+  final Object? error;
   final String? errorI18nKey;
 
   bool get isSignedIn => status == AuthStatus.signedIn && user != null;
@@ -72,7 +75,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await creds.setEnabled(false);
       }
     } on Exception catch (e) {
-      state = AuthState.error(e.toString());
+      state = AuthState.error(e);
     }
   }
 
@@ -92,7 +95,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           );
       await _persistAndFetch(tokens);
     } on Exception catch (e) {
-      state = AuthState.error(e.toString());
+      state = AuthState.error(e);
     }
   }
 

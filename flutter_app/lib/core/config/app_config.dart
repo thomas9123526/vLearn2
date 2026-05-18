@@ -31,14 +31,19 @@ class AppConfig {
 
   bool get isDev => environment == 'dev';
 
+  /// Loopback host for the dev backend: Android emulator maps `10.0.2.2` to
+  /// the host machine; other platforms use `localhost`.
+  static String get _defaultBackendHost =>
+      Platform.isAndroid ? '10.0.2.2' : 'localhost';
+
   /// The bundled default used when no config file exists. The file will be
   /// auto-created with these values on first launch.
-  static const defaults = AppConfig(
-    backendBaseUrl: 'http://localhost:3000/api',
-    requestTimeout: 30,
-    topicSyncInterval: 60,
-    environment: 'dev',
-  );
+  static AppConfig get defaults => AppConfig(
+        backendBaseUrl: 'http://$_defaultBackendHost:3000/api',
+        requestTimeout: 30,
+        topicSyncInterval: 60,
+        environment: 'dev',
+      );
 
   /// JSON shape — short field names per the spec (`baseurl`, `reqTout`,
   /// `tSync`, `dev`). `dev` is a string, not a boolean.
