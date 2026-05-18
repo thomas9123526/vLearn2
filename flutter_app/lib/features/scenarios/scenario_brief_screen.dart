@@ -20,6 +20,18 @@ final _personasProvider = FutureProvider<List<Persona>>((ref) async {
   return raw.map(Persona.fromJson).toList();
 });
 
+/// Returns the most recent active session for this scenario, or null.
+final _activeSessionProvider =
+    FutureProvider.family<ConversationSession?, String>((ref, scenarioId) async {
+  final raw = await ref.read(conversationsApiProvider).listSessions(
+        scenarioId: scenarioId,
+        status: 'active',
+        limit: 1,
+      );
+  if (raw.isEmpty) return null;
+  return ConversationSession.fromJson(raw.first);
+});
+
 /// Intermediate "brief" between picking a topic on the scenarios screen and
 /// actually starting the conversation. Matches design_handoff_freetalk
 /// `screens.md` §5 — header, hero card, roles, twist, objectives,
@@ -33,9 +45,12 @@ class ScenarioBriefScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scenarioAsync = ref.watch(_scenarioProvider(scenarioId));
     final personasAsync = ref.watch(_personasProvider);
+    final activeSessionAsync = ref.watch(_activeSessionProvider(scenarioId));
     final locale = ref.watch(localeProvider).languageCode;
     final scheme = Theme.of(context).colorScheme;
     final user = ref.watch(authProvider).user;
+
+    final activeSession = activeSessionAsync.asData?.value;
 
     return Scaffold(
       appBar: AppBar(
@@ -84,6 +99,10 @@ class ScenarioBriefScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
             children: [
+              if (activeSession != null) ...[
+                _ContinueBanner(session: activeSession),
+                const SizedBox(height: 16),
+              ],
               _HeroCard(scenario: scenario, locale: locale),
               const SizedBox(height: 20),
               _RolesRow(scenario: scenario, persona: activePersona),
@@ -107,30 +126,61 @@ class ScenarioBriefScreen extends ConsumerWidget {
         data: (scenario) => SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => context.pop(),
-                    child: const Text('Back to topics'),
+            child: activeSession != null
+                ? _ContinueDock(
+                    scenario: scenario,
+                    activeSession: activeSession,
+                    onContinue: () => context.pushReplacement(
+                      AppRoute.conversation(activeSession.id),
+                    ),
+                    onStartFresh: () =>
+                        _startFresh(context, ref, scenario, activeSession),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => context.pop(),
+                          child: const Text('Back to topics'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton.icon(
+                          onPressed: () => _startSession(context, ref, scenario),
+                          icon: const Icon(Icons.play_arrow),
+                          label: Text(
+                              'Start speaking (${scenario.estimatedMinutes}m)'),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: FilledButton.icon(
-                    onPressed: () => _startSession(context, ref, scenario),
-                    icon: const Icon(Icons.play_arrow),
-                    label: Text('Start speaking (${scenario.estimatedMinutes}m)'),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
         orElse: () => const SizedBox.shrink(),
       ),
     );
+  }
+
+  Future<void> _startFresh(
+    BuildContext context,
+    WidgetRef ref,
+    Scenario scenario,
+    ConversationSession activeSession,
+  ) async {
+    try {
+      await ref
+          .read(conversationsApiProvider)
+          .endSession(activeSession.id, status: 'abandoned');
+      ref.invalidate(_activeSessionProvider(scenarioId));
+    } catch (_) {
+      // If abandon fails, proceed anyway — the session will stay active on the
+      // server but the user wanted to start fresh.
+    }
+    if (context.mounted) {
+      await _startSession(context, ref, scenario);
+    }
   }
 
   Future<void> _startSession(
@@ -174,6 +224,111 @@ class ScenarioBriefScreen extends ConsumerWidget {
         );
       }
     }
+  }
+}
+
+class _ContinueBanner extends StatelessWidget {
+  const _ContinueBanner({required this.session});
+  final ConversationSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final turns = session.turnCount;
+    final ago = _timeAgo(session.startedAt);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.history_rounded, color: scheme.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Unfinished conversation',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$turns ${turns == 1 ? 'turn' : 'turns'} · started $ago',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+}
+
+class _ContinueDock extends StatelessWidget {
+  const _ContinueDock({
+    required this.scenario,
+    required this.activeSession,
+    required this.onContinue,
+    required this.onStartFresh,
+  });
+  final Scenario scenario;
+  final ConversationSession activeSession;
+  final VoidCallback onContinue;
+  final VoidCallback onStartFresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FilledButton.icon(
+          onPressed: onContinue,
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Continue conversation'),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Back'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: onStartFresh,
+                child: Text('Start fresh (${scenario.estimatedMinutes}m)'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }
 

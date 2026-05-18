@@ -72,9 +72,18 @@ export class ConversationsService {
     return this.toSessionDto(session);
   }
 
-  async listForUser(userId: string, limit = 50): Promise<SessionDto[]> {
+  async listForUser(
+    userId: string,
+    limit = 50,
+    scenarioId?: string,
+    status?: string,
+  ): Promise<SessionDto[]> {
     const rows = await this.sessions.find({
-      where: { user_id: userId },
+      where: {
+        user_id: userId,
+        ...(scenarioId ? { scenario_id: scenarioId } : {}),
+        ...(status ? { status } : {}),
+      },
       order: { started_at: 'DESC' },
       take: limit,
     });

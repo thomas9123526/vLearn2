@@ -37,8 +37,15 @@ class ConversationsController {
   list(
     @CurrentUser() user: JwtPayload,
     @Query('limit') limit?: string,
+    @Query('scenarioId') scenarioId?: string,
+    @Query('status') status?: string,
   ) {
-    return this.svc.listForUser(user.sub, limit ? parseInt(limit, 10) : 50);
+    return this.svc.listForUser(
+      user.sub,
+      limit ? parseInt(limit, 10) : 50,
+      scenarioId,
+      status,
+    );
   }
 
   @Get('sessions/:id')

@@ -101,10 +101,18 @@ class ConversationsApi {
     return res.data!;
   }
 
-  Future<List<Map<String, dynamic>>> listSessions({int? limit}) async {
+  Future<List<Map<String, dynamic>>> listSessions({
+    int? limit,
+    String? scenarioId,
+    String? status,
+  }) async {
     final res = await _dio.get<List<dynamic>>(
       '/conversations/sessions',
-      queryParameters: limit == null ? null : {'limit': limit},
+      queryParameters: <String, Object?>{
+        'limit': limit,
+        'scenarioId': scenarioId,
+        'status': status,
+      }..removeWhere((_, v) => v == null),
     );
     return res.data!.cast<Map<String, dynamic>>();
   }

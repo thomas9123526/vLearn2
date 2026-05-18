@@ -1,0 +1,9 @@
+When i tap edit for tutors in admin panel , I get message like this
+Error: An unsupported type was passed to use(): [object Object]
+
+in console like this.
+Type '{ status?: string | undefined; scenario_id?: string | undefined; user_id: string; }' is not assignable to type 'FindOptionsWhere<ConversationSessionEntity> | FindOptionsWhere<ConversationSessionEntity>[] | undefined'.
+  Type '{ status?: string | undefined; scenario_id?: string | undefined; user_id: string; }' is not assignable to type 'undefined'.
+
+82       where: {
+         ~~~~~
