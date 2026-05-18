@@ -217,87 +217,106 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     final caption = _liveCaption ?? 'Tap and hold the mic to talk.';
     final suggestion = _idleSuggestion;
 
-    return Container(
-      width: double.infinity,
+    return ColoredBox(
       color: scheme.surface,
-      child: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TutorAvatar(persona: widget.persona, mood: _mood),
-                    const SizedBox(height: 24),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Text(
-                        caption,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleMedium,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Avatar + glow is ~300px; shrink on short viewports to avoid overflow.
+          final compact = constraints.maxHeight < 640;
+          final avatarSize = compact ? 176.0 : 240.0;
+
+          return Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Column(
+                    children: [
+                      TutorAvatar(
+                        persona: widget.persona,
+                        mood: _mood,
+                        size: avatarSize,
                       ),
-                    ),
-                    if (suggestion != null) ...[
-                      const SizedBox(height: 16),
-                      _SuggestionChip(
-                        text: suggestion,
-                        onSend: () async {
-                          setState(() {
-                            _idleSuggestion = null;
-                            _mood = TutorMood.idle;
-                          });
-                          await widget.onSendText(suggestion);
-                        },
+                      SizedBox(height: compact ? 12 : 24),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          caption,
+                          textAlign: TextAlign.center,
+                          maxLines: compact ? 3 : 5,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _typedInput,
-                      minLines: 1,
-                      maxLines: 3,
-                      enabled: !_typedSending,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendTyped(),
-                      decoration: const InputDecoration(
-                        hintText: 'Or type if you can\'t talk…',
-                        isDense: true,
+              if (suggestion != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: _SuggestionChip(
+                    text: suggestion,
+                    onSend: () async {
+                      setState(() {
+                        _idleSuggestion = null;
+                        _mood = TutorMood.idle;
+                      });
+                      await widget.onSendText(suggestion);
+                    },
+                  ),
+                ),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _typedInput,
+                              minLines: 1,
+                              maxLines: 2,
+                              enabled: !_typedSending,
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (_) => _sendTyped(),
+                              decoration: const InputDecoration(
+                                hintText: 'Or type if you can\'t talk…',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filledTonal(
+                            onPressed: _typedSending ? null : _sendTyped,
+                            icon: _typedSending
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.send, size: 18),
+                          ),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      _MicButton(
+                        recording: _mood == TutorMood.listening,
+                        onPressStart: _startRecording,
+                        onPressEnd: _stopRecording,
+                        onCancel: _cancelRecording,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    onPressed: _typedSending ? null : _sendTyped,
-                    icon: _typedSending
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send, size: 18),
-                  ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _MicButton(
-              recording: _mood == TutorMood.listening,
-              onPressStart: _startRecording,
-              onPressEnd: _stopRecording,
-              onCancel: _cancelRecording,
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -357,32 +376,31 @@ class _SuggestionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Material(
-        color: scheme.primaryContainer,
+    return Material(
+      color: scheme.primaryContainer,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onSend,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.lightbulb_outline,
-                    size: 18, color: scheme.onPrimaryContainer),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    'Try: $text',
-                    style: TextStyle(color: scheme.onPrimaryContainer),
-                  ),
+        onTap: onSend,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.lightbulb_outline,
+                  size: 18, color: scheme.onPrimaryContainer),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Try: $text',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: scheme.onPrimaryContainer),
                 ),
-                const SizedBox(width: 8),
-                Icon(Icons.send, size: 16, color: scheme.onPrimaryContainer),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.send, size: 16, color: scheme.onPrimaryContainer),
+            ],
           ),
         ),
       ),
