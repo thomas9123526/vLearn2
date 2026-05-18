@@ -1,0 +1,11 @@
+# pick a free port (e.g. 4100, since 5173 is also listed in CORS_ORIGINS)
+cd /root/vfls/vLearn2/admin_panel
+
+# either edit package.json to use -p 4100 in `start`, or pass via env:
+#   "start": "next start -p ${PORT:-4000}"
+# then:
+npm run build
+
+pm2 delete vfls-admin
+PORT=4100 pm2 start npm --name vfls-admin --cwd /root/vfls/vLearn2/admin_panel -- run start
+pm2 save
