@@ -2,7 +2,7 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UserEntity } from '../../database/entities/user.entity';
+import { UserInfoEntity } from '../../database/entities/user-info.entity';
 import { ConversationSessionEntity } from '../../database/entities/conversation.entity';
 import { ScenarioEntity } from '../../database/entities/scenario.entity';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -21,8 +21,8 @@ interface AdminStatsResponse {
 @Controller('admin/stats')
 export class AdminStatsController {
   constructor(
-    @InjectRepository(UserEntity)
-    private readonly users: Repository<UserEntity>,
+    @InjectRepository(UserInfoEntity)
+    private readonly userInfos: Repository<UserInfoEntity>,
     @InjectRepository(ConversationSessionEntity)
     private readonly sessions: Repository<ConversationSessionEntity>,
     @InjectRepository(ScenarioEntity)
@@ -38,10 +38,10 @@ export class AdminStatsController {
 
     const [usersTotal, usersActive, sessionsTotal, scenariosPublished] =
       await Promise.all([
-        this.users.count(),
-        this.users
-          .createQueryBuilder('u')
-          .where('u.last_active_date >= :since', { since: thirtyDaysAgo })
+        this.userInfos.count({ where: { role: 'user' } }),
+        this.userInfos
+          .createQueryBuilder('i')
+          .where(`i.role = 'user' AND i.last_active_date >= :since`, { since: thirtyDaysAgo })
           .getCount(),
         this.sessions.count(),
         this.scenarios.count({ where: { status: 'published' } }),

@@ -22,6 +22,7 @@ import { RefreshTokenEntity } from './refresh-token.entity';
 import { ScenarioEntity } from './scenario.entity';
 import { UploadedFileEntity } from './uploaded-file.entity';
 import { UserEntity } from './user.entity';
+import { UserInfoEntity } from './user-info.entity';
 
 export {
   AdminEntity,
@@ -47,6 +48,7 @@ export {
   ScenarioEntity,
   UploadedFileEntity,
   UserEntity,
+  UserInfoEntity,
 };
 
 export const ALL_ENTITIES = [
@@ -73,4 +75,5 @@ export const ALL_ENTITIES = [
   ScenarioEntity,
   UploadedFileEntity,
   UserEntity,
+  UserInfoEntity,
 ];

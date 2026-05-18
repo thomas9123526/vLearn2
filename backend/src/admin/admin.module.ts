@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from '../database/entities/user.entity';
+import { UserInfoEntity } from '../database/entities/user-info.entity';
 import { AdminEntity } from '../database/entities/admin.entity';
 import { AdminRefreshTokenEntity } from '../database/entities/admin-refresh-token.entity';
 import { AdminPermissionEntity } from '../database/entities/admin-permission.entity';
@@ -26,6 +27,7 @@ import { AuthModule } from '../auth/auth.module';
   imports: [
     TypeOrmModule.forFeature([
       UserEntity,
+      UserInfoEntity,
       AdminEntity,
       AdminRefreshTokenEntity,
       AdminPermissionEntity,

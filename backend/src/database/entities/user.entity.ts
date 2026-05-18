@@ -2,24 +2,19 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { UserInfoEntity } from './user-info.entity';
 
 export type UserRole = 'user' | 'admin' | 'superadmin';
 export type UserStatus = 'active' | 'suspended' | 'deleted';
 
 @Entity({ name: 'users' })
-@Index(['xp_total'])
-@Index(['streak_days'])
 export class UserEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
-
-  @Index({ unique: true })
-  @Column({ type: 'varchar', length: 255 })
-  email!: string;
 
   @Column({ type: 'varchar', length: 255, select: false })
   password_hash!: string;
@@ -33,57 +28,13 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 12, nullable: true })
   cid_username!: string | null;
 
-  @Column({ type: 'varchar', length: 10, default: '🐣' })
-  avatar_emoji!: string;
-
   /// `'male' | 'female' | 'nonbinary' | 'unspecified'`. Surfaced in the
-  /// Settings profile-edit dialog. We don't make the app render anything
-  /// gender-specific yet — it's purely user-facing self-id for now.
+  /// Settings profile-edit dialog.
   @Column({ type: 'varchar', length: 20, default: 'unspecified' })
   gender!: string;
 
-  @Column({ type: 'varchar', length: 10, default: 'en' })
-  native_language!: string;
-
-  @Column({ type: 'varchar', length: 10, default: 'en' })
-  ui_language!: string;
-
-  @Column({ type: 'smallint', default: 1 })
-  current_level!: number;
-
-  @Column({ type: 'int', default: 0 })
-  xp_total!: number;
-
-  @Column({ type: 'smallint', default: 0 })
-  streak_days!: number;
-
-  @Column({ type: 'date', nullable: true })
-  last_active_date!: Date | null;
-
-  @Column({ type: 'uuid', nullable: true })
-  active_persona_id!: string | null;
-
-  @Column({ type: 'varchar', length: 20, default: 'apricot' })
-  active_theme!: string;
-
-  @Column({ type: 'boolean', default: false })
-  onboarding_done!: boolean;
-
-  @Column({ type: 'varchar', length: 20, default: 'user' })
-  role!: UserRole;
-
-  // Status & suspension (see 13 §13.4.4)
-  @Column({ type: 'varchar', length: 20, default: 'active' })
-  status!: UserStatus;
-
-  @Column({ type: 'timestamptz', nullable: true })
-  suspended_until!: Date | null;
-
-  @Column({ type: 'text', nullable: true })
-  suspended_reason!: string | null;
-
-  @Column({ type: 'boolean', default: true })
-  leaderboard_opt_in!: boolean;
+  @OneToOne(() => UserInfoEntity, (i) => i.user, { eager: true, cascade: ['insert', 'update'] })
+  info!: UserInfoEntity;
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at!: Date;

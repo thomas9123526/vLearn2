@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { UserEntity } from '../database/entities/user.entity';
+import { UserInfoEntity } from '../database/entities/user-info.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard, RequirePermission } from './permissions/permission.guard';
 
@@ -32,8 +32,8 @@ const METRIC_COLUMN: Record<Metric, string> = {
 @Controller('admin/leaderboard')
 export class AdminLeaderboardController {
   constructor(
-    @InjectRepository(UserEntity)
-    private readonly users: Repository<UserEntity>,
+    @InjectRepository(UserInfoEntity)
+    private readonly userInfos: Repository<UserInfoEntity>,
   ) {}
 
   @Get()
@@ -49,40 +49,30 @@ export class AdminLeaderboardController {
   ) {
     const col = METRIC_COLUMN[metric] ?? METRIC_COLUMN.xp_total;
     const lim = Math.min(parseInt(limit ?? '50', 10) || 50, 200);
-    const qb = this.users
-      .createQueryBuilder('u')
-      .select([
-        'u.id',
-        'u.email',
-        'u.name',
-        'u.avatar_emoji',
-        'u.ui_language',
-        'u.xp_total',
-        'u.current_level',
-        'u.streak_days',
-        'u.status',
-      ])
-      .where(`u.role = 'user' AND u.status = 'active'`)
-      .orderBy(`u.${col}`, 'DESC')
+    const qb = this.userInfos
+      .createQueryBuilder('i')
+      .leftJoinAndSelect('i.user', 'u')
+      .where(`i.role = 'user' AND i.status = 'active'`)
+      .orderBy(`i.${col}`, 'DESC')
       .limit(lim);
-    if (language) qb.andWhere('u.ui_language = :lang', { lang: language });
+    if (language) qb.andWhere('i.ui_language = :lang', { lang: language });
     const rows = await qb.getMany();
-    return rows.map((u, i) => ({
-      rank: i + 1,
-      id: u.id,
-      email: u.email,
-      display_name: u.name,
-      avatar_emoji: u.avatar_emoji,
-      ui_language: u.ui_language,
-      xp_total: u.xp_total,
-      current_level: u.current_level,
-      streak_days: u.streak_days,
+    return rows.map((i, idx) => ({
+      rank: idx + 1,
+      id: i.user_id,
+      email: i.email,
+      display_name: i.user.name,
+      avatar_emoji: i.avatar_emoji,
+      ui_language: i.ui_language,
+      xp_total: i.xp_total,
+      current_level: i.current_level,
+      streak_days: i.streak_days,
       score:
         metric === 'xp_total'
-          ? u.xp_total
+          ? i.xp_total
           : metric === 'streak_days'
-            ? u.streak_days
-            : u.current_level,
+            ? i.streak_days
+            : i.current_level,
     }));
   }
 }

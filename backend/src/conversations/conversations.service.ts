@@ -155,8 +155,8 @@ export class ConversationsService {
       reply = await this.orchestrator.generateTutorReply({
         persona,
         scenario,
-        userLevel: user.current_level,
-        userNativeLanguage: user.native_language,
+        userLevel: user.info.current_level,
+        userNativeLanguage: user.info.native_language,
         history,
       });
     } else {
@@ -214,8 +214,8 @@ export class ConversationsService {
     const suggestion = await this.orchestrator.suggestNextLine({
       persona,
       scenario,
-      userLevel: user.current_level,
-      userNativeLanguage: user.native_language,
+      userLevel: user.info.current_level,
+      userNativeLanguage: user.info.native_language,
       history: history.map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,

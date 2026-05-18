@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UserEntity } from '../database/entities/user.entity';
+import { UserInfoEntity } from '../database/entities/user-info.entity';
 import { RefreshTokenEntity } from '../database/entities/refresh-token.entity';
 import { AdminPermissionEntity } from '../database/entities/admin-permission.entity';
 import { UserProgressEntity } from '../database/entities/progress.entity';
@@ -15,6 +16,7 @@ import { UserProgressEntity } from '../database/entities/progress.entity';
   imports: [
     TypeOrmModule.forFeature([
       UserEntity,
+      UserInfoEntity,
       RefreshTokenEntity,
       AdminPermissionEntity,
       UserProgressEntity,

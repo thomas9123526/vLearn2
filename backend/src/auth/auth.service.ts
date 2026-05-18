@@ -11,6 +11,7 @@ import { Repository, MoreThan } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { randomBytes, createHash } from 'crypto';
 import { UserEntity } from '../database/entities/user.entity';
+import { UserInfoEntity } from '../database/entities/user-info.entity';
 import { RefreshTokenEntity } from '../database/entities/refresh-token.entity';
 import { AdminPermissionEntity } from '../database/entities/admin-permission.entity';
 import { UserProgressEntity } from '../database/entities/progress.entity';
@@ -29,6 +30,8 @@ export class AuthService {
   constructor(
     @InjectRepository(UserEntity)
     private readonly users: Repository<UserEntity>,
+    @InjectRepository(UserInfoEntity)
+    private readonly userInfos: Repository<UserInfoEntity>,
     @InjectRepository(RefreshTokenEntity)
     private readonly refreshTokens: Repository<RefreshTokenEntity>,
     @InjectRepository(AdminPermissionEntity)
@@ -41,18 +44,20 @@ export class AuthService {
 
   // ─── Sign-up (regular user) ─────────────────────────────
   async signUp(dto: SignUpDto): Promise<AuthResponseDto> {
-    const existing = await this.users.findOne({ where: { email: dto.email } });
+    const existing = await this.userInfos.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException({ i18nKey: 'auth.email_taken' });
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     const user = await this.users.save(
       this.users.create({
-        email: dto.email,
         password_hash: passwordHash,
         name: dto.displayName,
-        ui_language: dto.uiLanguage ?? 'en',
-        native_language: dto.uiLanguage ?? 'en',
-        role: 'user',
+        info: this.userInfos.create({
+          email: dto.email,
+          ui_language: dto.uiLanguage ?? 'en',
+          native_language: dto.uiLanguage ?? 'en',
+          role: 'user',
+        }),
       }),
     );
 
@@ -64,40 +69,34 @@ export class AuthService {
 
   // ─── Sign-in ────────────────────────────────────────────
   async signIn(dto: SignInDto): Promise<AuthResponseDto> {
-    const user = await this.users.findOne({
-      where: { email: dto.email },
-      select: [
-        'id',
-        'email',
-        'password_hash',
-        'name',
-        'role',
-        'status',
-        'suspended_until',
-        'suspended_reason',
-      ],
-    });
-    if (!user) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
+    const info = await this.userInfos.findOne({ where: { email: dto.email } });
+    if (!info) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
 
-    if (user.status === 'deleted') {
+    if (info.status === 'deleted') {
       throw new ForbiddenException({ i18nKey: 'account.deleted' });
     }
-    if (user.status === 'suspended') {
-      const stillSuspended =
-        !user.suspended_until || user.suspended_until > new Date();
+    if (info.status === 'suspended') {
+      const stillSuspended = !info.suspended_until || info.suspended_until > new Date();
       if (stillSuspended) {
         throw new ForbiddenException({
           i18nKey: 'account.suspended',
-          suspendedUntil: user.suspended_until,
-          reason: user.suspended_reason,
+          suspendedUntil: info.suspended_until,
+          reason: info.suspended_reason,
         });
       }
     }
 
-    const ok = await bcrypt.compare(dto.password, user.password_hash);
+    const userWithHash = await this.users.findOne({
+      where: { id: info.user_id },
+      select: ['id', 'password_hash', 'name'],
+    });
+    if (!userWithHash) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
+
+    const ok = await bcrypt.compare(dto.password, userWithHash.password_hash);
     if (!ok) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
 
-    return this.issueTokensAndShape(user);
+    userWithHash.info = info;
+    return this.issueTokensAndShape(userWithHash);
   }
 
   // ─── Refresh ────────────────────────────────────────────
@@ -108,6 +107,7 @@ export class AuthService {
     });
     if (!stored) throw new UnauthorizedException({ i18nKey: 'auth.invalid_refresh' });
 
+    // eager loading populates user.info automatically
     const user = await this.users.findOne({ where: { id: stored.user_id } });
     if (!user) throw new UnauthorizedException();
 
@@ -134,18 +134,18 @@ export class AuthService {
     return {
       ...pair,
       userId: user.id,
-      email: user.email,
+      email: user.info.email,
       displayName: user.name,
-      role: user.role,
+      role: user.info.role,
     };
   }
 
   private async issueTokens(user: UserEntity): Promise<TokenPairDto> {
     const permissions = await this.resolvePermissions(user);
-    const payload = {
+    const payload: JwtPayload = {
       sub: user.id,
-      email: user.email,
-      role: user.role,
+      email: user.info.email,
+      role: user.info.role,
       permissions,
       actor: 'user' as const,
     };
@@ -175,12 +175,10 @@ export class AuthService {
   }
 
   private async resolvePermissions(user: UserEntity): Promise<string[]> {
-    if (user.role === 'superadmin') {
-      // Superadmin has all permissions — empty array signals "wildcard"
-      // to PermissionGuard, which short-circuits the check.
+    if (user.info.role === 'superadmin') {
       return ['*'];
     }
-    if (user.role !== 'admin') return [];
+    if (user.info.role !== 'admin') return [];
     const rows = await this.adminPermissions.findBy({ user_id: user.id });
     return rows.map((r) => r.permission);
   }

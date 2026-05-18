@@ -13,7 +13,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
-import { UserEntity } from '../database/entities/user.entity';
+import { UserInfoEntity } from '../database/entities/user-info.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard, RequirePermission } from './permissions/permission.guard';
 
@@ -37,8 +37,8 @@ class SuspendUserDto {
 @Controller('admin/users')
 export class AdminUsersController {
   constructor(
-    @InjectRepository(UserEntity)
-    private readonly users: Repository<UserEntity>,
+    @InjectRepository(UserInfoEntity)
+    private readonly userInfos: Repository<UserInfoEntity>,
   ) {}
 
   @Get()
@@ -52,29 +52,30 @@ export class AdminUsersController {
   ) {
     const lim = Math.min(parseInt(limit ?? '20', 10) || 20, 100);
     const off = Math.max((parseInt(page ?? '1', 10) || 1) - 1, 0) * lim;
-    const qb = this.users
-      .createQueryBuilder('u')
-      .where(`u.role = 'user'`)
+    const qb = this.userInfos
+      .createQueryBuilder('i')
+      .leftJoinAndSelect('i.user', 'u')
+      .where(`i.role = 'user'`)
       .orderBy('u.created_at', 'DESC')
       .skip(off)
       .take(lim);
     if (q) {
-      qb.andWhere(`(u.email ILIKE :q OR u.name ILIKE :q)`, { q: `%${q}%` });
+      qb.andWhere(`(i.email ILIKE :q OR u.name ILIKE :q)`, { q: `%${q}%` });
     }
-    if (status) qb.andWhere('u.status = :s', { s: status });
+    if (status) qb.andWhere('i.status = :s', { s: status });
     const [items, total] = await qb.getManyAndCount();
     return {
-      items: items.map((u) => ({
-        id: u.id,
-        email: u.email,
-        display_name: u.name,
-        status: u.status,
-        suspended_until: u.suspended_until,
-        suspended_reason: u.suspended_reason,
-        xp_total: u.xp_total,
-        current_level: u.current_level,
-        streak_days: u.streak_days,
-        created_at: u.created_at,
+      items: items.map((i) => ({
+        id: i.user_id,
+        email: i.email,
+        display_name: i.user.name,
+        status: i.status,
+        suspended_until: i.suspended_until,
+        suspended_reason: i.suspended_reason,
+        xp_total: i.xp_total,
+        current_level: i.current_level,
+        streak_days: i.streak_days,
+        created_at: i.user.created_at,
       })),
       total,
       page: parseInt(page ?? '1', 10) || 1,
@@ -85,24 +86,24 @@ export class AdminUsersController {
   @Get(':id')
   @RequirePermission('users.view')
   async get(@Param('id') id: string) {
-    const u = await this.users.findOne({ where: { id } });
-    if (!u) throw new NotFoundException({ i18nKey: 'user.not_found' });
-    return u;
+    const i = await this.userInfos.findOne({ where: { user_id: id }, relations: ['user'] });
+    if (!i) throw new NotFoundException({ i18nKey: 'user.not_found' });
+    return i;
   }
 
   @Post(':id/suspend')
   @RequirePermission('users.suspend')
   @ApiOperation({ summary: 'Suspend (block) a user — sub-admins use this to stop abusers' })
   async suspend(@Param('id') id: string, @Body() dto: SuspendUserDto) {
-    const u = await this.users.findOne({ where: { id } });
-    if (!u) throw new NotFoundException({ i18nKey: 'user.not_found' });
-    if (u.role !== 'user') {
+    const i = await this.userInfos.findOne({ where: { user_id: id } });
+    if (!i) throw new NotFoundException({ i18nKey: 'user.not_found' });
+    if (i.role !== 'user') {
       throw new BadRequestException({ i18nKey: 'user.cannot_suspend_admin' });
     }
-    u.status = 'suspended';
-    u.suspended_reason = dto.reason ?? null;
-    u.suspended_until = dto.until ? new Date(dto.until) : null;
-    await this.users.save(u);
+    i.status = 'suspended';
+    i.suspended_reason = dto.reason ?? null;
+    i.suspended_until = dto.until ? new Date(dto.until) : null;
+    await this.userInfos.save(i);
     return { ok: true };
   }
 
@@ -110,12 +111,12 @@ export class AdminUsersController {
   @RequirePermission('users.suspend')
   @ApiOperation({ summary: 'Restore a previously suspended user' })
   async restore(@Param('id') id: string) {
-    const u = await this.users.findOne({ where: { id } });
-    if (!u) throw new NotFoundException({ i18nKey: 'user.not_found' });
-    u.status = 'active';
-    u.suspended_reason = null;
-    u.suspended_until = null;
-    await this.users.save(u);
+    const i = await this.userInfos.findOne({ where: { user_id: id } });
+    if (!i) throw new NotFoundException({ i18nKey: 'user.not_found' });
+    i.status = 'active';
+    i.suspended_reason = null;
+    i.suspended_until = null;
+    await this.userInfos.save(i);
     return { ok: true };
   }
 }
