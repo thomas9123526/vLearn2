@@ -153,7 +153,8 @@ class ConfigFileService {
     }
     try {
       final raw = await file.readAsString();
-      final j = jsonDecode(raw) as Map<String, dynamic>;
+      final jsonStr = _decodeContent(raw.trim());
+      final j = jsonDecode(jsonStr) as Map<String, dynamic>;
       return AppConfig.fromJson(j);
     } catch (_) {
       await write(AppConfig.defaults, file: file);
@@ -163,9 +164,20 @@ class ConfigFileService {
 
   Future<void> write(AppConfig config, {File? file}) async {
     final target = file ?? await resolveConfigFile();
-    await target.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(config.toJson()),
-    );
+    final jsonStr = const JsonEncoder.withIndent('  ').convert(config.toJson());
+    await target.writeAsString(base64Encode(utf8.encode(jsonStr)));
+  }
+
+  /// Decodes the file content. Accepts both base64 (new format) and plain
+  /// JSON (legacy) so existing config files are migrated transparently on
+  /// the next write rather than immediately wiped.
+  static String _decodeContent(String raw) {
+    try {
+      return utf8.decode(base64Decode(raw));
+    } catch (_) {
+      // Plain JSON from before the base64 migration — use as-is.
+      return raw;
+    }
   }
 }
 
