@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Power, RotateCcw } from 'lucide-react';
+import { Pencil, Plus, Power, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
@@ -106,26 +106,36 @@ export default function PersonasPage() {
                   </span>
                 </td>
                 <td className="px-4 py-2 text-right">
-                  {canEdit &&
-                    (p.is_active ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          if (confirm(`Deactivate tutor "${p.name}"? Past sessions stay attributed to them.`)) {
-                            deactivate.mutate(p.id);
-                          }
-                        }}
-                      >
-                        <Power className="h-4 w-4" />
-                        Deactivate
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={() => restore.mutate(p.id)}>
-                        <RotateCcw className="h-4 w-4" />
-                        Restore
-                      </Button>
-                    ))}
+                  <div className="flex items-center justify-end gap-1">
+                    {canEdit && (
+                      <Link href={`/personas/${p.id}`}>
+                        <Button size="sm" variant="ghost">
+                          <Pencil className="h-4 w-4" />
+                          Edit
+                        </Button>
+                      </Link>
+                    )}
+                    {canEdit &&
+                      (p.is_active ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (confirm(`Deactivate tutor "${p.name}"? Past sessions stay attributed to them.`)) {
+                              deactivate.mutate(p.id);
+                            }
+                          }}
+                        >
+                          <Power className="h-4 w-4" />
+                          Deactivate
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => restore.mutate(p.id)}>
+                          <RotateCcw className="h-4 w-4" />
+                          Restore
+                        </Button>
+                      ))}
+                  </div>
                 </td>
               </tr>
             ))}

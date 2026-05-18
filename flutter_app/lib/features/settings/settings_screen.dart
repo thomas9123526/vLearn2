@@ -5,6 +5,7 @@ import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/storage/model_registry.dart';
+import '../../core/theme/app_tokens.dart';
 import '../../core/theme/bubble_style.dart';
 import '../../core/theme/font_group.dart';
 import '../../features/conversation/widgets/chat_bubble.dart';
@@ -111,14 +112,35 @@ class SettingsScreen extends ConsumerWidget {
       };
 
   Future<void> _pickTheme(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(appSettingsProvider).theme;
     final picked = await showModalBottomSheet<String>(
       context: context,
-      builder: (_) => ListView(
-        shrinkWrap: true,
-        children: [
-          for (final t in const ['apricot', 'sage', 'iris', 'obsidian'])
-            ListTile(title: Text(t), onTap: () => Navigator.pop(context, t)),
-        ],
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Choose theme',
+                  style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+              for (final key in const ['apricot', 'sage', 'iris', 'obsidian'])
+                _ThemeTile(
+                  themeKey: key,
+                  isSelected: key == current,
+                  onTap: () => Navigator.pop(sheetCtx, key),
+                ),
+            ],
+          ),
+        ),
       ),
     );
     if (picked != null) {
@@ -423,6 +445,93 @@ class _SectionHeader extends StatelessWidget {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
               letterSpacing: 1.2,
             ),
+      ),
+    );
+  }
+}
+
+/// One row in the theme picker sheet. Shows the theme's actual colors so the
+/// user can tell what each theme will look like before selecting it.
+class _ThemeTile extends StatelessWidget {
+  const _ThemeTile({
+    required this.themeKey,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String themeKey;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  static const _labels = <String, String>{
+    'apricot': 'Apricot',
+    'sage': 'Sage',
+    'iris': 'Iris',
+    'obsidian': 'Obsidian',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.byKey[themeKey]!;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: palette.background,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? palette.primary : palette.outline,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Three colour dots: primary → accent → surface variant
+              _Dot(color: palette.primary, size: 28),
+              const SizedBox(width: 6),
+              _Dot(color: palette.accent, size: 20),
+              const SizedBox(width: 6),
+              _Dot(color: palette.surfaceVariant, size: 14, border: palette.outline),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  _labels[themeKey] ?? themeKey,
+                  style: TextStyle(
+                    color: palette.onSurface,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              if (isSelected)
+                Icon(Icons.check_circle_rounded, color: palette.primary, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot({required this.color, required this.size, this.border});
+  final Color color;
+  final double size;
+  final Color? border;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: border != null ? Border.all(color: border!) : null,
       ),
     );
   }

@@ -17,10 +17,16 @@ import '../../core/providers/auth_provider.dart';
 Future<void> showEditProfileDialog(BuildContext context) {
   return showDialog<void>(
     context: context,
-    builder: (_) => const Dialog(
-      insetPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-      child: SizedBox(width: 460, child: _EditProfileBody()),
-    ),
+    builder: (ctx) {
+      // When the Android IME opens, viewInsets.bottom grows to the keyboard
+      // height. By reflecting that in insetPadding.bottom the Dialog shifts
+      // up above the keyboard, keeping the focused field visible.
+      final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+      return Dialog(
+        insetPadding: EdgeInsets.fromLTRB(24, 48, 24, bottom > 0 ? bottom + 8 : 48),
+        child: const SizedBox(width: 460, child: _EditProfileBody()),
+      );
+    },
   );
 }
 
@@ -180,7 +186,7 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
                 ),
           ),
           const Divider(height: 32),
-          _SectionLabel('Display name'),
+          const _SectionLabel('Display name'),
           const SizedBox(height: 6),
           TextField(
             controller: _nameCtrl,
@@ -191,7 +197,7 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
             ),
           ),
           const SizedBox(height: 20),
-          _SectionLabel('Avatar'),
+          const _SectionLabel('Avatar'),
           const SizedBox(height: 6),
           TextField(
             controller: _avatarCtrl,
@@ -244,25 +250,27 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
                 ),
           ),
           const SizedBox(height: 20),
-          _SectionLabel('Gender'),
+          const _SectionLabel('Gender'),
           const SizedBox(height: 6),
-          Column(
-            children: [
-              for (final g in _genders)
-                RadioListTile<String>(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  value: g.$1,
-                  groupValue: _gender,
-                  onChanged: _saving
-                      ? null
-                      : (v) => setState(() => _gender = v ?? _gender),
-                  title: Text(g.$2),
-                ),
-            ],
+          RadioGroup<String>(
+            groupValue: _gender,
+            onChanged: (v) {
+              if (!_saving && v != null) setState(() => _gender = v);
+            },
+            child: Column(
+              children: [
+                for (final g in _genders)
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    value: g.$1,
+                    title: Text(g.$2),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
-          _SectionLabel('Change password'),
+          const _SectionLabel('Change password'),
           const SizedBox(height: 4),
           Text(
             'Leave blank to keep your current password.',
