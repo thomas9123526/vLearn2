@@ -18,6 +18,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get signIn => '로그인';
 
   @override
+  String get signInRememberMe => '이 기기에서 로그인 정보 기억하기';
+
+  @override
   String get signUp => '회원가입';
 
   @override

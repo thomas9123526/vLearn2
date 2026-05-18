@@ -1,0 +1,14 @@
+1. when i enter conversation screen by tap scenario, the application show dialog and ask to select chat mode or tutor mode.
+I want remove this dialog and enter automatically to conversation screen by default mode.
+set default mode as tutor mode. this settings can be changed via settings screen.
+and put toggle button on conversation screen. so if the user tap toggle button, the conversation mode changes between chat mode and tutor mode.
+
+2. When I enter conversation screen, I get error like 
+"speech models not installed. 
+No manifest.json was found in the expected folder. Your administrator should drop the bundle there per deployment instructions."
+So what should i prepare to make speech models work
+
+3. I found gzip options exists on both application side and backend side.
+I want put the gzip option on backend side only.
+So admin can enable or disable gzip on admin panel. And the application reads the gzip option and do the network communication with or without gzip.
+the default gzip option is enabled.

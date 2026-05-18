@@ -18,6 +18,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signIn => 'Sign in';
 
   @override
+  String get signInRememberMe => 'Remember me on this device';
+
+  @override
   String get signUp => 'Sign up';
 
   @override

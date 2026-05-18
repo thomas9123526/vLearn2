@@ -118,6 +118,12 @@ abstract class AppLocalizations {
   /// **'Sign in'**
   String get signIn;
 
+  /// No description provided for @signInRememberMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember me on this device'**
+  String get signInRememberMe;
+
   /// No description provided for @signUp.
   ///
   /// In en, this message translates to:

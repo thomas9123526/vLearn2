@@ -18,6 +18,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get signIn => '登录';
 
   @override
+  String get signInRememberMe => '在此设备上记住我';
+
+  @override
   String get signUp => '注册';
 
   @override
