@@ -186,6 +186,21 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsConversation => '대화';
 
   @override
+  String get settingsDefaultMode => '기본 모드';
+
+  @override
+  String get conversationModeFace => '튜터 모드 (대면)';
+
+  @override
+  String get conversationModeFaceHint => '애니메이션 튜터와 음성으로 대화합니다.';
+
+  @override
+  String get conversationModeChat => '채팅 모드';
+
+  @override
+  String get conversationModeChatHint => '튜터와 텍스트로 주고받습니다.';
+
+  @override
   String get settingsBubbleStyle => '말풍선 스타일';
 
   @override

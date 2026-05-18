@@ -442,6 +442,36 @@ abstract class AppLocalizations {
   /// **'Conversation'**
   String get settingsConversation;
 
+  /// No description provided for @settingsDefaultMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Default mode'**
+  String get settingsDefaultMode;
+
+  /// No description provided for @conversationModeFace.
+  ///
+  /// In en, this message translates to:
+  /// **'Tutor mode (face-to-face)'**
+  String get conversationModeFace;
+
+  /// No description provided for @conversationModeFaceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Speak with the animated tutor. The tutor speaks back.'**
+  String get conversationModeFaceHint;
+
+  /// No description provided for @conversationModeChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat mode'**
+  String get conversationModeChat;
+
+  /// No description provided for @conversationModeChatHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type back and forth with the tutor.'**
+  String get conversationModeChatHint;
+
   /// No description provided for @settingsBubbleStyle.
   ///
   /// In en, this message translates to:

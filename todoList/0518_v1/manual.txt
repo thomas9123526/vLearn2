@@ -12,3 +12,7 @@ So what should i prepare to make speech models work
 I want put the gzip option on backend side only.
 So admin can enable or disable gzip on admin panel. And the application reads the gzip option and do the network communication with or without gzip.
 the default gzip option is enabled.
+
+4. I want change android package to com.ryongma.vfls
+
+5. I download sherpa-onnx releases to "E:\dataToExport\vtran". What do i need to extract and copy to "C:\Users\aaa\AppData\Roaming\com.vlearn2\Virtual Foreign Language\models" folder in order to make the speech models work.

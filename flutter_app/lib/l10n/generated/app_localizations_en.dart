@@ -187,6 +187,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsConversation => 'Conversation';
 
   @override
+  String get settingsDefaultMode => 'Default mode';
+
+  @override
+  String get conversationModeFace => 'Tutor mode (face-to-face)';
+
+  @override
+  String get conversationModeFaceHint =>
+      'Speak with the animated tutor. The tutor speaks back.';
+
+  @override
+  String get conversationModeChat => 'Chat mode';
+
+  @override
+  String get conversationModeChatHint => 'Type back and forth with the tutor.';
+
+  @override
   String get settingsBubbleStyle => 'Bubble style';
 
   @override

@@ -186,6 +186,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsConversation => '对话';
 
   @override
+  String get settingsDefaultMode => '默认模式';
+
+  @override
+  String get conversationModeFace => '导师模式（面对面）';
+
+  @override
+  String get conversationModeFaceHint => '与动画导师语音对话，导师会语音回应。';
+
+  @override
+  String get conversationModeChat => '聊天模式';
+
+  @override
+  String get conversationModeChatHint => '与导师以文字往复对话。';
+
+  @override
   String get settingsBubbleStyle => '气泡样式';
 
   @override
