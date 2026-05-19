@@ -89,8 +89,15 @@ async function bootstrap() {
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
     .build();
   const doc = SwaggerModule.createDocument(app, swagger);
+  // The nginx in front of this backend maps /vfls/ → /api/, so the public
+  // path for the OpenAPI spec is /vfls/docs-json. Swagger UI's default
+  // (/api/docs-json) collides with another backend mounted at /api/, so we
+  // pin the URL explicitly. Override via ?url= when accessing directly.
   SwaggerModule.setup('api/docs', app, doc, {
-    swaggerOptions: { persistAuthorization: true },
+    swaggerOptions: {
+      persistAuthorization: true,
+      url: process.env.SWAGGER_SPEC_URL ?? '/vfls/docs-json',
+    },
   });
 
   // ─── Listen ────────────────────────────────────────────────
