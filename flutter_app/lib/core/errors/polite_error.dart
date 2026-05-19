@@ -80,7 +80,7 @@ String politeMessageFor(Object error, {ErrorContext context = ErrorContext.gener
   if (status != null) {
     if (status == 401 || _i18nMatches(error, 'auth.invalid_credentials')) {
       return context == ErrorContext.signIn
-          ? 'Email or password is not correct.'
+          ? 'Username or password is not correct.'
           : 'You need to sign in again.';
     }
     if (status == 403 ||
@@ -93,8 +93,10 @@ String politeMessageFor(Object error, {ErrorContext context = ErrorContext.gener
           ? "We couldn't find that. It may have been removed."
           : "Couldn't find what you were looking for.";
     }
-    if (status == 409 || _i18nMatches(error, 'auth.email_taken')) {
-      return 'That value is already in use.';
+    if (status == 409 ||
+        _i18nMatches(error, 'auth.cid_username_taken') ||
+        _i18nMatches(error, 'auth.email_taken')) {
+      return 'That username is already in use.';
     }
     if (status == 422 || status == 400) {
       return 'Something in that request looked off. Please check and try again.';
