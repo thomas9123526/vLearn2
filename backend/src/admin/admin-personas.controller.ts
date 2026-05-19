@@ -17,6 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -26,6 +27,10 @@ import {
   IsString,
   Length,
 } from 'class-validator';
+
+/** Treat empty form strings as null so @IsOptional skips @Length on PATCH. */
+const emptyToNull = ({ value }: { value: unknown }) =>
+  value === '' || value === undefined ? null : value;
 import * as fs from 'fs';
 import * as path from 'path';
 import { PersonaEntity } from '../database/entities/persona.entity';
@@ -52,8 +57,18 @@ class CreatePersonaDto {
   @ApiProperty({ type: [String] }) @IsArray() specialties!: string[];
   @ApiProperty() @IsHexColor() gradient_from!: string;
   @ApiProperty() @IsHexColor() gradient_to!: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @Length(1, 100) rive_asset?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @Length(1, 100) voice_id?: string;
+  @ApiProperty({ required: false })
+  @Transform(emptyToNull)
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  rive_asset?: string | null;
+  @ApiProperty({ required: false })
+  @Transform(emptyToNull)
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  voice_id?: string | null;
   @ApiProperty({ required: false, enum: ['female', 'male', 'neutral'] })
   @IsOptional()
   @IsIn(['female', 'male', 'neutral'])
@@ -69,8 +84,18 @@ class UpdatePersonaDto {
   @ApiProperty({ required: false, type: [String] }) @IsOptional() @IsArray() specialties?: string[];
   @ApiProperty({ required: false }) @IsOptional() @IsHexColor() gradient_from?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsHexColor() gradient_to?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @Length(1, 100) rive_asset?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @Length(1, 100) voice_id?: string;
+  @ApiProperty({ required: false })
+  @Transform(emptyToNull)
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  rive_asset?: string | null;
+  @ApiProperty({ required: false })
+  @Transform(emptyToNull)
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  voice_id?: string | null;
   @ApiProperty({ required: false, enum: ['female', 'male', 'neutral'] })
   @IsOptional()
   @IsIn(['female', 'male', 'neutral'])

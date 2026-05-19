@@ -8,6 +8,7 @@ import '../../core/models/models.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/router/app_router.dart';
+import '../settings/settings_screen.dart';
 
 final _scenarioProvider =
     FutureProvider.family<Scenario, String>((ref, idOrSlug) async {
@@ -117,7 +118,11 @@ class ScenarioBriefScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               _Phrases(scenario: scenario),
               const SizedBox(height: 20),
-              _PersonaPairing(persona: activePersona, scheme: scheme),
+              _PersonaPairing(
+                persona: activePersona,
+                scheme: scheme,
+                onChange: () => pickActivePersona(context, ref),
+              ),
             ],
           );
         },
@@ -750,9 +755,14 @@ class _Phrases extends StatelessWidget {
 }
 
 class _PersonaPairing extends StatelessWidget {
-  const _PersonaPairing({required this.persona, required this.scheme});
+  const _PersonaPairing({
+    required this.persona,
+    required this.scheme,
+    required this.onChange,
+  });
   final Persona? persona;
   final ColorScheme scheme;
+  final VoidCallback onChange;
 
   @override
   Widget build(BuildContext context) {
@@ -800,12 +810,7 @@ class _PersonaPairing extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () {
-              // Settings → tutor section. Stays inside the brief flow so the
-              // user can come back without losing their place.
-              // Settings change persona globally; the brief auto-refreshes
-              // because it reads the active persona from authProvider.
-            },
+            onPressed: onChange,
             child: const Text('Change'),
           ),
         ],

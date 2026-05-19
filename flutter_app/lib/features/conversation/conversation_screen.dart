@@ -6,6 +6,7 @@ import '../../core/api/app_apis.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/providers/personas_provider.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/bubble_style.dart';
 import 'widgets/chat_bubble.dart';
@@ -35,11 +36,7 @@ final _sessionProvider =
 
 /// Looks up the active persona for the session so Tutor mode can render
 /// the right gradient / Rive asset / voice.
-final _personaProvider =
-    FutureProvider.family<Persona?, String>((ref, personaId) async {
-  final raw = await ref.read(personasApiProvider).get(personaId);
-  return Persona.fromJson(raw);
-});
+// personaByIdProvider lives in core/providers/personas_provider.dart
 
 class ConversationScreen extends ConsumerStatefulWidget {
   const ConversationScreen({required this.sessionId, super.key});
@@ -303,7 +300,9 @@ class _TutorModeWrapper extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final persona = ref.watch(_personaProvider(personaId));
+    final displayPersonaId =
+        ref.watch(tutorDisplayPersonaIdProvider(personaId));
+    final persona = ref.watch(personaByIdProvider(displayPersonaId));
     return persona.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, st) {

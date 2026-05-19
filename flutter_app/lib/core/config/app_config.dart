@@ -6,6 +6,12 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
+/// Writes to stdout/stderr, which the Flutter engine forwards to Android
+/// Logcat under tag `flutter`. Filter Logcat by `flutter` (or by the tag
+/// passed below) to see these lines on a connected Android device.
+
 /// Application-wide runtime configuration loaded from the on-disk config file
 /// on first launch. See [ConfigFileService] for the path resolution.
 @immutable
@@ -17,6 +23,9 @@ class AppConfig {
     required this.environment,
   });
 
+  static void logx(String tag, Object message) {
+    debugPrint('[$tag] $message');
+  }
   /// Backend API base URL (e.g. `http://localhost:3000/api`).
   final String backendBaseUrl;
 

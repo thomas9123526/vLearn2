@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/api/app_apis.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/personas_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/storage/model_registry.dart';
 import '../../core/theme/app_tokens.dart';
@@ -12,6 +14,8 @@ import '../../features/conversation/widgets/chat_bubble.dart';
 import '../../core/models/models.dart';
 import 'change_password_dialog.dart';
 import 'edit_profile_dialog.dart';
+
+final _settingsPersonasProvider = personasListProvider;
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -65,6 +69,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _pickFontGroup(context, ref, fontGroup),
           ),
           const _SectionHeader(text: 'Conversation'),
+          const _ActiveTutorTile(),
           ListTile(
             leading: Icon(
               settings.defaultConversationMode == 'face'
@@ -355,6 +360,184 @@ class SettingsScreen extends ConsumerWidget {
     if (picked != null) {
       await ref.read(appSettingsProvider.notifier).setBubbleStyle(picked);
     }
+  }
+}
+
+Future<void> pickActivePersona(BuildContext context, WidgetRef ref) async {
+  final user = ref.read(authProvider).user;
+  if (user == null) return;
+
+  List<Persona> personas;
+  try {
+    personas = await ref.read(_settingsPersonasProvider.future);
+  } on Exception catch (e, st) {
+    logRawError('settings_screen.personas', e, st);
+    if (context.mounted) {
+      showPoliteErrorSnack(
+        context,
+        e,
+        tag: 'settings_screen.personas',
+        stack: st,
+      );
+    }
+    return;
+  }
+  if (personas.isEmpty) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No tutors available')),
+      );
+    }
+    return;
+  }
+  if (!context.mounted) return;
+
+  final currentId = user.activePersonaId;
+  final picked = await showModalBottomSheet<Persona>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetCtx) {
+      final scheme = Theme.of(sheetCtx).colorScheme;
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Text(
+                'Choose your tutor',
+                style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final p in personas)
+                    ListTile(
+                      leading: _PersonaAvatarChip(persona: p),
+                      title: Text(p.name),
+                      subtitle: Text('${p.style} · ${p.accent}'),
+                      trailing: p.id == currentId
+                          ? Icon(Icons.check, color: scheme.primary)
+                          : null,
+                      onTap: () => Navigator.pop(sheetCtx, p),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      );
+    },
+  );
+  if (picked == null || picked.id == currentId) return;
+
+  try {
+    await ref.read(usersApiProvider).updateProfile({
+      'activePersonaId': picked.id,
+    });
+    await ref.read(authProvider.notifier).refreshProfile();
+    ref.invalidate(personaByIdProvider(picked.id));
+    if (currentId != null && currentId.isNotEmpty) {
+      ref.invalidate(personaByIdProvider(currentId));
+    }
+  } on Exception catch (e, st) {
+    logRawError('settings_screen.active_persona', e, st);
+    if (context.mounted) {
+      showPoliteErrorSnack(
+        context,
+        e,
+        tag: 'settings_screen.active_persona',
+        errorContext: ErrorContext.action,
+        stack: st,
+      );
+    }
+  }
+}
+
+class _ActiveTutorTile extends ConsumerWidget {
+  const _ActiveTutorTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider).user;
+    final personasAsync = ref.watch(_settingsPersonasProvider);
+
+    if (user == null) return const SizedBox.shrink();
+
+    final subtitle = personasAsync.when(
+      loading: () => 'Loading…',
+      error: (e, st) {
+        logRawError('settings_screen.active_tutor_tile', e, st);
+        return 'Tap to choose';
+      },
+      data: (personas) {
+        if (personas.isEmpty) return 'No tutors available';
+        Persona? active;
+        for (final p in personas) {
+          if (p.id == user.activePersonaId) {
+            active = p;
+            break;
+          }
+        }
+        if (active != null) {
+          return '${active.name} · ${active.accent}';
+        }
+        return '${personas.first.name} (default)';
+      },
+    );
+
+    return ListTile(
+      leading: const Icon(Icons.record_voice_over_outlined),
+      title: const Text('Default tutor'),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => pickActivePersona(context, ref),
+    );
+  }
+}
+
+class _PersonaAvatarChip extends StatelessWidget {
+  const _PersonaAvatarChip({required this.persona});
+
+  final Persona persona;
+
+  Color _hex(String s) {
+    final cleaned = s.replaceFirst('#', '');
+    return Color(int.parse(cleaned, radix: 16) | 0xFF000000);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [_hex(persona.gradientFrom), _hex(persona.gradientTo)],
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          persona.name.isNotEmpty ? persona.name[0].toUpperCase() : '?',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
   }
 }
 

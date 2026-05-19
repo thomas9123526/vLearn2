@@ -81,6 +81,8 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
         method: 'PATCH',
         body: {
           ...values,
+          voice_id: values.voice_id?.trim() || null,
+          rive_asset: values.rive_asset?.trim() || null,
           specialties: values.specialties.split(',').map((s) => s.trim()).filter(Boolean),
         },
       }),
@@ -117,7 +119,16 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
           <CardTitle>Edit “{persona.name}”</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+          <form
+            className="space-y-4"
+            onSubmit={handleSubmit(onSubmit, (fieldErrors) => {
+              const msg = Object.values(fieldErrors)
+                .map((e) => e?.message)
+                .filter(Boolean)
+                .join(' ');
+              setError(msg || 'Please fix the highlighted fields.');
+            })}
+          >
             <div className="grid grid-cols-2 gap-3">
               <Field id="slug" label="Slug" {...register('slug')} error={errors.slug?.message} />
               <Field id="name" label="Display name" {...register('name')} error={errors.name?.message} />

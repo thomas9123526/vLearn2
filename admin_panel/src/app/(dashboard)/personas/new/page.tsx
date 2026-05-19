@@ -59,6 +59,8 @@ export default function NewPersonaPage() {
         method: 'POST',
         body: {
           ...values,
+          voice_id: values.voice_id?.trim() || null,
+          rive_asset: values.rive_asset?.trim() || null,
           specialties: values.specialties
             .split(',')
             .map((s) => s.trim())

@@ -1,0 +1,5 @@
+The backend api build prompt to interect with the AI-PROVIDER
+Is there a way to put edit box for prompt on admin panel and admin can modify prompt prototype .
+Then the backend api build prompt based on the prompt prototype?
+I think the backend api build prompt based on the scenario that the user selected in the application.
+Suggest me the effective way so admin can modify prompt variously to get the good result from the ai provider.

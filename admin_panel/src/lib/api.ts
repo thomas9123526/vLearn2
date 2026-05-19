@@ -13,6 +13,14 @@ export class ApiError extends Error {
   }
 }
 
+function messageFromBody(body: unknown, fallback: string): string {
+  if (!body || typeof body !== 'object') return fallback;
+  const msg = (body as { message?: string | string[] }).message;
+  if (Array.isArray(msg)) return msg.join(', ');
+  if (typeof msg === 'string' && msg.length > 0) return msg;
+  return fallback;
+}
+
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
@@ -80,7 +88,11 @@ export async function api<T = unknown>(
     } catch {
       // not json
     }
-    throw new ApiError(res.status, res.statusText, body);
+    throw new ApiError(
+      res.status,
+      messageFromBody(body, res.statusText || `Request failed (${res.status})`),
+      body,
+    );
   }
 
   if (res.status === 204) return undefined as unknown as T;

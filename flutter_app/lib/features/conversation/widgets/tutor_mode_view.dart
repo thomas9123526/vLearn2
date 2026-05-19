@@ -350,7 +350,12 @@ class _AvatarStage extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TutorAvatar(persona: persona, mood: mood, size: avatarSize),
+                TutorAvatar(
+                  key: ValueKey(persona.id),
+                  persona: persona,
+                  mood: mood,
+                  size: avatarSize,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   persona.name,

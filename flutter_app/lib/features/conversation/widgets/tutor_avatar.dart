@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_app/core/config/app_config.dart';
 import 'package:rive/rive.dart' as rive;
 
 import '../../../core/models/models.dart';
@@ -112,6 +113,11 @@ class _TutorAvatarState extends State<TutorAvatar>
     final to = _hex(widget.persona.gradientTo);
     final asset = widget.persona.riveAsset;
 
+    AppConfig.logx("assets for", widget.persona.name);
+    AppConfig.logx("assets path", asset!);
+
+
+
     return SizedBox(
       width: widget.size + 60,
       height: widget.size + 60,
@@ -173,15 +179,18 @@ class _TutorAvatarState extends State<TutorAvatar>
                   child: ClipOval(
                     child: asset != null
                         ? FutureBuilder<bool>(
+                            key: ValueKey('rive-${widget.persona.id}-$asset'),
                             future: _riveAssetExists('assets/animations/$asset'),
                             builder: (context, snap) {
                               if (snap.data == true) {
                                 return rive.RiveAnimation.asset(
                                   'assets/animations/$asset',
+                                  key: ValueKey(asset),
                                   fit: BoxFit.cover,
                                 );
                               }
                               return CartoonFace(
+                                key: ValueKey('face-${widget.persona.id}'),
                                 persona: widget.persona,
                                 mood: widget.mood,
                                 size: widget.size,
@@ -189,6 +198,7 @@ class _TutorAvatarState extends State<TutorAvatar>
                             },
                           )
                         : CartoonFace(
+                            key: ValueKey('face-${widget.persona.id}'),
                             persona: widget.persona,
                             mood: widget.mood,
                             size: widget.size,
