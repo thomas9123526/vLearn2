@@ -45,6 +45,12 @@ export class OpenAICompatibleProvider extends AiProvider {
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
     const start = Date.now();
+    // Debug: prove the full system prompt leaves the backend. Look for this
+    // line in the backend console; LM Studio's log UI truncates the display
+    // but our outbound payload is intact.
+    this.logger.log(
+      `OUTBOUND system_prompt (${req.systemPrompt.length} chars): ${req.systemPrompt}`,
+    );
     try {
       const res = await this.client.chat.completions.create({
         model: this.chatModel,
