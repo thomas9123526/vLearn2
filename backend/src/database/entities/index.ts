@@ -23,6 +23,7 @@ import { ScenarioEntity } from './scenario.entity';
 import { UploadedFileEntity } from './uploaded-file.entity';
 import { UserEntity } from './user.entity';
 import { UserInfoEntity } from './user-info.entity';
+import { PromptTemplateEntity } from './prompt-template.entity';
 
 export {
   AdminEntity,
@@ -49,6 +50,7 @@ export {
   UploadedFileEntity,
   UserEntity,
   UserInfoEntity,
+  PromptTemplateEntity,
 };
 
 export const ALL_ENTITIES = [
@@ -76,4 +78,5 @@ export const ALL_ENTITIES = [
   UploadedFileEntity,
   UserEntity,
   UserInfoEntity,
+  PromptTemplateEntity,
 ];

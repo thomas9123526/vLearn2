@@ -1,12 +1,15 @@
 import { Module, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { AI_PROVIDER, AiProvider } from './ai-provider.interface';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { OpenAICompatibleProvider } from './providers/openai-compatible.provider';
 import { PromptBuilderService } from './prompt-builder.service';
 import { ConversationOrchestrator } from './conversation.orchestrator';
+import { PromptTemplateEntity } from '../database/entities/prompt-template.entity';
 
 @Module({
+  imports: [TypeOrmModule.forFeature([PromptTemplateEntity])],
   providers: [
     AnthropicProvider,
     OpenAICompatibleProvider,

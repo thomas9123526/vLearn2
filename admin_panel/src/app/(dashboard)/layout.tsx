@@ -14,6 +14,7 @@ import {
   Trophy,
   LogOut,
   Sparkles,
+  MessageSquareCode,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { tokenStore, currentClaims } from '@/lib/auth';
@@ -22,6 +23,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 const NAV = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard, perm: null },
   { href: '/personas', label: 'Tutors', icon: Sparkles, perm: 'personas.edit' },
+  { href: '/prompt-templates', label: 'Prompts', icon: MessageSquareCode, perm: 'config.edit' },
   { href: '/scenarios', label: 'Scenarios', icon: BookOpen, perm: 'scenarios.view' },
   { href: '/users', label: 'Users', icon: Users, perm: 'users.view' },
   { href: '/news', label: 'News', icon: Newspaper, perm: 'news.view' },

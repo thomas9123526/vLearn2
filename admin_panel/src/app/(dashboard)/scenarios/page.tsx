@@ -74,9 +74,9 @@ export default function ScenariosPage() {
             {(data ?? []).map((s) => (
               <tr key={s.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-2">
-                  <Link href={`/scenarios/${s.id}`} className="hover:underline">
-                    {s.title?.en ?? s.slug}
-                  </Link>
+                  {/* Scenario edit page is not built yet — render as plain text
+                      instead of a link that 404s. Re-enable when the route lands. */}
+                  <span>{s.title?.en ?? s.slug}</span>
                 </td>
                 <td className="px-4 py-2 capitalize">{s.category}</td>
                 <td className="px-4 py-2">{'★'.repeat(s.difficulty)}</td>

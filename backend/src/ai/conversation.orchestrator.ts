@@ -25,7 +25,7 @@ export class ConversationOrchestrator {
     userNativeLanguage: string;
     history: ChatMessage[];
   }): Promise<string> {
-    const systemPrompt = this.prompts.buildSystemPrompt(
+    const systemPrompt = await this.prompts.buildSystemPrompt(
       args.persona,
       args.scenario,
       args.userLevel,
@@ -67,7 +67,7 @@ export class ConversationOrchestrator {
         strengths: string[];
       }>({
         systemPrompt: 'You are an expert English grammar evaluator.',
-        userPrompt: this.prompts.buildGrammarPrompt(userMessages, level),
+        userPrompt: await this.prompts.buildGrammarPrompt(userMessages, level),
         jsonSchema: {
           type: 'object',
           properties: {
@@ -102,13 +102,14 @@ export class ConversationOrchestrator {
     userNativeLanguage: string;
     history: ChatMessage[];
   }): Promise<string> {
+    const baseSystem = await this.prompts.buildSystemPrompt(
+      args.persona,
+      args.scenario,
+      args.userLevel,
+      args.userNativeLanguage,
+    );
     const systemPrompt =
-      this.prompts.buildSystemPrompt(
-        args.persona,
-        args.scenario,
-        args.userLevel,
-        args.userNativeLanguage,
-      ) +
+      baseSystem +
       '\n\nThe student has gone quiet. Reply ONLY with a single short English sentence (8–15 words) ' +
       'the student could say next to continue the conversation. ' +
       'Do not introduce yourself, do not explain, do not use quotation marks.';

@@ -10,6 +10,7 @@ import { AdminPermissionEntity } from '../database/entities/admin-permission.ent
 import { ConversationSessionEntity } from '../database/entities/conversation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
+import { PromptTemplateEntity } from '../database/entities/prompt-template.entity';
 import { AdminPermissionsService } from './permissions/admin-permissions.service';
 import { PermissionGuard } from './permissions/permission.guard';
 import { AdminAuthController } from './admins/admin-auth.controller';
@@ -20,6 +21,7 @@ import { AdminUsersController } from './admin-users.controller';
 import { AdminScenariosController } from './admin-scenarios.controller';
 import { AdminPersonasController } from './admin-personas.controller';
 import { AdminLeaderboardController } from './admin-leaderboard.controller';
+import { AdminPromptTemplatesController } from './admin-prompt-templates.controller';
 import { AuthModule } from '../auth/auth.module';
 
 @Global()
@@ -34,6 +36,7 @@ import { AuthModule } from '../auth/auth.module';
       ConversationSessionEntity,
       ScenarioEntity,
       PersonaEntity,
+      PromptTemplateEntity,
     ]),
     AuthModule,
     JwtModule.registerAsync({
@@ -53,6 +56,7 @@ import { AuthModule } from '../auth/auth.module';
     AdminScenariosController,
     AdminPersonasController,
     AdminLeaderboardController,
+    AdminPromptTemplatesController,
   ],
   exports: [AdminPermissionsService, PermissionGuard, AdminAuthService],
 })

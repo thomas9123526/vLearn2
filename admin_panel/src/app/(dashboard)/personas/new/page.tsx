@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { forwardRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -175,15 +175,14 @@ export default function NewPersonaPage() {
   );
 }
 
-const Field = ({
-  id,
-  label,
-  error,
-  ...rest
-}: { id: string; label: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
+const Field = forwardRef<
+  HTMLInputElement,
+  { id: string; label: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>
+>(({ id, label, error, ...rest }, ref) => (
   <div className="space-y-1">
     <Label htmlFor={id}>{label}</Label>
-    <Input id={id} {...rest} />
+    <Input id={id} ref={ref} {...rest} />
     {error && <p className="text-xs text-destructive">{error}</p>}
   </div>
-);
+));
+Field.displayName = 'Field';

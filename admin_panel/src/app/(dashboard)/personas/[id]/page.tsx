@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -233,15 +233,18 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
   );
 }
 
-const Field = ({
-  id,
-  label,
-  error,
-  ...rest
-}: { id: string; label: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
+/// react-hook-form passes a `ref` through {...register(...)}. The Field
+/// wrapper MUST forward it to the inner <Input>, otherwise reset() and
+/// setValue() can't update the DOM input value, leaving the form blank
+/// even when defaults / API data are loaded.
+const Field = forwardRef<
+  HTMLInputElement,
+  { id: string; label: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>
+>(({ id, label, error, ...rest }, ref) => (
   <div className="space-y-1">
     <Label htmlFor={id}>{label}</Label>
-    <Input id={id} {...rest} />
+    <Input id={id} ref={ref} {...rest} />
     {error && <p className="text-xs text-destructive">{error}</p>}
   </div>
-);
+));
+Field.displayName = 'Field';
