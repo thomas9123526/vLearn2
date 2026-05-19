@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:rive/rive.dart' as rive;
 
 import '../../../core/models/models.dart';
@@ -96,6 +97,15 @@ class _TutorAvatarState extends State<TutorAvatar>
     return Color(v);
   }
 
+  Future<bool> _riveAssetExists(String path) async {
+    try {
+      await rootBundle.load(path);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final from = _hex(widget.persona.gradientFrom);
@@ -162,9 +172,21 @@ class _TutorAvatarState extends State<TutorAvatar>
                   ),
                   child: ClipOval(
                     child: asset != null
-                        ? rive.RiveAnimation.asset(
-                            'assets/animations/$asset',
-                            fit: BoxFit.cover,
+                        ? FutureBuilder<bool>(
+                            future: _riveAssetExists('assets/animations/$asset'),
+                            builder: (context, snap) {
+                              if (snap.data == true) {
+                                return rive.RiveAnimation.asset(
+                                  'assets/animations/$asset',
+                                  fit: BoxFit.cover,
+                                );
+                              }
+                              return CartoonFace(
+                                persona: widget.persona,
+                                mood: widget.mood,
+                                size: widget.size,
+                              );
+                            },
                           )
                         : CartoonFace(
                             persona: widget.persona,

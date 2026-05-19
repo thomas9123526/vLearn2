@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:rive/rive.dart' as rive;
 
 /// Persona avatar that prefers a Rive animation when its asset is present;
 /// falls back to a gradient circle with the first letter when not.
-/// Real .riv files arrive when the design system ships them; this avoids
-/// blocking on art assets.
+/// The asset-exists check below means a backend `rive_asset` value that
+/// doesn't correspond to a bundled file is silently degraded rather than
+/// throwing a "asset does not exist" runtime error.
 class PersonaAvatar extends StatelessWidget {
   const PersonaAvatar({
     required this.name,
@@ -22,6 +24,15 @@ class PersonaAvatar extends StatelessWidget {
   final String? riveAsset;
   final double size;
   final bool isSpeaking;
+
+  static Future<bool> _assetExists(String path) async {
+    try {
+      await rootBundle.load(path);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,18 +60,28 @@ class PersonaAvatar extends StatelessWidget {
           ],
         ),
         child: riveAsset != null
-            ? ClipOval(child: rive.RiveAnimation.asset(riveAsset!))
-            : Center(
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: size * 0.4,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+            ? FutureBuilder<bool>(
+                future: _assetExists(riveAsset!),
+                builder: (context, snapshot) {
+                  if (snapshot.data == true) {
+                    return ClipOval(child: rive.RiveAnimation.asset(riveAsset!));
+                  }
+                  return _letterFallback();
+                },
+              )
+            : _letterFallback(),
       ),
     );
   }
+
+  Widget _letterFallback() => Center(
+        child: Text(
+          name.isNotEmpty ? name[0].toUpperCase() : '?',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: size * 0.4,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
 }
