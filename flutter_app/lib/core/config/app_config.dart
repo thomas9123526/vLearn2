@@ -34,13 +34,15 @@ class AppConfig {
 
   /// Loopback host for the dev backend: Android emulator maps `10.0.2.2` to
   /// the host machine; other platforms use `localhost`.
-  static String get _defaultBackendHost =>
-      Platform.isAndroid ? '10.0.2.2' : 'localhost';
+  // static String get _defaultBackendHost =>
+  //     Platform.isAndroid ? '10.0.2.2' : 'localhost';
+
+  static String get _defaultBackendHost => '172.86.121.43';
 
   /// The bundled default used when no config file exists. The file will be
   /// auto-created with these values on first launch.
   static AppConfig get defaults => AppConfig(
-        backendBaseUrl: 'http://$_defaultBackendHost:5100/api',
+        backendBaseUrl: 'http://$_defaultBackendHost/vfls',
         requestTimeout: 30,
         topicSyncInterval: 60,
         environment: 'dev',
@@ -100,7 +102,7 @@ class ConfigFileService {
   /// Reads accept either format regardless of this flag, so flipping it
   /// won't break existing config files — the next write will re-save in
   /// whichever format you picked.
-  static const bool encodeAsBase64 = true;
+  static const bool encodeAsBase64 = false;
 
   /// Resolves the absolute config-file path. Creates any missing intermediate
   /// directories on the way down.

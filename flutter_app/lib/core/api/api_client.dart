@@ -7,6 +7,12 @@ import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/compression_interceptor.dart';
 
+import 'dart:developer' as dev;
+
+void logx(String tag, Object message) {
+  dev.log(message.toString(), name: tag);
+}
+
 /// Token storage facade — `flutter_secure_storage` for production; an
 /// in-memory map for widget tests.
 class TokenStore {
@@ -44,9 +50,11 @@ final apiClientProvider = Provider<Dio>((ref) {
   // Dio client this is already populated.
   final config = ref.watch(appConfigProvider).asData?.value ?? AppConfig.defaults;
   // Compile-time override (`--dart-define=API_BASE_URL=...`) wins so CI and
+  logx('config_baseurl111', config.backendBaseUrl);
   // dev scripts can target a non-default backend without editing the JSON.
   const envOverride = String.fromEnvironment('API_BASE_URL');
   final baseUrl = envOverride.isNotEmpty ? envOverride : config.backendBaseUrl;
+  logx('config_baseurl222', baseUrl);
   final tokenStore = ref.watch(tokenStoreProvider);
 
   final dio = Dio(
