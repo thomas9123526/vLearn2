@@ -1,0 +1,3 @@
+On admins tab of admin panel, the page shows information with many checkbox.
+I want show simple cardview per admin and if the user tap "Edit Permission", then shows permission dialogs that have the check box permissions.
+
