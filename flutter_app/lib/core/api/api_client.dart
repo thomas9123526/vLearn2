@@ -7,10 +7,13 @@ import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/compression_interceptor.dart';
 
-import 'dart:developer' as dev;
+import 'package:flutter/foundation.dart' show debugPrint;
 
+/// Writes to stdout/stderr, which the Flutter engine forwards to Android
+/// Logcat under tag `flutter`. Filter Logcat by `flutter` (or by the tag
+/// passed below) to see these lines on a connected Android device.
 void logx(String tag, Object message) {
-  dev.log(message.toString(), name: tag);
+  debugPrint('[$tag] $message');
 }
 
 /// Token storage facade — `flutter_secure_storage` for production; an
