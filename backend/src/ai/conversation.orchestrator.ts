@@ -35,11 +35,16 @@ export class ConversationOrchestrator {
       const res = await this.ai.chat({
         systemPrompt,
         messages: args.history,
-        maxTokens: 300,
+        maxTokens: 1024,
         temperature: 0.8,
         enablePromptCache: this.ai.capabilities.supportsPromptCache,
       });
-      return res.content;
+      const text = res.content.trim();
+      if (!text) {
+        this.logger.warn('AI chat returned empty text; using canned reply');
+        return this.fallbackReply(args.history);
+      }
+      return text;
     } catch (e) {
       this.logger.warn(`AI chat failed (${(e as AiProviderError).kind}): falling back to canned reply`);
       return this.fallbackReply(args.history);
@@ -111,13 +116,19 @@ export class ConversationOrchestrator {
       const res = await this.ai.chat({
         systemPrompt,
         messages: args.history,
-        maxTokens: 60,
+        maxTokens: 256,
         temperature: 0.7,
         enablePromptCache: this.ai.capabilities.supportsPromptCache,
       });
-      // Strip surrounding quotes the model might still emit and squeeze
-      // whitespace so the suggestion fits in a single chip.
-      return res.content.replace(/^["'`\s]+|["'`\s]+$/g, '').replace(/\s+/g, ' ');
+      const text = res.content
+          .replace(/^["'`\s]+|["'`\s]+$/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+      if (!text) {
+        this.logger.warn('AI suggestion returned empty text; using canned suggestion');
+        return this.fallbackSuggestion(args.history);
+      }
+      return text;
     } catch (e) {
       this.logger.warn(`AI suggestion failed (${(e as AiProviderError).kind}): using canned suggestion`);
       return this.fallbackSuggestion(args.history);

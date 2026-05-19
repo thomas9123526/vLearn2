@@ -1,0 +1,40 @@
+On Windows (PowerShell), use the port number you want to free:
+
+Stop whatever is listening on a port
+PowerShell (recommended):
+
+$port = 5101
+Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object {
+    $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
+    Write-Host "Killing PID $($_.OwningProcess) ($($p.ProcessName))"
+    Stop-Process -Id $_.OwningProcess -Force
+  }
+Replace 5101 with your port (e.g. 4101, 5100, 3000).
+
+One-liner:
+
+Get-NetTCPConnection -LocalPort 5101 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+See what’s using the port first
+netstat -ano | findstr ":5101"
+The last column is the PID. Then:
+
+Stop-Process -Id <PID> -Force
+Or:
+
+taskkill /PID <PID> /F
+In this repo
+backend/stop_start_service.bat kills the process on PORT then starts the backend:
+
+cd c:\project\vLearn2\backend
+$env:PORT = 5101
+.\stop_start_service.bat
+That script only stops if you run the PowerShell block from lines 42–43 by itself, or use the commands above.
+
+Note: If multiple processes bind the same port (e.g. node on 0.0.0.0:5101 and Code.exe on 127.0.0.1:5101), run the kill command once per PID or repeat until netstat shows nothing listening on that port.
+
+
+
+
+cd c:\project\vLearn2\admin_panel
+npx next dev -p 4101

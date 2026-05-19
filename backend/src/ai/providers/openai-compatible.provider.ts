@@ -55,8 +55,15 @@ export class OpenAICompatibleProvider extends AiProvider {
         max_tokens: req.maxTokens ?? 400,
         temperature: req.temperature ?? 0.8,
       });
+      const content = this.extractAssistantText(res.choices[0]?.message);
+      if (!content) {
+        this.logger.warn(
+          'Model returned empty assistant content (common with Qwen3 reasoning when max_tokens is too low). ' +
+            'Raise max_tokens or disable reasoning in LM Studio.',
+        );
+      }
       return {
-        content: res.choices[0]?.message?.content ?? '',
+        content,
         inputTokens: res.usage?.prompt_tokens ?? 0,
         outputTokens: res.usage?.completion_tokens ?? 0,
         modelUsed: res.model,
@@ -86,7 +93,7 @@ export class OpenAICompatibleProvider extends AiProvider {
           },
         } as OpenAI.ChatCompletionCreateParams['response_format'],
       });
-      const raw = res.choices[0]?.message?.content ?? '{}';
+      const raw = this.extractAssistantText(res.choices[0]?.message) || '{}';
       let parsed: unknown;
       try {
         parsed = JSON.parse(raw);
@@ -103,6 +110,34 @@ export class OpenAICompatibleProvider extends AiProvider {
       // TODO: fallback to response_format: 'json_object' for Ollama compatibility
       throw this.translateError(e);
     }
+  }
+
+  /**
+   * llama.cpp / Qwen3 "reasoning" models often fill `reasoning_content` first
+   * and leave `content` empty when `max_tokens` is small. Prefer `content`,
+   * then a trimmed tail of reasoning so the app is not silent.
+   */
+  private extractAssistantText(
+    message: OpenAI.Chat.Completions.ChatCompletionMessage | undefined,
+  ): string {
+    if (!message) return '';
+    const content = message.content?.trim() ?? '';
+    if (content) return content;
+
+    const reasoning = (
+      message as OpenAI.Chat.Completions.ChatCompletionMessage & {
+        reasoning_content?: string;
+      }
+    ).reasoning_content?.trim();
+    if (!reasoning) return '';
+
+    // Drop obvious chain-of-thought wrappers; keep the last substantive line.
+    const stripped = reasoning
+      .replace(/[\s\S]*?<\/think>/gi, '')
+      .replace(/^thinking:\s*/i, '')
+      .trim();
+    const lines = stripped.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    return lines.length > 0 ? lines[lines.length - 1]! : stripped;
   }
 
   private translateError(e: unknown): AiProviderError {

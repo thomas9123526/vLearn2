@@ -34,15 +34,21 @@ class AppConfig {
 
   /// Loopback host for the dev backend: Android emulator maps `10.0.2.2` to
   /// the host machine; other platforms use `localhost`.
-  // static String get _defaultBackendHost =>
-  //     Platform.isAndroid ? '10.0.2.2' : 'localhost';
+  ///
+  /// Physical devices on Wi‑Fi must override `baseurl` in `app_config.json`
+  /// to your PC's LAN IP, e.g. `http://192.168.1.50:5101/api`.
+  static String get _defaultBackendHost =>
+      Platform.isAndroid ? '10.0.2.2' : 'localhost';
 
-  static String get _defaultBackendHost => '172.86.121.43';
+  /// Production nginx prefix is `/vfls` (→ `/api` on the server). Local dev
+  /// hits Nest directly on `/api`.
+  static const _defaultBackendPort = 5101;
 
   /// The bundled default used when no config file exists. The file will be
   /// auto-created with these values on first launch.
   static AppConfig get defaults => AppConfig(
-        backendBaseUrl: 'http://$_defaultBackendHost/vfls',
+        backendBaseUrl:
+            'http://$_defaultBackendHost:$_defaultBackendPort/api',
         requestTimeout: 30,
         topicSyncInterval: 60,
         environment: 'dev',
