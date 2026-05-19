@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, ChevronUp, ShieldCheck, ShieldOff, Plus } from 'lucide-react';
+import { KeyRound, Plus, ShieldCheck, ShieldOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
@@ -50,6 +51,9 @@ export default function AdminsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-admins'] }),
   });
 
+  // Which admin is currently having its permissions edited in the modal.
+  const [editPermsFor, setEditPermsFor] = useState<SubAdmin | null>(null);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -65,46 +69,58 @@ export default function AdminsPage() {
         />
       )}
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {(admins ?? []).map((a) => (
           <AdminCard
             key={a.id}
             admin={a}
-            catalog={catalog ?? []}
             canGrant={canGrant}
             canSuspend={canSuspend}
             onSuspend={() => suspend.mutate(a.id)}
             onRestore={() => restore.mutate(a.id)}
-            onChangePerms={(next) => replacePerms.mutate({ id: a.id, permissions: next })}
+            onEditPermissions={() => setEditPermsFor(a)}
           />
         ))}
         {(admins ?? []).length === 0 && (
           <p className="text-sm text-muted-foreground">No sub-admins yet.</p>
         )}
       </div>
+
+      <EditPermissionsDialog
+        admin={editPermsFor}
+        catalog={catalog ?? []}
+        disabled={!canGrant}
+        pending={replacePerms.isPending}
+        onClose={() => setEditPermsFor(null)}
+        onSave={(perms) => {
+          if (!editPermsFor) return;
+          replacePerms.mutate(
+            { id: editPermsFor.id, permissions: perms },
+            { onSuccess: () => setEditPermsFor(null) },
+          );
+        }}
+      />
     </div>
   );
 }
 
+/// Compact card. No permission checkboxes here — the user opens a dialog
+/// for those instead. Shows just enough identity / status info to act on.
 function AdminCard({
   admin,
-  catalog,
   canGrant,
   canSuspend,
   onSuspend,
   onRestore,
-  onChangePerms,
+  onEditPermissions,
 }: {
   admin: SubAdmin;
-  catalog: PermissionDef[];
   canGrant: boolean;
   canSuspend: boolean;
   onSuspend: () => void;
   onRestore: () => void;
-  onChangePerms: (next: string[]) => void;
+  onEditPermissions: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-
   const statusColor =
     admin.status === 'active'
       ? 'text-green-600'
@@ -113,71 +129,107 @@ function AdminCard({
         : 'text-muted-foreground';
 
   const roleLabel = admin.role === 'superadmin' ? 'Superadmin' : 'Admin';
+  const permCount = admin.permissions?.length ?? 0;
 
   return (
-    <Card>
+    <Card className="flex h-full flex-col">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0 flex-1">
-            <CardTitle className="text-base">{admin.display_name}</CardTitle>
-            <CardDescription className="flex flex-wrap items-center gap-x-2">
-              <span>{admin.email}</span>
-              <span>·</span>
-              <span>{roleLabel}</span>
-              <span>·</span>
-              <span className={statusColor}>{admin.status}</span>
-            </CardDescription>
-          </div>
-
-          <div className="ml-3 flex shrink-0 items-center gap-2">
-            {canSuspend && admin.role !== 'superadmin' && admin.status === 'active' && (
-              <Button size="sm" variant="destructive" onClick={onSuspend}>
-                <ShieldOff className="h-4 w-4" /> Suspend
-              </Button>
-            )}
-            {canSuspend && admin.status === 'suspended' && (
-              <Button size="sm" variant="outline" onClick={onRestore}>
-                Restore
-              </Button>
-            )}
-            {/* Expand toggle — only shown if there's something worth expanding */}
-            {(canGrant || admin.role === 'superadmin') && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setExpanded((v) => !v)}
-                aria-expanded={expanded}
-              >
-                {expanded ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
+        <CardTitle className="text-base">{admin.display_name}</CardTitle>
+        <CardDescription className="break-all">{admin.email}</CardDescription>
       </CardHeader>
-
-      {expanded && (
-        <CardContent className="pt-0">
-          <div className="border-t border-border pt-4">
+      <CardContent className="flex flex-1 flex-col gap-3 pt-0">
+        <dl className="grid grid-cols-2 gap-y-1 text-xs">
+          <dt className="text-muted-foreground">Role</dt>
+          <dd>{roleLabel}</dd>
+          <dt className="text-muted-foreground">Status</dt>
+          <dd className={statusColor}>{admin.status}</dd>
+          <dt className="text-muted-foreground">Permissions</dt>
+          <dd>
             {admin.role === 'superadmin' ? (
-              <p className="text-sm text-muted-foreground">
-                Superadmin has all permissions implicitly.
-              </p>
+              <span className="text-muted-foreground">all (implicit)</span>
             ) : (
-              <PermissionGrid
-                catalog={catalog}
-                granted={admin.permissions ?? []}
-                disabled={!canGrant}
-                onChange={onChangePerms}
-              />
+              <span>{permCount} granted</span>
             )}
-          </div>
-        </CardContent>
-      )}
+          </dd>
+        </dl>
+
+        <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-2">
+          {canGrant && admin.role !== 'superadmin' && (
+            <Button size="sm" variant="outline" onClick={onEditPermissions}>
+              <KeyRound className="h-4 w-4" />
+              Edit Permission
+            </Button>
+          )}
+          {canSuspend &&
+            admin.role !== 'superadmin' &&
+            admin.status === 'active' && (
+              <Button size="sm" variant="destructive" onClick={onSuspend}>
+                <ShieldOff className="h-4 w-4" />
+                Suspend
+              </Button>
+            )}
+          {canSuspend && admin.status === 'suspended' && (
+            <Button size="sm" variant="outline" onClick={onRestore}>
+              Restore
+            </Button>
+          )}
+        </div>
+      </CardContent>
     </Card>
+  );
+}
+
+/// Dialog body. Tracks its own selection while open so cancel-on-dismiss
+/// works without re-fetching. Resets when a different admin is targeted.
+function EditPermissionsDialog({
+  admin,
+  catalog,
+  disabled,
+  pending,
+  onClose,
+  onSave,
+}: {
+  admin: SubAdmin | null;
+  catalog: PermissionDef[];
+  disabled: boolean;
+  pending: boolean;
+  onClose: () => void;
+  onSave: (perms: string[]) => void;
+}) {
+  const [selection, setSelection] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (admin) setSelection(admin.permissions ?? []);
+  }, [admin]);
+
+  return (
+    <Dialog
+      open={admin !== null}
+      onClose={onClose}
+      title={admin ? `Permissions — ${admin.display_name}` : 'Permissions'}
+      description={admin?.email}
+      size="lg"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            disabled={disabled || pending}
+            onClick={() => onSave(selection)}
+          >
+            {pending ? 'Saving…' : 'Save'}
+          </Button>
+        </>
+      }
+    >
+      <PermissionGrid
+        catalog={catalog}
+        granted={selection}
+        disabled={disabled}
+        onChange={setSelection}
+      />
+    </Dialog>
   );
 }
 
@@ -194,6 +246,7 @@ function CreateSubAdminForm({
   const [perms, setPerms] = useState<string[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPermDialog, setShowPermDialog] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -257,15 +310,38 @@ function CreateSubAdminForm({
               />
             </div>
           </div>
-          <div>
-            <Label>Initial permissions</Label>
-            <PermissionGrid catalog={catalog} granted={perms} onChange={setPerms} />
+          <div className="flex items-center gap-3">
+            <span className="text-sm">
+              <span className="text-muted-foreground">Initial permissions:</span>{' '}
+              <span className="font-medium">{perms.length} selected</span>
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setShowPermDialog(true)}
+            >
+              <KeyRound className="h-4 w-4" />
+              Choose permissions
+            </Button>
           </div>
           {err && <p className="text-sm text-destructive">{err}</p>}
           <Button type="submit" disabled={busy}>
             {busy ? 'Creating…' : 'Create sub-admin'}
           </Button>
         </form>
+
+        <Dialog
+          open={showPermDialog}
+          onClose={() => setShowPermDialog(false)}
+          title="Initial permissions"
+          size="lg"
+          footer={
+            <Button onClick={() => setShowPermDialog(false)}>Done</Button>
+          }
+        >
+          <PermissionGrid catalog={catalog} granted={perms} onChange={setPerms} />
+        </Dialog>
       </CardContent>
     </Card>
   );
@@ -292,6 +368,14 @@ function PermissionGrid({
     if (checked) next.add(key);
     else next.delete(key);
     onChange([...next]);
+  }
+
+  if (grantable.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Permission catalog not loaded yet.
+      </p>
+    );
   }
 
   return (
