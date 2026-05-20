@@ -11,7 +11,7 @@ import { UserInfoEntity } from './user-info.entity';
 export type UserRole = 'user' | 'admin' | 'superadmin';
 export type UserStatus = 'active' | 'suspended' | 'deleted';
 
-@Entity({ name: 'vl_users' })
+@Entity({ name: 'users' })
 export class UserEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -33,10 +33,7 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 20, default: 'unspecified' })
   gender!: string;
 
-  @OneToOne(() => UserInfoEntity, (i) => i.user, {
-    eager: true,
-    cascade: ['insert', 'update'],
-  })
+  @OneToOne(() => UserInfoEntity, (i) => i.user, { eager: true, cascade: ['insert', 'update'] })
   info!: UserInfoEntity;
 
   @CreateDateColumn({ type: 'timestamptz' })
