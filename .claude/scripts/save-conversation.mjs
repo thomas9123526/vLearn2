@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Stop hook: render the current session as markdown to
-// todoList_report/question/<slug>.md, where <slug> derives from
-// the first user prompt of the session. Rewrites the same file on
-// each turn so the on-disk record stays in sync with the live chat.
+// Stop hook: save the LATEST exchange (most recent user prompt +
+// Claude's response to it) as markdown to
+// todoList_report/question/<slug>.md. Slug derives from the latest
+// user prompt, so each prompt becomes its own file.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -103,22 +103,34 @@ async function main() {
   }
   if (turns.length === 0) return;
 
-  const firstUser = turns.find((t) => t.role === 'user');
-  if (!firstUser) return;
-  const slug = slugify(firstUser.text);
-  const headerLine = firstUser.text.replace(/[\r\n]+/g, ' ').trim().slice(0, 80);
+  // Walk back to the most recent user prompt; everything after it is the
+  // assistant's response to that prompt (possibly multiple text blocks).
+  let lastUserIdx = -1;
+  for (let i = turns.length - 1; i >= 0; i--) {
+    if (turns[i].role === 'user') { lastUserIdx = i; break; }
+  }
+  if (lastUserIdx === -1) return;
+
+  const userPrompt = turns[lastUserIdx];
+  const assistantParts = turns.slice(lastUserIdx + 1).filter((t) => t.role === 'assistant');
+
+  const slug = slugify(userPrompt.text);
+  const headerLine = userPrompt.text.replace(/[\r\n]+/g, ' ').trim().slice(0, 80);
 
   const md = [];
   md.push(`# ${headerLine}`);
   md.push('');
   md.push(`Session: \`${hookInput.session_id || 'unknown'}\``);
-  md.push(`Last updated: ${new Date().toISOString()}`);
-  md.push(`Turns: ${turns.length}`);
+  md.push(`Saved: ${new Date().toISOString()}`);
   md.push('');
-  for (const t of turns) {
-    md.push(t.role === 'user' ? '## User' : '## Assistant');
+  md.push('## User');
+  md.push('');
+  md.push(userPrompt.text);
+  md.push('');
+  for (const a of assistantParts) {
+    md.push('## Assistant');
     md.push('');
-    md.push(t.text);
+    md.push(a.text);
     md.push('');
   }
 
