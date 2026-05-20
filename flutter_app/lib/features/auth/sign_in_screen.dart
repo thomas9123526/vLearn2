@@ -192,7 +192,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                             ? null
                             : () => setState(() => _rememberMe = !_rememberMe),
                         child: Text(
-                          'Remember me on this device',
+                          'Save my account',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
