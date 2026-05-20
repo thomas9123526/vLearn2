@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/compression_interceptor.dart';
+import 'interceptors/request_log_interceptor.dart';
 
 
 
@@ -84,6 +85,9 @@ final apiClientProvider = Provider<Dio>((ref) {
       });
     },
   ));
+  // Sits AFTER AuthInterceptor so the Bearer header is already attached
+  // by the time we log. Debug-only — see [RequestLogInterceptor].
+  dio.interceptors.add(RequestLogInterceptor());
   dio.interceptors.add(ErrorInterceptor());
 
   return dio;
