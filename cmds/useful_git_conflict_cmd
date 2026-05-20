@@ -1,0 +1,40 @@
+The actual fix was one command:
+
+
+git pull --rebase
+That's it. The error you hit was Git refusing to pull until you told it how to reconcile divergent branches (your 1 local commit vs. 10 remote commits). --rebase replays your local commit on top of the remote tip, giving a linear history.
+
+Full sequence I'd run from a fresh shell:
+
+
+cd /root/vfls/vLearn2
+
+# 1. Inspect divergence first
+git status -sb                       # shows "[ahead N, behind M]"
+git log --oneline origin/dev..HEAD   # your local commits not on remote
+git log --oneline HEAD..origin/dev   # remote commits you don't have
+
+# 2. Pull with explicit strategy
+git pull --rebase                    # rebase: linear history (recommended for dev/feature branches)
+# OR
+git pull --no-rebase                 # merge: creates a merge commit
+# OR
+git pull --ff-only                   # fast-forward only (fails if you have local commits)
+
+# 3. Verify
+git status -sb
+git log --oneline -5
+To make --rebase the permanent default so you can just type git pull next time:
+
+
+git config --global pull.rebase true   # affects every repo on this machine
+# OR
+git config pull.rebase true            # affects only this repo
+If a rebase ever hits a conflict (this one didn't, but for the file):
+
+
+# fix conflicts in the listed files, then:
+git add <the-files>
+git rebase --continue
+# or to abort and go back to where you were:
+git rebase --abort
