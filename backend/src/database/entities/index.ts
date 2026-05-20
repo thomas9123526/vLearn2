@@ -9,6 +9,7 @@ import {
   ConversationMessageEntity,
   SessionScoreEntity,
 } from './conversation.entity';
+import { CategoryEntity } from './category.entity';
 import { CourseEntity, CourseScenarioEntity } from './course.entity';
 import { GuardViolationEntity } from './guard-violation.entity';
 import { NewsPostEntity, NewsReadStatusEntity } from './news.entity';
@@ -33,6 +34,7 @@ export {
   AchievementEntity,
   UserAchievementEntity,
   AppConfigEntity,
+  CategoryEntity,
   ConversationSessionEntity,
   ConversationMessageEntity,
   SessionScoreEntity,
@@ -61,6 +63,7 @@ export const ALL_ENTITIES = [
   AchievementEntity,
   UserAchievementEntity,
   AppConfigEntity,
+  CategoryEntity,
   ConversationSessionEntity,
   ConversationMessageEntity,
   SessionScoreEntity,

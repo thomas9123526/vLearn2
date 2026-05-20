@@ -7,11 +7,13 @@ import {
 } from 'typeorm';
 
 export type ScenarioStatus = 'draft' | 'published' | 'archived';
-export type ScenarioCategory =
-  | 'travel'
-  | 'business'
-  | 'social'
-  | 'daily';
+/**
+ * @deprecated Categories are now stored in vl_categories. The slug column
+ * (`vl_scenarios.category`) holds a denormalized slug for backwards-
+ * compatibility with API clients that read `category: <slug>`. Any string
+ * referencing an active row in vl_categories is valid.
+ */
+export type ScenarioCategory = string;
 
 export interface I18nText {
   en: string;
@@ -35,6 +37,7 @@ export interface KeyPhrase {
 @Index(['status'])
 @Index(['category'])
 @Index(['difficulty'])
+@Index(['category_id'])
 export class ScenarioEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -42,8 +45,17 @@ export class ScenarioEntity {
   @Column({ type: 'varchar', length: 100, unique: true })
   slug!: string;
 
+  /**
+   * Denormalized category slug. Source of truth is `category_id` →
+   * `vl_categories(id)`; this column is kept in sync by the admin
+   * controllers so existing API clients can read `category` as a string
+   * without an extra join. Never edit slugs directly — see [CategoryEntity].
+   */
   @Column({ type: 'varchar', length: 50 })
   category!: ScenarioCategory;
+
+  @Column({ type: 'uuid' })
+  category_id!: string;
 
   @Column({ type: 'smallint' })
   difficulty!: number;

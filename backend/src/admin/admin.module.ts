@@ -8,6 +8,7 @@ import { AdminEntity } from '../database/entities/admin.entity';
 import { AdminRefreshTokenEntity } from '../database/entities/admin-refresh-token.entity';
 import { AdminPermissionEntity } from '../database/entities/admin-permission.entity';
 import { AdminAuditLogEntity } from '../database/entities/admin-audit-log.entity';
+import { CategoryEntity } from '../database/entities/category.entity';
 import { ConversationSessionEntity } from '../database/entities/conversation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
@@ -25,6 +26,7 @@ import { AdminScenariosController } from './admin-scenarios.controller';
 import { AdminPersonasController } from './admin-personas.controller';
 import { AdminLeaderboardController } from './admin-leaderboard.controller';
 import { AdminPromptTemplatesController } from './admin-prompt-templates.controller';
+import { AdminCategoriesController } from './admin-categories.controller';
 import { AuthModule } from '../auth/auth.module';
 
 @Global()
@@ -37,6 +39,7 @@ import { AuthModule } from '../auth/auth.module';
       AdminRefreshTokenEntity,
       AdminPermissionEntity,
       AdminAuditLogEntity,
+      CategoryEntity,
       ConversationSessionEntity,
       ScenarioEntity,
       PersonaEntity,
@@ -61,6 +64,7 @@ import { AuthModule } from '../auth/auth.module';
     AdminPersonasController,
     AdminLeaderboardController,
     AdminPromptTemplatesController,
+    AdminCategoriesController,
     AdminAuditController,
   ],
   exports: [AdminPermissionsService, PermissionGuard, AdminAuthService, AdminAuditLogService],

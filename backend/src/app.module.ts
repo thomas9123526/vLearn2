@@ -10,6 +10,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { UsersModule } from './users/users.module';
 import { PersonasModule } from './personas/personas.module';
 import { ScenariosModule } from './scenarios/scenarios.module';
+import { CategoriesModule } from './categories/categories.module';
 import { CoursesModule } from './courses/courses.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { ProgressModule } from './progress/progress.module';
@@ -43,6 +44,7 @@ import { NewsModule } from './news/news.module';
     UsersModule,
     PersonasModule,
     ScenariosModule,
+    CategoriesModule,
     CoursesModule,
     ConversationsModule,
     ProgressModule,

@@ -15,6 +15,7 @@ import {
   LogOut,
   Sparkles,
   MessageSquareCode,
+  ListTree,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { tokenStore, currentClaims } from '@/lib/auth';
@@ -25,6 +26,7 @@ const NAV = [
   { href: '/personas', label: 'Tutors', icon: Sparkles, perm: 'personas.edit' },
   { href: '/prompt-templates', label: 'Prompts', icon: MessageSquareCode, perm: 'prompts.view' },
   { href: '/scenarios', label: 'Scenarios', icon: BookOpen, perm: 'scenarios.view' },
+  { href: '/categories', label: 'Categories', icon: ListTree, perm: 'categories.view' },
   { href: '/users', label: 'Users', icon: Users, perm: 'users.view' },
   { href: '/news', label: 'News', icon: Newspaper, perm: 'news.view' },
   { href: '/leaderboard', label: 'Leaderboard', icon: Trophy, perm: 'leaderboard.view' },

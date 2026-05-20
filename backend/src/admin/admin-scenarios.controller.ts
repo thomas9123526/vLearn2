@@ -19,7 +19,6 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ApiBearerAuth, ApiProperty, ApiTags } from '@nestjs/swagger';
 import {
   IsArray,
-  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -33,10 +32,10 @@ import * as path from 'path';
 import {
   ScenarioEntity,
   type I18nText,
-  type ScenarioCategory,
   type ScenarioObjective,
   type KeyPhrase,
 } from '../database/entities/scenario.entity';
+import { CategoryEntity } from '../database/entities/category.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
@@ -51,8 +50,8 @@ class I18nTextDto implements I18nText {
 
 class CreateScenarioDto {
   @ApiProperty() @IsString() slug!: string;
-  @ApiProperty() @IsString() @IsIn(['travel', 'business', 'social', 'daily'])
-  category!: ScenarioCategory;
+  /** Category slug — resolved server-side to category_id. Must reference an active row in vl_categories. */
+  @ApiProperty() @IsString() category!: string;
   @ApiProperty() @IsInt() @Min(1) @Max(5) difficulty!: number;
   @ApiProperty({ type: I18nTextDto }) @ValidateNested() @Type(() => I18nTextDto) title!: I18nTextDto;
   @ApiProperty({ type: I18nTextDto }) @ValidateNested() @Type(() => I18nTextDto) description!: I18nTextDto;
@@ -67,8 +66,7 @@ class CreateScenarioDto {
 
 class UpdateScenarioDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() slug?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @IsIn(['travel', 'business', 'social', 'daily'])
-  category?: ScenarioCategory;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() category?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(1) @Max(5) difficulty?: number;
   @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() title?: I18nTextDto;
   @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() description?: I18nTextDto;
@@ -123,9 +121,11 @@ export class AdminScenariosController {
       const repo = em.getRepository(ScenarioEntity);
       const existing = await repo.findOne({ where: { slug: dto.slug } });
       if (existing) throw new BadRequestException({ i18nKey: 'scenario.slug_taken' });
+      const cat = await this.resolveCategoryBySlug(dto.category, em);
       const s = repo.create({
         slug: dto.slug,
-        category: dto.category,
+        category: cat.slug,
+        category_id: cat.id,
         difficulty: dto.difficulty,
         title: dto.title,
         description: dto.description,
@@ -171,6 +171,13 @@ export class AdminScenariosController {
       const s = await this.findById(id, em);
       const before: Record<string, unknown> = {};
       const after: Record<string, unknown> = {};
+      // Resolve slug → category before diffing so the audit log carries the
+      // category slug that the admin actually typed, not the FK uuid.
+      let nextCategoryId: string | undefined;
+      if (dto.category !== undefined && dto.category !== s.category) {
+        const cat = await this.resolveCategoryBySlug(dto.category, em);
+        nextCategoryId = cat.id;
+      }
       for (const [k, v] of Object.entries(dto) as [keyof UpdateScenarioDto, unknown][]) {
         if (v === undefined) continue;
         const current = (s as unknown as Record<string, unknown>)[k as string];
@@ -179,6 +186,7 @@ export class AdminScenariosController {
         after[k as string] = v;
       }
       Object.assign(s, dto);
+      if (nextCategoryId) s.category_id = nextCategoryId;
       const saved = await repo.save(s);
       if (Object.keys(after).length > 0) {
         await this.audit.record(
@@ -315,6 +323,19 @@ export class AdminScenariosController {
     const s = await repo.findOne({ where: { id } });
     if (!s) throw new NotFoundException({ i18nKey: 'scenario.not_found' });
     return s;
+  }
+
+  private async resolveCategoryBySlug(
+    slug: string,
+    em: EntityManager,
+  ): Promise<CategoryEntity> {
+    const cat = await em
+      .getRepository(CategoryEntity)
+      .findOne({ where: { slug } });
+    if (!cat || !cat.is_active) {
+      throw new BadRequestException({ i18nKey: 'scenario.category_invalid' });
+    }
+    return cat;
   }
 }
 
