@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/router/app_router.dart';
 import '../../core/services/cid_fetch_service.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
@@ -88,7 +89,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     return Scaffold(
       appBar: AppBar(leading: IconButton(
         icon: const Icon(Icons.arrow_back),
-        onPressed: () => context.pop(),
+        // Sign-up can be reached two ways: pushed from /signin (pop works),
+        // or replaced onto the stack from the splash auto-route for fresh
+        // installs (nothing to pop). Fall back to /signin in the latter
+        // case so the back arrow always lands somewhere useful.
+        onPressed: () => context.canPop()
+            ? context.pop()
+            : context.go(AppRoute.signIn),
       )),
       body: SafeArea(
         child: Padding(
