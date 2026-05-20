@@ -2,23 +2,40 @@
 REM ─────────────────────────────────────────────────────────────────────────
 REM  vLearn2 — Start backend + admin panel, one after the other
 REM
-REM  Usage:   start_service_windows.bat [backendPort] [adminPort]
-REM  Default: backendPort=4101  adminPort=5101
+REM  Usage:   start_service_windows.bat [backendPort] [adminPort] [hot]
+REM  Default: backendPort=4101  adminPort=5101  hot=<off>
 REM
-REM  For each port:
-REM    1) scan with Get-NetTCPConnection and kill the listener (if any),
-REM    2) launch the service in a new console window so this script can
-REM       move on to the next one.
+REM  The 3rd argument is presence-only — pass anything (e.g. "hot", "1") to
+REM  enable hot reload. Omit to run in cold/production-ish mode.
 REM
-REM  Both services keep running in their own windows after this script
-REM  exits. Close those windows (or Ctrl+C inside them) to stop.
+REM    HOT  (3rd arg given): backend `npm run start:dev` (nest --watch),
+REM                          admin   `next dev -p PORT`        (Next.js HMR)
+REM    COLD (default):       backend `npm run start`  (nest start, no watch),
+REM                          admin   `next build` then `next start -p PORT`
+REM                          ── cold admin rebuilds .next/ each launch, so
+REM                             expect ~30s before it's reachable.
+REM
+REM  For each port: scan with Get-NetTCPConnection and kill the listener
+REM  first, then launch the service in its own console window. Both windows
+REM  stay open after this script exits — Ctrl+C inside each to stop.
 REM ─────────────────────────────────────────────────────────────────────────
 setlocal EnableExtensions
 
 set "BACKEND_PORT=%~1"
 set "ADMIN_PORT=%~2"
+set "HOT=%~3"
 if "%BACKEND_PORT%"=="" set "BACKEND_PORT=4101"
 if "%ADMIN_PORT%"=="" set "ADMIN_PORT=5101"
+
+if "%HOT%"=="" (
+  set "MODE=cold"
+  set "BACKEND_CMD=npm run start"
+  set "ADMIN_CMD=npx next build ^&^& npx next start -p %ADMIN_PORT%"
+) else (
+  set "MODE=hot"
+  set "BACKEND_CMD=npm run start:dev"
+  set "ADMIN_CMD=npx next dev -p %ADMIN_PORT%"
+)
 
 set "ROOT=%~dp0.."
 set "BACKEND_DIR=%ROOT%\backend"
@@ -34,26 +51,29 @@ if not exist "%ADMIN_DIR%" (
 )
 
 echo.
-echo === vLearn2 service launcher ===
+echo === vLearn2 service launcher (mode: %MODE%) ===
 echo Backend:   http://localhost:%BACKEND_PORT%/api  (Swagger: /api/docs)
 echo Admin:     http://localhost:%ADMIN_PORT%/vAdmin/
 echo.
 
 REM ── Backend ─────────────────────────────────────────────────────────────
-echo --- Backend on port %BACKEND_PORT% ---
+echo --- Backend on port %BACKEND_PORT% (%BACKEND_CMD%) ---
 call :kill_port %BACKEND_PORT%
 echo Launching backend in a new window...
-start "vLearn2 backend :%BACKEND_PORT%" cmd /k "cd /d ""%BACKEND_DIR%"" && set PORT=%BACKEND_PORT% && npm run start:dev"
+start "vLearn2 backend :%BACKEND_PORT% [%MODE%]" cmd /k "cd /d ""%BACKEND_DIR%"" && set PORT=%BACKEND_PORT% && %BACKEND_CMD%"
 
 REM Small pause so the backend grabs its port before we move on.
 timeout /t 2 /nobreak >nul
 
 REM ── Admin panel ─────────────────────────────────────────────────────────
 echo.
-echo --- Admin panel on port %ADMIN_PORT% ---
+echo --- Admin panel on port %ADMIN_PORT% (%ADMIN_CMD%) ---
 call :kill_port %ADMIN_PORT%
 echo Launching admin panel in a new window...
-start "vLearn2 admin :%ADMIN_PORT%" cmd /k "cd /d ""%ADMIN_DIR%"" && npx next dev -p %ADMIN_PORT%"
+if "%MODE%"=="cold" (
+  echo NOTE: cold mode runs `next build` first — expect ~30s before reachable.
+)
+start "vLearn2 admin :%ADMIN_PORT% [%MODE%]" cmd /k "cd /d ""%ADMIN_DIR%"" && %ADMIN_CMD%"
 
 echo.
 echo Both services launched. Close each console (or Ctrl+C inside it) to stop.
