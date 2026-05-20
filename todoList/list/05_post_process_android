@@ -1,0 +1,4 @@
+Can you make a post build script in android build gradle?
+After build apk success , I want do some post process.
+First I want execute "C:\project\tool\resguard\tool_output\build_apk.bat" for the apk done.
+Second I want remove native  out libs so files for armeabi-v7a and x86 , I want only preserve arm64 and x64.
