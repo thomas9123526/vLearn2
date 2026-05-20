@@ -45,8 +45,8 @@ class _ChangePasswordBodyState extends ConsumerState<_ChangePasswordBody> {
       setState(() => _error = 'Enter your current password.');
       return;
     }
-    if (_newCtrl.text.length < 8) {
-      setState(() => _error = 'New password must be at least 8 characters.');
+    if (_newCtrl.text.length < 6) {
+      setState(() => _error = 'New password must be at least 6 characters.');
       return;
     }
     if (_newCtrl.text != _confirmCtrl.text) {
@@ -121,7 +121,7 @@ class _ChangePasswordBodyState extends ConsumerState<_ChangePasswordBody> {
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               isDense: true,
-              labelText: 'New password (≥ 8 chars)',
+              labelText: 'New password (≥ 6 chars)',
             ),
           ),
           const SizedBox(height: 12),

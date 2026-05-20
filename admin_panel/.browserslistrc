@@ -1,0 +1,14 @@
+# Floor for the admin panel — Chrome 80+ per product spec
+# (item 13 in todoList/list). SWC and PostCSS both consume this file.
+#
+# Chrome 80 (Feb 2020) supports optional chaining (?.), nullish
+# coalescing (??), BigInt, and dynamic import. It does NOT support
+# logical-assignment (??= /||= /&&=, Chrome 85), String.replaceAll
+# (Chrome 85), Array.prototype.at (Chrome 92), Object.hasOwn
+# (Chrome 93), or top-level await (Chrome 89). SWC will down-level
+# those for us when the build sees this floor.
+Chrome >= 80
+Edge >= 80
+Firefox >= 78
+Safari >= 14
+not dead

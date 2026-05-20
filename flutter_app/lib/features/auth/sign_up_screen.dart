@@ -172,8 +172,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   controller: _passwordCtrl,
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    helperText: 'At least 8 characters, with upper, lower, and a digit',
-                    helperMaxLines: 2,
+                    helperText: 'At least 6 characters',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
@@ -183,10 +182,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   obscureText: _obscure,
                   autofillHints: const [AutofillHints.newPassword],
                   validator: (v) {
-                    if (v == null || v.length < 8) return 'Min 8 characters';
-                    if (!RegExp('[a-z]').hasMatch(v)) return 'Need a lowercase letter';
-                    if (!RegExp('[A-Z]').hasMatch(v)) return 'Need an uppercase letter';
-                    if (!RegExp('[0-9]').hasMatch(v)) return 'Need a digit';
+                    if (v == null || v.length < 6) return 'Min 6 characters';
                     return null;
                   },
                 ),

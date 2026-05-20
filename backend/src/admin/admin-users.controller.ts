@@ -17,8 +17,11 @@ import {
   ApiProperty,
   ApiTags,
 } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import * as bcrypt from 'bcrypt';
 import { UserInfoEntity } from '../database/entities/user-info.entity';
+import { UserEntity } from '../database/entities/user.entity';
+import { RefreshTokenEntity } from '../database/entities/refresh-token.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
@@ -27,6 +30,8 @@ import {
   RequirePermission,
 } from './permissions/permission.guard';
 import { AdminAuditLogService } from './audit/admin-audit-log.service';
+
+const BCRYPT_ROUNDS = 10;
 
 class SuspendUserDto {
   @ApiProperty({ required: false })
@@ -43,6 +48,18 @@ class SuspendUserDto {
   until?: string;
 }
 
+class ResetPasswordDto {
+  @ApiProperty({
+    description:
+      'New plain-text password chosen by the admin. Must satisfy the same length-only rule as user sign-up (≥ 6 chars).',
+    example: 'temp1234',
+  })
+  @IsString()
+  @MinLength(6)
+  @MaxLength(128)
+  newPassword!: string;
+}
+
 /**
  * Admin endpoints for managing app users (not sub-admins — those live under
  * `/admin/admins`). Suspend/restore is the most-used path and is granted to
@@ -56,6 +73,10 @@ export class AdminUsersController {
   constructor(
     @InjectRepository(UserInfoEntity)
     private readonly userInfos: Repository<UserInfoEntity>,
+    @InjectRepository(UserEntity)
+    private readonly users: Repository<UserEntity>,
+    @InjectRepository(RefreshTokenEntity)
+    private readonly refreshTokens: Repository<RefreshTokenEntity>,
     private readonly audit: AdminAuditLogService,
     private readonly dataSource: DataSource,
   ) {}
@@ -187,6 +208,65 @@ export class AdminUsersController {
             suspended_reason: null,
             suspended_until: null,
           },
+        },
+        em,
+      );
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Admin-driven password reset. The admin types the new password; we
+   * bcrypt-hash it, overwrite the user's `password_hash`, and revoke every
+   * outstanding refresh token for that user so any concurrent sessions
+   * are kicked out. The plain-text password is **not** echoed back —
+   * the admin already knows what they typed; we just confirm "ok".
+   *
+   * Length-only constraint (≥ 6 chars) matches the sign-up DTO.
+   */
+  @Post(':id/reset-password')
+  @RequirePermission('users.reset_password')
+  @ApiOperation({
+    summary: 'Reset a user’s password (overwrite + revoke sessions)',
+  })
+  async resetPassword(
+    @CurrentUser() actor: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: ResetPasswordDto,
+  ) {
+    await this.dataSource.transaction(async (em) => {
+      const userRepo = em.getRepository(UserEntity);
+      const infoRepo = em.getRepository(UserInfoEntity);
+      const refreshRepo = em.getRepository(RefreshTokenEntity);
+
+      const info = await infoRepo.findOne({ where: { user_id: id } });
+      if (!info) throw new NotFoundException({ i18nKey: 'user.not_found' });
+      if (info.role !== 'user') {
+        // Admin password changes happen via the admin-side flow, not here.
+        throw new BadRequestException({
+          i18nKey: 'user.cannot_reset_admin_password',
+        });
+      }
+
+      const target = await userRepo.findOne({ where: { id } });
+      if (!target) throw new NotFoundException({ i18nKey: 'user.not_found' });
+
+      target.password_hash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+      await userRepo.save(target);
+
+      // Kick every device — they must re-sign-in with the new password.
+      const revoked = await refreshRepo.delete({ user_id: id });
+
+      await this.audit.record(
+        {
+          actorId: actor.sub,
+          action: 'user.reset_password',
+          targetType: 'user',
+          targetId: id,
+          // Do NOT log the plain-text password or the hash. Just the fact
+          // that a reset happened and how many sessions were revoked.
+          oldValue: null,
+          newValue: { revokedSessions: revoked.affected ?? 0 },
         },
         em,
       );

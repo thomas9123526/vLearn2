@@ -26,8 +26,13 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         ndk {
-            // Native ABIs sherpa-onnx will eventually require (see todoList/09 §9.15)
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+            // Per todoList/list/05_post_process_android: ship only 64-bit
+            // ABIs (arm64 + x64). Older 32-bit ABIs (armeabi-v7a, x86) are
+            // dropped — Google Play has required 64-bit since Aug 2019 and
+            // modern Android devices all support arm64-v8a. Pruning them
+            // shrinks the APK and drops the native .so files that the
+            // legacy 32-bit slots would otherwise pull in.
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
 
@@ -42,4 +47,30 @@ android {
 
 flutter {
     source = "../.."
+}
+
+// ─── Post-build hooks ─────────────────────────────────────────────────────
+//
+// Per todoList/list/05_post_process_android: after the release APK is
+// assembled, run the external resguard batch that lives in the user's
+// tooling tree. Windows-only — both the path and the .bat are
+// Windows-specific. On Linux/Mac CI this task no-ops cleanly.
+tasks.register<Exec>("postBuildResguard") {
+    description = "Run the resguard repackaging batch on the built APK."
+    group = "build"
+    onlyIf {
+        System.getProperty("os.name").lowercase().contains("windows")
+    }
+    workingDir = file("C:/project/tool/resguard/tool_output")
+    commandLine("cmd", "/c", "build_apk.bat")
+    // Don't fail the whole gradle build if the resguard step errors —
+    // the APK is already produced; resguard is a follow-up packaging.
+    isIgnoreExitValue = true
+}
+
+// Fire after the standard release assemble. `findByName` is null-safe so
+// we don't crash on debug-only builds (the task is registered on every
+// configuration but only attaches when the corresponding assemble exists).
+afterEvaluate {
+    tasks.findByName("assembleRelease")?.finalizedBy("postBuildResguard")
 }

@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ban, RotateCcw, Search } from 'lucide-react';
+import { Ban, KeyRound, RotateCcw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { usePermission } from '@/hooks/use-permission';
 
@@ -31,9 +33,11 @@ interface UserListResp {
 
 export default function UsersPage() {
   const canSuspend = usePermission('users.suspend');
+  const canResetPassword = usePermission('users.reset_password');
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<string>('');
+  const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
 
   const { data, isLoading } = useQuery<UserListResp>({
     queryKey: ['admin-users', q, status],
@@ -108,23 +112,34 @@ export default function UsersPage() {
                 <td className="px-4 py-2 text-right tabular-nums">{u.xp_total}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{u.streak_days}</td>
                 <td className="px-4 py-2 text-right">
-                  {canSuspend && u.status === 'active' && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => {
-                        const reason = prompt('Reason for suspension?') ?? '';
-                        if (reason !== null) suspend.mutate({ id: u.id, reason });
-                      }}
-                    >
-                      <Ban className="h-4 w-4" /> Block
-                    </Button>
-                  )}
-                  {canSuspend && u.status === 'suspended' && (
-                    <Button size="sm" variant="outline" onClick={() => restore.mutate(u.id)}>
-                      <RotateCcw className="h-4 w-4" /> Restore
-                    </Button>
-                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    {canResetPassword && u.status !== 'deleted' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setResetTarget(u)}
+                      >
+                        <KeyRound className="h-4 w-4" /> Reset Password
+                      </Button>
+                    )}
+                    {canSuspend && u.status === 'active' && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          const reason = prompt('Reason for suspension?') ?? '';
+                          if (reason !== null) suspend.mutate({ id: u.id, reason });
+                        }}
+                      >
+                        <Ban className="h-4 w-4" /> Block
+                      </Button>
+                    )}
+                    {canSuspend && u.status === 'suspended' && (
+                      <Button size="sm" variant="outline" onClick={() => restore.mutate(u.id)}>
+                        <RotateCcw className="h-4 w-4" /> Restore
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -138,7 +153,148 @@ export default function UsersPage() {
           </tbody>
         </table>
       </Card>
+
+      <ResetPasswordDialog
+        target={resetTarget}
+        onClose={() => setResetTarget(null)}
+      />
     </div>
+  );
+}
+
+function ResetPasswordDialog({
+  target,
+  onClose,
+}: {
+  target: UserRow | null;
+  onClose: () => void;
+}) {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const submit = useMutation({
+    mutationFn: ({ id, newPassword }: { id: string; newPassword: string }) =>
+      api(`/admin/users/${id}/reset-password`, {
+        method: 'POST',
+        body: { newPassword },
+      }),
+    onSuccess: () => setDone(true),
+    onError: (e: Error) =>
+      setError(e.message || 'Reset failed. Please try again.'),
+  });
+
+  // Reset form state whenever a different user is selected (or dialog closes).
+  const targetId = target?.id ?? null;
+  // useEffect would import another hook; doing it inline via key on Dialog
+  // is cleaner — see `key={targetId ?? 'closed'}` below.
+
+  if (!target) return null;
+
+  return (
+    <Dialog
+      key={targetId ?? 'closed'}
+      open={!!target}
+      onClose={() => {
+        setPassword('');
+        setConfirm('');
+        setError(null);
+        setDone(false);
+        onClose();
+      }}
+      title="Reset password"
+      description={
+        done
+          ? 'Password has been reset and every active session for this user has been revoked.'
+          : `Set a new password for ${target.display_name || target.email}. They will be signed out of all devices.`
+      }
+      size="sm"
+      footer={
+        done ? (
+          <Button
+            onClick={() => {
+              setPassword('');
+              setConfirm('');
+              setError(null);
+              setDone(false);
+              onClose();
+            }}
+          >
+            Close
+          </Button>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPassword('');
+                setConfirm('');
+                setError(null);
+                onClose();
+              }}
+              disabled={submit.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setError(null);
+                if (password.length < 6) {
+                  setError('Password must be at least 6 characters.');
+                  return;
+                }
+                if (password !== confirm) {
+                  setError('Passwords do not match.');
+                  return;
+                }
+                submit.mutate({ id: target.id, newPassword: password });
+              }}
+              disabled={submit.isPending}
+            >
+              {submit.isPending ? 'Resetting…' : 'Reset password'}
+            </Button>
+          </>
+        )
+      }
+    >
+      {done ? (
+        <p className="text-sm">
+          Tell the user their new password through a channel they trust
+          (phone, in-person, secure messenger). It is <strong>not</strong>{' '}
+          shown again here.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="reset-pw">New password</Label>
+            <Input
+              id="reset-pw"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Min 6 characters"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="reset-pw2">Confirm</Label>
+            <Input
+              id="reset-pw2"
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              autoComplete="new-password"
+            />
+          </div>
+          {error && (
+            <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
+    </Dialog>
   );
 }
 

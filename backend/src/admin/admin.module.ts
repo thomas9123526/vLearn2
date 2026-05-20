@@ -6,6 +6,7 @@ import { UserEntity } from '../database/entities/user.entity';
 import { UserInfoEntity } from '../database/entities/user-info.entity';
 import { AdminEntity } from '../database/entities/admin.entity';
 import { AdminRefreshTokenEntity } from '../database/entities/admin-refresh-token.entity';
+import { RefreshTokenEntity } from '../database/entities/refresh-token.entity';
 import { AdminPermissionEntity } from '../database/entities/admin-permission.entity';
 import { AdminAuditLogEntity } from '../database/entities/admin-audit-log.entity';
 import { CategoryEntity } from '../database/entities/category.entity';
@@ -44,6 +45,8 @@ import { AuthModule } from '../auth/auth.module';
       ScenarioEntity,
       PersonaEntity,
       PromptTemplateEntity,
+      // Needed by admin users password-reset to revoke active user sessions
+      RefreshTokenEntity,
     ]),
     AuthModule,
     JwtModule.registerAsync({

@@ -226,6 +226,14 @@ export const PERMISSION_CATALOG: PermissionDef[] = [
     implies: ['users.view'],
   },
   {
+    key: 'users.reset_password',
+    category: 'users',
+    description:
+      'Reset (overwrite) a user’s password and revoke their active sessions',
+    grantable_to_subadmin: true,
+    implies: ['users.view'],
+  },
+  {
     key: 'users.delete',
     category: 'users',
     description: 'Soft-delete users',

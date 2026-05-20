@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../news_providers.dart';
+import 'news_dialog.dart';
 
 /// Notification bell shown in the home AppBar. Renders a red unread-count
-/// badge when `unreadNewsCountProvider` reports > 0.
+/// badge when `unreadNewsCountProvider` reports > 0. Tapping opens the
+/// `NewsDialog` (list + in-place detail), per the design handoff —
+/// previously this pushed `/news` as a fullscreen route.
 class BellIcon extends ConsumerWidget {
   const BellIcon({super.key});
 
@@ -17,7 +19,7 @@ class BellIcon extends ConsumerWidget {
         IconButton(
           icon: const Icon(Icons.notifications_outlined),
           tooltip: 'News',
-          onPressed: () => context.push('/news'),
+          onPressed: () => showNewsDialog(context),
         ),
         if (unread > 0)
           Positioned(

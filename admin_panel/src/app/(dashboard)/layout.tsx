@@ -100,7 +100,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 overflow-x-hidden">
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
           <div className="text-sm font-medium capitalize">
-            {pathname === '/' ? 'Dashboard' : pathname.slice(1).replaceAll('/', ' / ')}
+            {pathname === '/' ? 'Dashboard' : pathname.slice(1).split('/').join(' / ')}
           </div>
           <div className="text-xs text-muted-foreground">
             Role: <span className="font-medium">{user.role}</span>

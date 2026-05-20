@@ -5,7 +5,6 @@ import {
   IsString,
   MaxLength,
   MinLength,
-  Matches,
 } from 'class-validator';
 
 export class SignUpDto {
@@ -26,13 +25,13 @@ export class SignUpDto {
   @MaxLength(50)
   cidUsername!: string;
 
-  @ApiProperty({ example: 'StrongP@ssw0rd' })
+  // Single constraint per product spec: length >= 6. No upper/lower/digit/
+  // symbol classes. MaxLength stays as defense-in-depth against accidental
+  // megabyte payloads from a buggy client.
+  @ApiProperty({ example: 'mypass1' })
   @IsString()
-  @MinLength(8)
+  @MinLength(6)
   @MaxLength(128)
-  @Matches(/[a-z]/, { message: 'Password must contain a lowercase letter' })
-  @Matches(/[A-Z]/, { message: 'Password must contain an uppercase letter' })
-  @Matches(/[0-9]/, { message: 'Password must contain a digit' })
   password!: string;
 
   @ApiProperty({ example: 'Alex' })

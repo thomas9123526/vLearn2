@@ -67,10 +67,11 @@ export class UpdateProfileDto {
   onboardingDone?: boolean;
 
   /// Plain-text new password. Server hashes it before storing.
-  /// Validated against the current password for safety.
+  /// Validated against the current password for safety. Length-only
+  /// constraint per product spec (no upper/lower/digit/symbol classes).
   @IsOptional()
   @IsString()
-  @MinLength(8)
+  @MinLength(6)
   @MaxLength(128)
   @ApiProperty({ required: false })
   newPassword?: string;

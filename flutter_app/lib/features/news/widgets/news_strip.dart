@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../news_providers.dart';
+import 'news_dialog.dart';
 
 /// Horizontal scrollable strip rendered on the home screen.
 ///
@@ -58,7 +58,7 @@ class _NewsCard extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => context.push('/news/${post.slug}'),
+          onTap: () => showNewsDialog(context, initialSlug: post.slug),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
