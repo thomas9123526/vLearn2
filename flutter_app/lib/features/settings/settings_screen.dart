@@ -453,7 +453,6 @@ Future<void> pickActivePersona(BuildContext context, WidgetRef ref) async {
         context,
         e,
         tag: 'settings_screen.active_persona',
-        errorContext: ErrorContext.action,
         stack: st,
       );
     }

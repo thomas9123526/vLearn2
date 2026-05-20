@@ -192,7 +192,7 @@ class _BubbleTailShape extends ShapeBorder {
 
   @override
   Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
-    final r = Radius.circular(_radius);
+    const r = Radius.circular(_radius);
     final body = isUser
         ? RRect.fromLTRBAndCorners(
             rect.left,

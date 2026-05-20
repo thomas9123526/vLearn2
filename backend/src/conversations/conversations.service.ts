@@ -147,7 +147,7 @@ export class ConversationsService {
     if (persona && user) {
       const history = [
         ...priorMessages.map((m) => ({
-          role: m.role as 'user' | 'assistant',
+          role: m.role,
           content: m.content,
         })),
         { role: 'user' as const, content: dto.content },
@@ -217,7 +217,7 @@ export class ConversationsService {
       userLevel: user.info.current_level,
       userNativeLanguage: user.info.native_language,
       history: history.map((m) => ({
-        role: m.role as 'user' | 'assistant',
+        role: m.role,
         content: m.content,
       })),
     });

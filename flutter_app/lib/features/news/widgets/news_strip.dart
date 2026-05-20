@@ -21,7 +21,7 @@ class NewsStrip extends ConsumerWidget {
         height: 140,
         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       ),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (items) {
         if (items.isEmpty) return const SizedBox.shrink();
         return SizedBox(
@@ -30,7 +30,7 @@ class NewsStrip extends ConsumerWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (_, i) => _NewsCard(post: items[i], lang: lang),
           ),
         );
@@ -69,7 +69,7 @@ class _NewsCard extends StatelessWidget {
                     ? Image.network(
                         post.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
+                        errorBuilder: (_, _, _) =>
                             _GradientFallback(scheme: scheme),
                       )
                     : _GradientFallback(scheme: scheme),

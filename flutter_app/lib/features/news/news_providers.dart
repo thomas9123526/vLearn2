@@ -5,7 +5,7 @@ import '../../core/models/models.dart';
 
 /// Paginated list of published news posts for the current user.
 final newsListProvider = FutureProvider<List<NewsPost>>((ref) async {
-  final raw = await ref.read(newsApiProvider).list(page: 1, limit: 20);
+  final raw = await ref.read(newsApiProvider).list();
   return (raw['items'] as List<dynamic>)
       .cast<Map<String, dynamic>>()
       .map(NewsPost.fromJson)
@@ -47,7 +47,7 @@ class UnreadNewsCountNotifier extends StateNotifier<int> {
 
 final unreadNewsCountProvider =
     StateNotifierProvider<UnreadNewsCountNotifier, int>(
-  (ref) => UnreadNewsCountNotifier(ref),
+  UnreadNewsCountNotifier.new,
 );
 
 final newsDetailProvider =

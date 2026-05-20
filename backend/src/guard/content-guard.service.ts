@@ -53,7 +53,7 @@ export class ContentGuardService {
     langs.add('en'); // always check English
     langs.add('custom'); // always check custom additions
 
-    let warnMatches: string[] = [];
+    const warnMatches: string[] = [];
     for (const lang of langs) {
       const wl = this.wordlists.get(lang);
       if (!wl) continue;

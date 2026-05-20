@@ -71,7 +71,7 @@ class NewsListScreen extends ConsumerWidget {
             child: ListView.separated(
               padding: const EdgeInsets.all(12),
               itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (_, i) => _NewsListTile(
                 post: items[i],
                 lang: lang,
@@ -118,7 +118,7 @@ class _NewsListTile extends StatelessWidget {
                     width: 64,
                     height: 64,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _ImageFallback(scheme: scheme),
+                    errorBuilder: (_, _, _) => _ImageFallback(scheme: scheme),
                   ),
                 ),
                 const SizedBox(width: 12),

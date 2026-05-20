@@ -113,8 +113,8 @@ class _TutorAvatarState extends State<TutorAvatar>
     final to = _hex(widget.persona.gradientTo);
     final asset = widget.persona.riveAsset;
 
-    AppConfig.logx("assets for", widget.persona.name);
-    AppConfig.logx("assets path", asset!);
+    AppConfig.logx('assets for', widget.persona.name);
+    AppConfig.logx('assets path', asset ?? '(none)');
 
 
 

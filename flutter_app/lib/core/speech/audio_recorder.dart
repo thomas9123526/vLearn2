@@ -114,7 +114,7 @@ class AudioRecorderService {
         onError: (Object _) => _setState(AudioRecorderState.error),
         cancelOnError: true,
       );
-      _maxTimer = Timer(maxDuration, () => stop());
+      _maxTimer = Timer(maxDuration, stop);
       _setState(AudioRecorderState.recording);
       return true;
     } catch (_) {

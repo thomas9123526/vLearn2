@@ -93,7 +93,7 @@ class ProgressService {
       }
       // Running average — keep newer evidence weighted higher.
       if (existing && existing[key] != null) {
-        const prev = existing[key]!;
+        const prev = existing[key];
         (merged as Record<typeof key, number>)[key] = Math.round(prev * 0.7 + raw * 0.3);
       } else {
         (merged as Record<typeof key, number>)[key] = Math.round(raw);

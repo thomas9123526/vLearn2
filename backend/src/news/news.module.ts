@@ -31,7 +31,6 @@ import {
   NewsReadStatusEntity,
 } from '../database/entities/news.entity';
 import type { NewsStatus } from '../database/entities/news.entity';
-import type { I18nText } from '../database/entities/scenario.entity';
 import { PermissionGuard, RequirePermission } from '../admin/permissions/permission.guard';
 
 class I18nTextDto {
@@ -126,7 +125,7 @@ export class NewsService {
   }
 
   async unreadCount(userId: string): Promise<{ count: number }> {
-    const row = await this.reads.query(
+    const row: Array<{ count: number }> = await this.reads.query(
       `SELECT COUNT(*)::int AS count
          FROM vl_news_posts p
          LEFT JOIN vl_news_read_status r

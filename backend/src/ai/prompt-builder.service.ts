@@ -86,7 +86,7 @@ export class PromptBuilderService {
     userLevel: number,
     userNativeLanguage: string,
   ): Record<string, string> {
-    const en = (v: I18nText | unknown) =>
+    const en = (v: unknown) =>
       (v as I18nText | undefined)?.en ?? '';
     const specialties = (persona.specialties ?? []).join(', ');
     const sc = scenario;

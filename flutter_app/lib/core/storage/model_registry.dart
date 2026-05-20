@@ -107,9 +107,10 @@ class ModelRegistry {
   /// `path_provider_windows` resolution (which varies with VERSIONINFO
   /// fields and was making the expected location hard to communicate).
   Future<Directory> resolveModelRoot() async {
-    if (_overrideRoot != null) return _overrideRoot;
     Directory? root;
-    if (Platform.isAndroid) {
+    if (_overrideRoot != null) {
+      root = _overrideRoot;
+    } else if (Platform.isAndroid) {
       root = await getExternalStorageDirectory();
     } else if (Platform.isWindows) {
       final appData = Platform.environment['APPDATA'];

@@ -50,7 +50,7 @@ class HomeScreen extends ConsumerWidget {
             await ref.read(authProvider.notifier).refreshProfile();
           },
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),

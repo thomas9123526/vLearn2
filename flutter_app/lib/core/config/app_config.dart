@@ -6,8 +6,6 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import 'package:flutter/foundation.dart' show debugPrint;
-
 /// Writes to stdout/stderr, which the Flutter engine forwards to Android
 /// Logcat under tag `flutter`. Filter Logcat by `flutter` (or by the tag
 /// passed below) to see these lines on a connected Android device.
@@ -22,6 +20,15 @@ class AppConfig {
     required this.topicSyncInterval,
     required this.environment,
   });
+
+  /// JSON shape — short field names per the spec (`baseurl`, `reqTout`,
+  /// `tSync`, `dev`). `dev` is a string, not a boolean.
+  factory AppConfig.fromJson(Map<String, dynamic> j) => AppConfig(
+        backendBaseUrl: (j['baseurl'] as String?) ?? defaults.backendBaseUrl,
+        requestTimeout: (j['reqTout'] as num?)?.toInt() ?? defaults.requestTimeout,
+        topicSyncInterval: (j['tSync'] as num?)?.toInt() ?? defaults.topicSyncInterval,
+        environment: (j['dev'] as String?) ?? defaults.environment,
+      );
 
   static void logx(String tag, Object message) {
     debugPrint('[$tag] $message');
@@ -60,15 +67,6 @@ class AppConfig {
         requestTimeout: 30,
         topicSyncInterval: 60,
         environment: 'dev',
-      );
-
-  /// JSON shape — short field names per the spec (`baseurl`, `reqTout`,
-  /// `tSync`, `dev`). `dev` is a string, not a boolean.
-  factory AppConfig.fromJson(Map<String, dynamic> j) => AppConfig(
-        backendBaseUrl: (j['baseurl'] as String?) ?? defaults.backendBaseUrl,
-        requestTimeout: (j['reqTout'] as num?)?.toInt() ?? defaults.requestTimeout,
-        topicSyncInterval: (j['tSync'] as num?)?.toInt() ?? defaults.topicSyncInterval,
-        environment: (j['dev'] as String?) ?? defaults.environment,
       );
 
   Map<String, dynamic> toJson() => {

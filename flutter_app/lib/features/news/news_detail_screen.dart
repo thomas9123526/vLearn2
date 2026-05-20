@@ -46,7 +46,7 @@ class NewsDetailScreen extends ConsumerWidget {
                       child: Image.network(
                         post.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (_, _, _) => Container(
                           color: scheme.primaryContainer,
                           alignment: Alignment.center,
                           child: Icon(Icons.image_not_supported,

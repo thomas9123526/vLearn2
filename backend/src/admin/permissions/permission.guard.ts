@@ -28,8 +28,8 @@ export class PermissionGuard implements CanActivate {
     ) ?? [];
     if (required.length === 0) return true;
 
-    const req = ctx.switchToHttp().getRequest();
-    const user = req.user as { sub: string; role: string } | undefined;
+    const req = ctx.switchToHttp().getRequest<{ user?: { sub: string; role: string } }>();
+    const user = req.user;
     if (!user) throw new UnauthorizedException();
 
     if (user.role === 'superadmin') return true;

@@ -263,7 +263,6 @@ class _TutorTopBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Material(
       color: scheme.surface,
-      elevation: 0,
       child: SafeArea(
         bottom: false,
         child: SizedBox(
@@ -561,7 +560,6 @@ class _SuggestionChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: scheme.tertiary.withValues(alpha: 0.5),
-              width: 1,
             ),
           ),
           child: Row(

@@ -56,7 +56,7 @@ export class OpenAICompatibleProvider extends AiProvider {
         model: this.chatModel,
         messages: [
           { role: 'system', content: req.systemPrompt },
-          ...req.messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+          ...req.messages.map((m) => ({ role: m.role, content: m.content })),
         ],
         max_tokens: req.maxTokens ?? 400,
         temperature: req.temperature ?? 0.8,
@@ -97,7 +97,7 @@ export class OpenAICompatibleProvider extends AiProvider {
             schema: req.jsonSchema as Record<string, unknown>,
             strict: true,
           },
-        } as OpenAI.ChatCompletionCreateParams['response_format'],
+        },
       });
       const raw = this.extractAssistantText(res.choices[0]?.message) || '{}';
       let parsed: unknown;
@@ -143,7 +143,7 @@ export class OpenAICompatibleProvider extends AiProvider {
       .replace(/^thinking:\s*/i, '')
       .trim();
     const lines = stripped.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    return lines.length > 0 ? lines[lines.length - 1]! : stripped;
+    return lines.length > 0 ? lines[lines.length - 1] : stripped;
   }
 
   private translateError(e: unknown): AiProviderError {
