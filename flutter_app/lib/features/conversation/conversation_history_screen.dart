@@ -145,23 +145,31 @@ class _SessionTileState extends ConsumerState<_SessionTile> {
   }
 
   Future<void> _confirmAndDelete() async {
+    // IMPORTANT: use the dialog's own `dialogContext` (the `builder`
+    // parameter), NOT the outer screen `context`. Since this screen
+    // lives inside a ShellRoute, the outer context's nearest Navigator
+    // is the shell's nested Navigator — popping THAT would tear down
+    // the shell tab itself, empty go_router's match list, and trip
+    // a cascade of Navigator-dispose assertions. The dialog's context
+    // resolves to the root Navigator (where `showDialog` puts it), so
+    // popping there dismisses just the dialog.
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete conversation?'),
         content: const Text(
           'The transcript and any score will be permanently removed. This cannot be undone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Cancel'),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Delete'),
           ),
         ],
