@@ -12,6 +12,15 @@ import 'interceptors/request_log_interceptor.dart';
 
 /// Token storage facade — `flutter_secure_storage` for production; an
 /// in-memory map for widget tests.
+///
+/// **Memory cache.** Reads go through an in-memory cache that mirrors the
+/// secure-storage values. The cache is populated lazily on first read
+/// (`_hydrate`) and updated synchronously on every `writePair` / `clear`
+/// **before** the disk-write `await`. This eliminates a stale-read race
+/// observed on Windows where `flutter_secure_storage.write()` returns
+/// before the just-written value is visible to the next `.read()` — the
+/// classic symptom is a successful sign-in immediately followed by a 401
+/// on the next request because the bearer header is missing.
 class TokenStore {
   TokenStore(this._storage);
   final FlutterSecureStorage _storage;
@@ -19,10 +28,37 @@ class TokenStore {
   static const _kAccess = 'auth.access';
   static const _kRefresh = 'auth.refresh';
 
-  Future<String?> readAccess() => _storage.read(key: _kAccess);
-  Future<String?> readRefresh() => _storage.read(key: _kRefresh);
+  String? _access;
+  String? _refresh;
+  bool _hydrated = false;
+
+  Future<void> _hydrate() async {
+    if (_hydrated) return;
+    final results = await Future.wait<String?>([
+      _storage.read(key: _kAccess),
+      _storage.read(key: _kRefresh),
+    ]);
+    _access = results[0];
+    _refresh = results[1];
+    _hydrated = true;
+  }
+
+  Future<String?> readAccess() async {
+    await _hydrate();
+    return _access;
+  }
+
+  Future<String?> readRefresh() async {
+    await _hydrate();
+    return _refresh;
+  }
 
   Future<void> writePair({required String access, required String refresh}) async {
+    // Update the cache synchronously FIRST so any concurrent reader sees
+    // the new tokens immediately, even before the disk write resolves.
+    _access = access;
+    _refresh = refresh;
+    _hydrated = true;
     await Future.wait<void>([
       _storage.write(key: _kAccess, value: access),
       _storage.write(key: _kRefresh, value: refresh),
@@ -30,6 +66,9 @@ class TokenStore {
   }
 
   Future<void> clear() async {
+    _access = null;
+    _refresh = null;
+    _hydrated = true;
     await Future.wait<void>([
       _storage.delete(key: _kAccess),
       _storage.delete(key: _kRefresh),
