@@ -27,10 +27,13 @@ class AppShell extends ConsumerWidget {
   static const double _sidebarWidth = 220;
 
   static const _allTabs = <_TabSpec>[
-    _TabSpec(route: AppRoute.home,      icon: Icons.home_outlined,         selected: Icons.home,         label: 'Home',      flagKey: 'tabs.home'),
-    _TabSpec(route: AppRoute.scenarios, icon: Icons.explore_outlined,      selected: Icons.explore,      label: 'Scenarios', flagKey: 'tabs.scenarios'),
-    _TabSpec(route: AppRoute.progress,  icon: Icons.trending_up_outlined,  selected: Icons.trending_up,  label: 'Progress',  flagKey: 'tabs.progress'),
-    _TabSpec(route: AppRoute.settings,  icon: Icons.settings_outlined,     selected: Icons.settings,     label: 'Settings',  flagKey: 'tabs.settings'),
+    _TabSpec(route: AppRoute.home,                icon: Icons.home_outlined,         selected: Icons.home,         label: 'Home',      flagKey: 'tabs.home'),
+    _TabSpec(route: AppRoute.scenarios,           icon: Icons.explore_outlined,      selected: Icons.explore,      label: 'Scenarios', flagKey: 'tabs.scenarios'),
+    // History fits a short label on the bottom nav (mobile) but the longer
+    // "Conversation history" reads better in the desktop sidebar.
+    _TabSpec(route: AppRoute.conversationHistory, icon: Icons.history_outlined,      selected: Icons.history,      label: 'History',   desktopLabel: 'Conversation history', flagKey: 'tabs.history'),
+    _TabSpec(route: AppRoute.progress,            icon: Icons.trending_up_outlined,  selected: Icons.trending_up,  label: 'Progress',  flagKey: 'tabs.progress'),
+    _TabSpec(route: AppRoute.settings,            icon: Icons.settings_outlined,     selected: Icons.settings,     label: 'Settings',  flagKey: 'tabs.settings'),
   ];
 
   @override
@@ -96,13 +99,24 @@ class _TabSpec {
     required this.selected,
     required this.label,
     required this.flagKey,
+    this.desktopLabel,
   });
 
   final String route;
   final IconData icon;
   final IconData selected;
+
+  /// Compact label used on the mobile `NavigationBar`.
   final String label;
+
+  /// Longer label preferred by the desktop sidebar. Falls back to [label]
+  /// when null, so most tabs need not set this.
+  final String? desktopLabel;
+
   final String flagKey;
+
+  String labelFor({required bool isDesktop}) =>
+      (isDesktop ? desktopLabel : null) ?? label;
 }
 
 // ─── Desktop sidebar ──────────────────────────────────────────────────────
@@ -255,7 +269,7 @@ class _SidebarItemState extends State<_SidebarItem> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  widget.spec.label,
+                  widget.spec.labelFor(isDesktop: true),
                   style: TextStyle(
                     color: fg,
                     fontFamily: 'EditorialBody',

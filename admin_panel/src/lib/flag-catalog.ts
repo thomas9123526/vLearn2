@@ -56,7 +56,6 @@ export const FLAG_CATALOG: FlagDescriptor[] = [
   { key: 'conversation.mode_toggle', label: 'Chat / Face mode toggle', tier: 'big', tab: 'conversation' },
   { key: 'conversation.mic_button', label: 'Mic / voice input', tier: 'big', tab: 'conversation' },
   { key: 'conversation.live_caption', label: 'Live caption in Face mode', tier: 'fine', tab: 'conversation' },
-  { key: 'conversation.history', label: 'Conversation history screen', tier: 'big', tab: 'conversation' },
 
   // ── Progress ────────────────────────────────────────────────────────────
   { key: 'progress.level_badge', label: 'CEFR level card', tier: 'big', tab: 'progress' },
@@ -87,10 +86,11 @@ export const FLAG_CATALOG: FlagDescriptor[] = [
   { key: 'evaluation.report.share_button', label: 'Share button', tier: 'fine', tab: 'report' },
 
   // ── Navigation tabs ─────────────────────────────────────────────────────
-  { key: 'tabs.home',      label: 'Home tab',      tier: 'big', tab: 'navigation' },
-  { key: 'tabs.scenarios', label: 'Scenarios tab', tier: 'big', tab: 'navigation' },
-  { key: 'tabs.progress',  label: 'Progress tab',  tier: 'big', tab: 'navigation' },
-  { key: 'tabs.settings',  label: 'Settings tab',  tier: 'big', tab: 'navigation' },
+  { key: 'tabs.home',      label: 'Home tab',                 tier: 'big', tab: 'navigation' },
+  { key: 'tabs.scenarios', label: 'Scenarios tab',            tier: 'big', tab: 'navigation' },
+  { key: 'tabs.history',   label: 'Conversation history tab', tier: 'big', tab: 'navigation' },
+  { key: 'tabs.progress',  label: 'Progress tab',             tier: 'big', tab: 'navigation' },
+  { key: 'tabs.settings',  label: 'Settings tab',             tier: 'big', tab: 'navigation' },
 
   // ── System (always shown last; advanced-only by default) ───────────────
   { key: 'system.gzip_enabled', label: 'Gzip response compression', tier: 'big', tab: 'system' },

@@ -10,10 +10,8 @@ import '../../core/storage/model_registry.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/bubble_style.dart';
 import '../../core/theme/font_group.dart';
-import '../../core/router/app_router.dart';
 import '../../features/conversation/widgets/chat_bubble.dart';
 import '../../core/models/models.dart';
-import '../../shared/widgets/layout_visibility.dart';
 import 'change_password_dialog.dart';
 import 'edit_profile_dialog.dart';
 
@@ -97,16 +95,6 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: Text(bubbleStyle.displayName),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickBubbleStyle(context, ref, bubbleStyle),
-          ),
-          LayoutVisibility(
-            configKey: 'conversation.history',
-            child: ListTile(
-              leading: const Icon(Icons.history),
-              title: const Text('Conversation history'),
-              subtitle: const Text('Past sessions, transcripts, and active resumes'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(AppRoute.conversationHistory),
-            ),
           ),
           const Divider(),
           const _SectionHeader(text: 'Storage'),

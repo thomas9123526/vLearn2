@@ -109,10 +109,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             ConversationScreen(sessionId: s.pathParameters['sessionId']!),
       ),
       GoRoute(
-        path: AppRoute.conversationHistory,
-        builder: (_, _) => const ConversationHistoryScreen(),
-      ),
-      GoRoute(
         path: '/report/:sessionId',
         builder: (_, s) =>
             SessionReportScreen(sessionId: s.pathParameters['sessionId']!),
@@ -143,10 +139,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (_, _, child) => AppShell(child: child),
         routes: [
-          GoRoute(path: AppRoute.home,      builder: (_, _) => const HomeScreen()),
-          GoRoute(path: AppRoute.scenarios, builder: (_, _) => const ScenariosScreen()),
-          GoRoute(path: AppRoute.progress,  builder: (_, _) => const ProgressScreen()),
-          GoRoute(path: AppRoute.settings,  builder: (_, _) => const SettingsScreen()),
+          GoRoute(path: AppRoute.home,                builder: (_, _) => const HomeScreen()),
+          GoRoute(path: AppRoute.scenarios,           builder: (_, _) => const ScenariosScreen()),
+          GoRoute(path: AppRoute.conversationHistory, builder: (_, _) => const ConversationHistoryScreen()),
+          GoRoute(path: AppRoute.progress,            builder: (_, _) => const ProgressScreen()),
+          GoRoute(path: AppRoute.settings,            builder: (_, _) => const SettingsScreen()),
         ],
       ),
     ],

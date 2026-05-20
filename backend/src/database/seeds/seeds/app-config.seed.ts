@@ -62,7 +62,6 @@ const CATALOG: ConfigSeed[] = [
   { key: 'conversation.face_mode_available',  value: true, value_type: 'boolean', category: 'conversation', description: 'Face mode reachable at all' },
   { key: 'conversation.mic_button',           value: true, value_type: 'boolean', category: 'conversation', description: 'Mic button (also gated by STT availability)' },
   { key: 'conversation.live_caption',         value: true, value_type: 'boolean', category: 'conversation', description: 'Live caption on Face mode' },
-  { key: 'conversation.history',              value: true, value_type: 'boolean', category: 'conversation', description: 'Conversation history screen and Settings entry point' },
 
   // ── Settings ─────────────────────────────────────────────
   { key: 'settings.profile_section',     value: true, value_type: 'boolean', category: 'settings', description: 'Profile section (avatar + name)' },
@@ -75,10 +74,11 @@ const CATALOG: ConfigSeed[] = [
   { key: 'settings.about_section',       value: true, value_type: 'boolean', category: 'settings', description: 'About / Terms / Privacy' },
 
   // ── Navigation tabs ──────────────────────────────────────
-  { key: 'tabs.home',      value: true, value_type: 'boolean', category: 'system', description: 'Show Home tab in the bottom nav bar', is_visible_to_app: true },
-  { key: 'tabs.scenarios', value: true, value_type: 'boolean', category: 'system', description: 'Show Scenarios tab in the bottom nav bar', is_visible_to_app: true },
-  { key: 'tabs.progress',  value: true, value_type: 'boolean', category: 'system', description: 'Show Progress tab in the bottom nav bar', is_visible_to_app: true },
-  { key: 'tabs.settings',  value: true, value_type: 'boolean', category: 'system', description: 'Show Settings tab in the bottom nav bar', is_visible_to_app: true },
+  { key: 'tabs.home',      value: true, value_type: 'boolean', category: 'system', description: 'Show Home tab in the bottom nav bar / sidebar',      is_visible_to_app: true },
+  { key: 'tabs.scenarios', value: true, value_type: 'boolean', category: 'system', description: 'Show Scenarios tab in the bottom nav bar / sidebar', is_visible_to_app: true },
+  { key: 'tabs.history',   value: true, value_type: 'boolean', category: 'system', description: 'Show Conversation history tab in the bottom nav bar / sidebar', is_visible_to_app: true },
+  { key: 'tabs.progress',  value: true, value_type: 'boolean', category: 'system', description: 'Show Progress tab in the bottom nav bar / sidebar',  is_visible_to_app: true },
+  { key: 'tabs.settings',  value: true, value_type: 'boolean', category: 'system', description: 'Show Settings tab in the bottom nav bar / sidebar',  is_visible_to_app: true },
 
   // ── System ───────────────────────────────────────────────
   { key: 'system.maintenance_banner',    value: { enabled: false, message_i18n_key: null }, value_type: 'object', category: 'system', description: 'App-wide maintenance banner' },

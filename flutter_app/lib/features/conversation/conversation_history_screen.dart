@@ -29,10 +29,9 @@ class ConversationHistoryScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        // No leading back button: this screen is a top-level shell tab
+        // (sidebar item on desktop, bottom-nav tab on mobile).
+        automaticallyImplyLeading: false,
         title: const Text('Conversation history'),
       ),
       body: history.when(
