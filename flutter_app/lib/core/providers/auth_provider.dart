@@ -69,14 +69,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
             password: password,
           );
       await _persistAndFetch(tokens);
+    } on Exception catch (e) {
+      state = AuthState.error(e);
+      return;
+    }
+
+    // At this point auth succeeded and the router has already redirected
+    // the user past /signin. Persisting "Save my account" credentials is
+    // best-effort — a failure here MUST NOT demote the auth state back to
+    // signedOut, otherwise the user gets bounced from /home back to /signin
+    // moments after a successful sign-in.
+    try {
       final creds = _ref.read(rememberedCredentialsStoreProvider);
       if (rememberMe) {
         await creds.save(cidUsername: cidUsername, password: password);
       } else {
         await creds.setEnabled(false);
       }
-    } on Exception catch (e) {
-      state = AuthState.error(e);
+    } on Exception {
+      // swallow — already signed in
     }
   }
 
