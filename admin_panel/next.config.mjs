@@ -6,7 +6,7 @@ const nextConfig = {
   // nginx location /vAdmin/ requires the trailing slash; keep it canonical
   trailingSlash: true,
   experimental: {
-    serverActions: { allowedOrigins: ['localhost:4100', 'localhost:4101', '172.86.121.43'] },
+    serverActions: { allowedOrigins: ['localhost:4100', 'localhost:4101', '172.86.121.43', '192.168.135.30:4101'] },
   },
   // Proxy bearer-token traffic through Next.js so admin-only routes can be
   // gated by middleware. The backend lives on a separate origin.

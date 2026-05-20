@@ -7,9 +7,11 @@ REM  Flutter project so you can launch it without leaving flutter_app/.
 REM
 REM  Requires: Flutter 3.41+, Visual Studio 2022 with "Desktop development
 REM  with C++" + the LLVM/clang-cl components (rive_common needs ClangCL).
+REM
+REM  The backend URL is loaded from app_config.json at runtime (see
+REM  ConfigFileService in lib/core/config/app_config.dart).
 REM ─────────────────────────────────────────────────────────────────────────
 setlocal
-set "API_BASE_URL=http://localhost:3000/api"
 
 pushd "%~dp0" || (
   echo [ERROR] Could not enter %~dp0.
@@ -20,7 +22,7 @@ pushd "%~dp0" || (
 echo.
 echo === vLearn2 Windows Debug ===
 echo Working dir: %CD%
-echo API base:    %API_BASE_URL%
+echo Backend URL: from app_config.json at runtime
 echo.
 
 flutter pub get
@@ -31,7 +33,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-flutter run -d windows --debug --dart-define=API_BASE_URL=%API_BASE_URL%
+flutter run -d windows --debug
 set "RC=%ERRORLEVEL%"
 
 popd

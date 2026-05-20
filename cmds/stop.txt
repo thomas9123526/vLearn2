@@ -37,7 +37,7 @@ Note: If multiple processes bind the same port (e.g. node on 0.0.0.0:5101 and Co
 
 
 cd c:\project\vLearn2\admin_panel
-npx next dev -p 4101
+npx next dev -p 4101 -H 0.0.0.0
 
 cd c:\project\vLearn2\flutter_app
 flutter pub get
