@@ -58,6 +58,18 @@ export class AdminAdminsController {
     return PERMISSION_CATALOG;
   }
 
+  @Get('me/permissions')
+  @RequirePermission() // any logged-in admin reads their own perms
+  @ApiOperation({ summary: 'Current admin\'s effective permission set (used by the admin panel UI)' })
+  async myPermissions(@CurrentUser() user: JwtPayload): Promise<string[]> {
+    // Superadmin holds every permission implicitly — the frontend already
+    // short-circuits on role, but be explicit for direct callers.
+    if (user.role === 'superadmin') {
+      return [...PERMISSION_KEYS];
+    }
+    return [...(await this.permissions.getForUser(user.sub))];
+  }
+
   @Get()
   @RequirePermission('admins.view')
   @ApiOperation({ summary: 'List all sub-admins with their permissions' })
