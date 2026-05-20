@@ -63,8 +63,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           loc == AppRoute.splash;
 
       if (checking) return null; // keep current — splash will animate
-      // Auth resolved & no token: leave splash for the sign-in screen.
-      if (!signedIn && loc == AppRoute.splash) return AppRoute.signIn;
+      // Signed-out users stay on `/` until they tap "Tap to begin"; the
+      // splash CTA pushes /signup explicitly. Non-public routes still
+      // fall through to /signin so deep links can't bypass auth.
       if (!signedIn && !isPublic) return AppRoute.signIn;
       if (signedIn && (loc == AppRoute.signIn || loc == AppRoute.signUp)) {
         return auth.user!.onboardingDone ? AppRoute.home : AppRoute.onboarding;
