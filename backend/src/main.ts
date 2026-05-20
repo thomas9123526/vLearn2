@@ -57,8 +57,8 @@ async function bootstrap() {
     compression({
       threshold: gzipThreshold,
       filter: (req, res) => {
-        if (gzipForcedOff) return false;
-        if (!GzipFlagCache.enabled) return false;
+        // if (gzipForcedOff) return false;
+        // if (!GzipFlagCache.enabled) return false;
         return compression.filter(req, res);
       },
     }),

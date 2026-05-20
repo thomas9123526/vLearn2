@@ -24,8 +24,8 @@ setlocal EnableExtensions
 set "BACKEND_PORT=%~1"
 set "ADMIN_PORT=%~2"
 set "HOT=%~3"
-if "%BACKEND_PORT%"=="" set "BACKEND_PORT=4101"
-if "%ADMIN_PORT%"=="" set "ADMIN_PORT=5101"
+if "%BACKEND_PORT%"=="" set "BACKEND_PORT=5101"
+if "%ADMIN_PORT%"=="" set "ADMIN_PORT=4101"
 
 if "%HOT%"=="" (
   set "MODE=cold"
