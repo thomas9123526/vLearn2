@@ -772,9 +772,10 @@ class _Slogan extends StatelessWidget {
 }
 
 /// "Tap to begin" pill with the trailing accent arrow circle, slide-up
-/// entrance at 0.45s. Tapping pushes /signup — matches the JSX `nav('signup')`.
-/// Returning users with a valid token never see this button: the router
-/// redirects them past `/` once auth resolves (see app_router.dart).
+/// entrance at 0.45s. Tapping always routes to `/signin`; first-time users
+/// reach sign-up via the "Don't have an account?" link on that screen.
+/// Returning users on this device never see this button — they're auto-
+/// redirected to /signin by [_SplashScreenState._resolveReturning].
 class _TapToBeginButton extends ConsumerStatefulWidget {
   const _TapToBeginButton({
     required this.controller,
@@ -797,17 +798,14 @@ class _TapToBeginButtonState extends ConsumerState<_TapToBeginButton> {
   bool _hovered = false;
   bool _navigating = false;
 
-  /// Returning users land on /signin; first-time users on /signup. The
-  /// AuthHistory flag is written on every successful signin/signup (see
-  /// auth_provider._persistAndFetch), so anyone who's ever held a token on
-  /// this install is treated as returning. Reinstall resets the flag —
-  /// they'll see /signup once, then either screen cross-links to the other.
-  Future<void> _begin() async {
+  /// Tap-to-begin always lands on `/signin`. New users hit the "Don't have
+  /// an account? Sign up" link there to reach `/signup`. The fork by
+  /// install-history happens earlier, at the splash level — returning
+  /// devices auto-redirect to /signin without ever showing this button.
+  void _begin() {
     if (_navigating) return;
     setState(() => _navigating = true);
-    final returning = await ref.read(authHistoryProvider).hasEverSignedIn();
-    if (!mounted) return;
-    context.go(returning ? AppRoute.signIn : AppRoute.signUp);
+    context.go(AppRoute.signIn);
   }
 
   @override
