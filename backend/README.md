@@ -26,11 +26,27 @@ npm run db:seed
 ## Run
 
 ```bash
-npm run start:dev    # watch mode, http://localhost:3000
+npm run start:dev    # watch mode (PORT from .env, default 5101)
 ```
 
-- Swagger docs: http://localhost:3000/api/docs
-- Health: http://localhost:3000/health
+- Swagger docs: `http://localhost:<PORT>/api/docs`
+- Health: `http://localhost:<PORT>/health`
+
+## Debug (breakpoints in Cursor / VS Code)
+
+1. Copy the launch config into the workspace (`.vscode/` is gitignored):
+
+   ```powershell
+   New-Item -ItemType Directory -Force -Path ..\.vscode | Out-Null
+   Copy-Item debug.launch.json ..\.vscode\launch.json
+   ```
+
+2. **F5** → choose **Backend: NestJS (debug + watch)**  
+   Or run `start_debug.bat` (frees port 5101, runs `npm run start:debug`) then **Backend: attach (port 9229)**.
+
+3. Set breakpoints under `src/` (e.g. `auth/auth.service.ts` → `signIn`).
+
+4. Point the Flutter app at `http://localhost:5101/api` when testing sign-in locally.
 
 ## Common commands
 
