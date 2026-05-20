@@ -118,7 +118,6 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   String _languageLabel(String code) => switch (code) {
-        'ko' => '한국어',
         'zh' => '中文',
         _ => 'English',
       };
@@ -166,7 +165,7 @@ class SettingsScreen extends ConsumerWidget {
       builder: (_) => ListView(
         shrinkWrap: true,
         children: [
-          for (final l in const [('en', 'English'), ('ko', '한국어'), ('zh', '中文')])
+          for (final l in const [('en', 'English'), ('zh', '中文')])
             ListTile(
               title: Text(l.$2),
               onTap: () => Navigator.pop(context, l.$1),

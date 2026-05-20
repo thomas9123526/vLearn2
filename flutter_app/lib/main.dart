@@ -88,11 +88,10 @@ class VLearn2App extends ConsumerWidget {
       // AppTheme.build memoizes the result for the current pair.
       theme: AppTheme.build(themeKey, fontGroup),
       locale: locale,
-      // Locales are the three the app's ARB files cover. ICU 73's
-      // fallback rules pick `en` for any unsupported locale automatically.
+      // Locales the app's ARB files cover. ICU 73's fallback rules pick
+      // `en` for any unsupported locale automatically.
       supportedLocales: const [
         Locale('en'),
-        Locale('ko'),
         Locale('zh'),
       ],
       localizationsDelegates: const [

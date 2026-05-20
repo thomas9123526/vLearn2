@@ -199,7 +199,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'en', child: Text('English')),
-                    DropdownMenuItem(value: 'ko', child: Text('한국어')),
                     DropdownMenuItem(value: 'zh', child: Text('中文')),
                   ],
                   onChanged: (v) => setState(() => _language = v ?? 'en'),
