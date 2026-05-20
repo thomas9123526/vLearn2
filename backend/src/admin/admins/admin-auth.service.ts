@@ -6,13 +6,14 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { DataSource, MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
 import { AdminEntity } from '../../database/entities/admin.entity';
 import { AdminRefreshTokenEntity } from '../../database/entities/admin-refresh-token.entity';
 import { AdminPermissionEntity } from '../../database/entities/admin-permission.entity';
 import type { JwtPayload } from '../../auth/strategies/jwt.strategy';
+import { AdminAuditLogService } from '../audit/admin-audit-log.service';
 
 const BCRYPT_ROUNDS = 10;
 
@@ -45,6 +46,8 @@ export class AdminAuthService {
     private readonly permissions: Repository<AdminPermissionEntity>,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly audit: AdminAuditLogService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async signUp(
@@ -52,24 +55,41 @@ export class AdminAuthService {
     password: string,
     displayName: string,
   ): Promise<AdminAuthResponse> {
-    const existing = await this.admins.findOne({ where: { email } });
-    if (existing) {
-      throw new ConflictException({ i18nKey: 'auth.email_taken' });
-    }
-
-    const adminCount = await this.admins.count();
-    const role: 'admin' | 'superadmin' =
-      adminCount === 0 ? 'superadmin' : 'admin';
-
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const admin = await this.admins.save(
-      this.admins.create({
-        email,
-        password_hash: hash,
-        display_name: displayName,
-        role,
-      }),
-    );
+
+    // Create the admin row and the audit row in one transaction so a
+    // failed audit insert rolls the new admin back. issue() runs after the
+    // commit — its refresh-token write should not be rolled back if the
+    // session-issue step itself fails.
+    const admin = await this.dataSource.transaction(async (em) => {
+      const adminRepo = em.getRepository(AdminEntity);
+      const existing = await adminRepo.findOne({ where: { email } });
+      if (existing) {
+        throw new ConflictException({ i18nKey: 'auth.email_taken' });
+      }
+      const adminCount = await adminRepo.count();
+      const role: 'admin' | 'superadmin' =
+        adminCount === 0 ? 'superadmin' : 'admin';
+      const created = await adminRepo.save(
+        adminRepo.create({
+          email,
+          password_hash: hash,
+          display_name: displayName,
+          role,
+        }),
+      );
+      await this.audit.record(
+        {
+          actorId: created.id,
+          action: 'admin.signup',
+          targetType: 'admin',
+          targetId: created.id,
+          newValue: { email, display_name: displayName, role },
+        },
+        em,
+      );
+      return created;
+    });
 
     return this.issue(admin);
   }

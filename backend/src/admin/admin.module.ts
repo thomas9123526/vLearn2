@@ -7,12 +7,15 @@ import { UserInfoEntity } from '../database/entities/user-info.entity';
 import { AdminEntity } from '../database/entities/admin.entity';
 import { AdminRefreshTokenEntity } from '../database/entities/admin-refresh-token.entity';
 import { AdminPermissionEntity } from '../database/entities/admin-permission.entity';
+import { AdminAuditLogEntity } from '../database/entities/admin-audit-log.entity';
 import { ConversationSessionEntity } from '../database/entities/conversation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
 import { PromptTemplateEntity } from '../database/entities/prompt-template.entity';
 import { AdminPermissionsService } from './permissions/admin-permissions.service';
 import { PermissionGuard } from './permissions/permission.guard';
+import { AdminAuditLogService } from './audit/admin-audit-log.service';
+import { AdminAuditController } from './audit/admin-audit.controller';
 import { AdminAuthController } from './admins/admin-auth.controller';
 import { AdminAuthService } from './admins/admin-auth.service';
 import { AdminAdminsController } from './admins/admin-admins.controller';
@@ -33,6 +36,7 @@ import { AuthModule } from '../auth/auth.module';
       AdminEntity,
       AdminRefreshTokenEntity,
       AdminPermissionEntity,
+      AdminAuditLogEntity,
       ConversationSessionEntity,
       ScenarioEntity,
       PersonaEntity,
@@ -47,7 +51,7 @@ import { AuthModule } from '../auth/auth.module';
       }),
     }),
   ],
-  providers: [AdminPermissionsService, PermissionGuard, AdminAuthService],
+  providers: [AdminPermissionsService, PermissionGuard, AdminAuthService, AdminAuditLogService],
   controllers: [
     AdminAuthController,
     AdminAdminsController,
@@ -57,7 +61,8 @@ import { AuthModule } from '../auth/auth.module';
     AdminPersonasController,
     AdminLeaderboardController,
     AdminPromptTemplatesController,
+    AdminAuditController,
   ],
-  exports: [AdminPermissionsService, PermissionGuard, AdminAuthService],
+  exports: [AdminPermissionsService, PermissionGuard, AdminAuthService, AdminAuditLogService],
 })
 export class AdminModule {}

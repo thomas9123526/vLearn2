@@ -14,7 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { DataSource, Repository, In } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   IsBoolean,
@@ -32,6 +32,7 @@ import {
 } from '../database/entities/news.entity';
 import type { NewsStatus } from '../database/entities/news.entity';
 import { PermissionGuard, RequirePermission } from '../admin/permissions/permission.guard';
+import { AdminAuditLogService } from '../admin/audit/admin-audit-log.service';
 
 class I18nTextDto {
   @ApiProperty() @IsString() en!: string;
@@ -62,6 +63,8 @@ export class NewsService {
     private readonly posts: Repository<NewsPostEntity>,
     @InjectRepository(NewsReadStatusEntity)
     private readonly reads: Repository<NewsReadStatusEntity>,
+    private readonly audit: AdminAuditLogService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /** List published posts for app users; annotates each with a `read` boolean. */
@@ -159,52 +162,156 @@ export class NewsService {
   }
 
   async create(dto: CreateNewsDto, authorId: string) {
-    const existing = await this.posts.findOne({ where: { slug: dto.slug } });
-    if (existing) throw new BadRequestException({ i18nKey: 'news.slug_taken' });
-    const post = this.posts.create({
-      slug: dto.slug,
-      title: dto.title,
-      body: dto.body,
-      summary: dto.summary ?? null,
-      pinned: dto.pinned ?? false,
-      author_id: authorId,
-      status: 'draft',
+    return this.dataSource.transaction(async (em) => {
+      const repo = em.getRepository(NewsPostEntity);
+      const existing = await repo.findOne({ where: { slug: dto.slug } });
+      if (existing) throw new BadRequestException({ i18nKey: 'news.slug_taken' });
+      const post = repo.create({
+        slug: dto.slug,
+        title: dto.title,
+        body: dto.body,
+        summary: dto.summary ?? null,
+        pinned: dto.pinned ?? false,
+        author_id: authorId,
+        status: 'draft',
+      });
+      const saved = await repo.save(post);
+      await this.audit.record(
+        {
+          actorId: authorId,
+          action: 'news.create',
+          targetType: 'news',
+          targetId: saved.id,
+          newValue: { slug: saved.slug, pinned: saved.pinned, status: saved.status },
+        },
+        em,
+      );
+      return saved;
     });
-    return this.posts.save(post);
   }
 
-  async update(id: string, dto: UpdateNewsDto) {
-    const post = await this.adminGet(id);
-    if (dto.slug && dto.slug !== post.slug) {
-      const collision = await this.posts.findOne({ where: { slug: dto.slug } });
-      if (collision) throw new BadRequestException({ i18nKey: 'news.slug_taken' });
-      post.slug = dto.slug;
-    }
-    if (dto.title) post.title = dto.title;
-    if (dto.body) post.body = dto.body;
-    if (dto.summary !== undefined) post.summary = dto.summary ?? null;
-    if (dto.pinned !== undefined) post.pinned = dto.pinned;
-    return this.posts.save(post);
+  async update(id: string, dto: UpdateNewsDto, actorId: string) {
+    return this.dataSource.transaction(async (em) => {
+      const repo = em.getRepository(NewsPostEntity);
+      const post = await repo.findOne({ where: { id } });
+      if (!post) throw new NotFoundException({ i18nKey: 'news.not_found' });
+
+      const before: Record<string, unknown> = {};
+      const after: Record<string, unknown> = {};
+
+      if (dto.slug && dto.slug !== post.slug) {
+        const collision = await repo.findOne({ where: { slug: dto.slug } });
+        if (collision) throw new BadRequestException({ i18nKey: 'news.slug_taken' });
+        before.slug = post.slug;
+        after.slug = dto.slug;
+        post.slug = dto.slug;
+      }
+      if (dto.title) {
+        before.title = post.title;
+        after.title = dto.title;
+        post.title = dto.title;
+      }
+      if (dto.body) {
+        before.body = post.body;
+        after.body = dto.body;
+        post.body = dto.body;
+      }
+      if (dto.summary !== undefined) {
+        const next = dto.summary ?? null;
+        if (next !== post.summary) {
+          before.summary = post.summary;
+          after.summary = next;
+          post.summary = next;
+        }
+      }
+      if (dto.pinned !== undefined && dto.pinned !== post.pinned) {
+        before.pinned = post.pinned;
+        after.pinned = dto.pinned;
+        post.pinned = dto.pinned;
+      }
+
+      const saved = await repo.save(post);
+      if (Object.keys(after).length > 0) {
+        await this.audit.record(
+          {
+            actorId,
+            action: 'news.update',
+            targetType: 'news',
+            targetId: id,
+            oldValue: before,
+            newValue: after,
+          },
+          em,
+        );
+      }
+      return saved;
+    });
   }
 
-  async publish(id: string) {
-    const post = await this.adminGet(id);
-    post.status = 'published';
-    if (!post.published_at) post.published_at = new Date();
-    return this.posts.save(post);
+  async publish(id: string, actorId: string) {
+    return this.dataSource.transaction(async (em) => {
+      const repo = em.getRepository(NewsPostEntity);
+      const post = await repo.findOne({ where: { id } });
+      if (!post) throw new NotFoundException({ i18nKey: 'news.not_found' });
+      const oldStatus = post.status;
+      post.status = 'published';
+      if (!post.published_at) post.published_at = new Date();
+      const saved = await repo.save(post);
+      await this.audit.record(
+        {
+          actorId,
+          action: 'news.publish',
+          targetType: 'news',
+          targetId: id,
+          oldValue: { status: oldStatus },
+          newValue: { status: 'published' },
+        },
+        em,
+      );
+      return saved;
+    });
   }
 
-  async archive(id: string) {
-    const post = await this.adminGet(id);
-    post.status = 'archived';
-    return this.posts.save(post);
+  async archive(id: string, actorId: string) {
+    return this.dataSource.transaction(async (em) => {
+      const repo = em.getRepository(NewsPostEntity);
+      const post = await repo.findOne({ where: { id } });
+      if (!post) throw new NotFoundException({ i18nKey: 'news.not_found' });
+      const oldStatus = post.status;
+      post.status = 'archived';
+      const saved = await repo.save(post);
+      await this.audit.record(
+        {
+          actorId,
+          action: 'news.archive',
+          targetType: 'news',
+          targetId: id,
+          oldValue: { status: oldStatus },
+          newValue: { status: 'archived' },
+        },
+        em,
+      );
+      return saved;
+    });
   }
 
-  async remove(id: string) {
-    const result = await this.posts.delete({ id });
-    if (result.affected === 0) {
-      throw new NotFoundException({ i18nKey: 'news.not_found' });
-    }
+  async remove(id: string, actorId: string) {
+    await this.dataSource.transaction(async (em) => {
+      const repo = em.getRepository(NewsPostEntity);
+      const post = await repo.findOne({ where: { id } });
+      if (!post) throw new NotFoundException({ i18nKey: 'news.not_found' });
+      await repo.delete({ id });
+      await this.audit.record(
+        {
+          actorId,
+          action: 'news.delete',
+          targetType: 'news',
+          targetId: id,
+          oldValue: { slug: post.slug, status: post.status },
+        },
+        em,
+      );
+    });
     return { ok: true };
   }
 
@@ -299,26 +406,26 @@ export class AdminNewsController {
 
   @Patch(':id')
   @RequirePermission('news.edit')
-  update(@Param('id') id: string, @Body() dto: UpdateNewsDto) {
-    return this.svc.update(id, dto);
+  update(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: UpdateNewsDto) {
+    return this.svc.update(id, dto, user.sub);
   }
 
   @Post(':id/publish')
   @RequirePermission('news.edit')
-  publish(@Param('id') id: string) {
-    return this.svc.publish(id);
+  publish(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.svc.publish(id, user.sub);
   }
 
   @Post(':id/archive')
   @RequirePermission('news.edit')
-  archive(@Param('id') id: string) {
-    return this.svc.archive(id);
+  archive(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.svc.archive(id, user.sub);
   }
 
   @Delete(':id')
   @RequirePermission('news.delete')
-  remove(@Param('id') id: string) {
-    return this.svc.remove(id);
+  remove(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.svc.remove(id, user.sub);
   }
 }
 

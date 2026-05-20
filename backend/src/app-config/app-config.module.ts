@@ -13,13 +13,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { TypeOrmModule, InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AppConfigEntity } from '../database/entities/app-config.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { PermissionGuard, RequirePermission } from '../admin/permissions/permission.guard';
+import { AdminAuditLogService } from '../admin/audit/admin-audit-log.service';
 
 /// Live in-memory cache for the gzip-enable flag. The compression filter in
 /// `main.ts` reads this directly because it's on the hot path of every
@@ -34,6 +35,8 @@ class AppConfigService {
   constructor(
     @InjectRepository(AppConfigEntity)
     private readonly repo: Repository<AppConfigEntity>,
+    private readonly audit: AdminAuditLogService,
+    private readonly dataSource: DataSource,
   ) {
     void this.refreshGzipCache();
   }
@@ -67,28 +70,60 @@ class AppConfigService {
   }
 
   async update(key: string, value: unknown, updatedBy: string): Promise<AppConfigEntity> {
-    const row = await this.getOne(key);
-    if (!this.typeMatches(row.value_type, value)) {
-      throw new BadRequestException({ i18nKey: 'config.type_mismatch', expected: row.value_type });
-    }
-    row.value = value;
-    row.updated_by = updatedBy;
-    const saved = await this.repo.save(row);
-    if (key === 'system.gzip_enabled' && typeof value === 'boolean') {
-      GzipFlagCache.enabled = value;
-    }
-    return saved;
+    return this.dataSource.transaction(async (em) => {
+      const repo = em.getRepository(AppConfigEntity);
+      const row = await repo.findOne({ where: { key } });
+      if (!row) throw new NotFoundException({ i18nKey: 'config.not_found' });
+      if (!this.typeMatches(row.value_type, value)) {
+        throw new BadRequestException({ i18nKey: 'config.type_mismatch', expected: row.value_type });
+      }
+      const oldValue = row.value;
+      row.value = value;
+      row.updated_by = updatedBy;
+      const saved = await repo.save(row);
+      await this.audit.record(
+        {
+          actorId: updatedBy,
+          action: 'config.update',
+          targetType: 'config',
+          targetId: key,
+          oldValue: { value: oldValue },
+          newValue: { value },
+        },
+        em,
+      );
+      if (key === 'system.gzip_enabled' && typeof value === 'boolean') {
+        GzipFlagCache.enabled = value;
+      }
+      return saved;
+    });
   }
 
   async reset(key: string, updatedBy: string): Promise<AppConfigEntity> {
-    const row = await this.getOne(key);
-    row.value = row.default_value;
-    row.updated_by = updatedBy;
-    const saved = await this.repo.save(row);
-    if (key === 'system.gzip_enabled' && typeof row.value === 'boolean') {
-      GzipFlagCache.enabled = row.value;
-    }
-    return saved;
+    return this.dataSource.transaction(async (em) => {
+      const repo = em.getRepository(AppConfigEntity);
+      const row = await repo.findOne({ where: { key } });
+      if (!row) throw new NotFoundException({ i18nKey: 'config.not_found' });
+      const oldValue = row.value;
+      row.value = row.default_value;
+      row.updated_by = updatedBy;
+      const saved = await repo.save(row);
+      await this.audit.record(
+        {
+          actorId: updatedBy,
+          action: 'config.reset',
+          targetType: 'config',
+          targetId: key,
+          oldValue: { value: oldValue },
+          newValue: { value: row.default_value },
+        },
+        em,
+      );
+      if (key === 'system.gzip_enabled' && typeof row.value === 'boolean') {
+        GzipFlagCache.enabled = row.value;
+      }
+      return saved;
+    });
   }
 
   private typeMatches(t: string, v: unknown): boolean {

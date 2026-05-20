@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiProperty } from '@nestjs/swagger';
 import { ArrayMinSize, IsArray, IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
 import * as bcrypt from 'bcrypt';
@@ -24,6 +24,7 @@ import type { JwtPayload } from '../../auth/strategies/jwt.strategy';
 import { AdminPermissionsService } from '../permissions/admin-permissions.service';
 import { PermissionGuard, RequirePermission } from '../permissions/permission.guard';
 import { GRANTABLE_PERMISSION_KEYS, PERMISSION_CATALOG, PERMISSION_KEYS } from '../permissions/catalog';
+import { AdminAuditLogService } from '../audit/admin-audit-log.service';
 
 class CreateSubAdminDto {
   @ApiProperty() @IsEmail() email!: string;
@@ -49,6 +50,8 @@ export class AdminAdminsController {
     @InjectRepository(AdminEntity)
     private readonly admins: Repository<AdminEntity>,
     private readonly permissions: AdminPermissionsService,
+    private readonly audit: AdminAuditLogService,
+    private readonly dataSource: DataSource,
   ) {}
 
   @Get('catalog')
@@ -95,22 +98,39 @@ export class AdminAdminsController {
     if (user.role !== 'superadmin') {
       throw new ForbiddenException({ i18nKey: 'admin.superadmin_only' });
     }
-    const dup = await this.admins.findOne({ where: { email: dto.email } });
-    if (dup) throw new ConflictException({ i18nKey: 'auth.email_taken' });
-
     this.validatePermissions(dto.permissions);
-
     const hash = await bcrypt.hash(dto.password, 10);
-    const created = await this.admins.save(
-      this.admins.create({
-        email: dto.email,
-        password_hash: hash,
-        display_name: dto.displayName,
-        role: 'admin',
-      }),
-    );
-    await this.permissions.replaceAll(created.id, dto.permissions, user.sub);
-    return { id: created.id, email: created.email, permissions: dto.permissions };
+
+    return this.dataSource.transaction(async (em) => {
+      const adminRepo = em.getRepository(AdminEntity);
+      const dup = await adminRepo.findOne({ where: { email: dto.email } });
+      if (dup) throw new ConflictException({ i18nKey: 'auth.email_taken' });
+
+      const created = await adminRepo.save(
+        adminRepo.create({
+          email: dto.email,
+          password_hash: hash,
+          display_name: dto.displayName,
+          role: 'admin',
+        }),
+      );
+      await this.permissions.replaceAll(created.id, dto.permissions, user.sub, em);
+      await this.audit.record(
+        {
+          actorId: user.sub,
+          action: 'admin.create',
+          targetType: 'admin',
+          targetId: created.id,
+          newValue: {
+            email: dto.email,
+            display_name: dto.displayName,
+            permissions: dto.permissions,
+          },
+        },
+        em,
+      );
+      return { id: created.id, email: created.email, permissions: dto.permissions };
+    });
   }
 
   @Put(':id/permissions')
@@ -121,10 +141,24 @@ export class AdminAdminsController {
     @Param('id') id: string,
     @Body() dto: ReplacePermissionsDto,
   ) {
-    await this.ensureTargetIsAdmin(id);
     this.validatePermissions(dto.permissions);
-    await this.permissions.replaceAll(id, dto.permissions, user.sub);
-    return { id, permissions: dto.permissions };
+    return this.dataSource.transaction(async (em) => {
+      await this.ensureTargetIsAdmin(id, em);
+      const before = [...(await this.permissions.getForUser(id, em))].sort();
+      await this.permissions.replaceAll(id, dto.permissions, user.sub, em);
+      await this.audit.record(
+        {
+          actorId: user.sub,
+          action: 'admin.replace_permissions',
+          targetType: 'admin',
+          targetId: id,
+          oldValue: { permissions: before },
+          newValue: { permissions: [...dto.permissions].sort() },
+        },
+        em,
+      );
+      return { id, permissions: dto.permissions };
+    });
   }
 
   @Post(':id/permissions/:perm')
@@ -135,17 +169,45 @@ export class AdminAdminsController {
     @Param('id') id: string,
     @Param('perm') perm: string,
   ) {
-    await this.ensureTargetIsAdmin(id);
     this.validatePermissions([perm]);
-    await this.permissions.grant(id, [perm], user.sub);
+    await this.dataSource.transaction(async (em) => {
+      await this.ensureTargetIsAdmin(id, em);
+      await this.permissions.grant(id, [perm], user.sub, em);
+      await this.audit.record(
+        {
+          actorId: user.sub,
+          action: 'admin.grant_permission',
+          targetType: 'admin',
+          targetId: id,
+          newValue: { permission: perm },
+        },
+        em,
+      );
+    });
     return { ok: true };
   }
 
   @Delete(':id/permissions/:perm')
   @RequirePermission('admins.grant_permissions')
   @ApiOperation({ summary: 'Revoke a single permission' })
-  async revokeOne(@Param('id') id: string, @Param('perm') perm: string) {
-    await this.permissions.revoke(id, [perm]);
+  async revokeOne(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Param('perm') perm: string,
+  ) {
+    await this.dataSource.transaction(async (em) => {
+      await this.permissions.revoke(id, [perm], em);
+      await this.audit.record(
+        {
+          actorId: user.sub,
+          action: 'admin.revoke_permission',
+          targetType: 'admin',
+          targetId: id,
+          oldValue: { permission: perm },
+        },
+        em,
+      );
+    });
     return { ok: true };
   }
 
@@ -154,18 +216,46 @@ export class AdminAdminsController {
   @ApiOperation({ summary: 'Suspend a sub-admin' })
   async suspend(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     if (id === user.sub) throw new ForbiddenException({ i18nKey: 'admin.cannot_self_modify' });
-    const a = await this.ensureTargetIsAdmin(id);
-    a.status = 'suspended';
-    await this.admins.save(a);
+    await this.dataSource.transaction(async (em) => {
+      const a = await this.ensureTargetIsAdmin(id, em);
+      const oldStatus = a.status;
+      a.status = 'suspended';
+      await em.getRepository(AdminEntity).save(a);
+      await this.audit.record(
+        {
+          actorId: user.sub,
+          action: 'admin.suspend',
+          targetType: 'admin',
+          targetId: id,
+          oldValue: { status: oldStatus },
+          newValue: { status: 'suspended' },
+        },
+        em,
+      );
+    });
     return { ok: true };
   }
 
   @Post(':id/restore')
   @RequirePermission('admins.suspend')
-  async restore(@Param('id') id: string) {
-    const a = await this.ensureTargetIsAdmin(id);
-    a.status = 'active';
-    await this.admins.save(a);
+  async restore(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    await this.dataSource.transaction(async (em) => {
+      const a = await this.ensureTargetIsAdmin(id, em);
+      const oldStatus = a.status;
+      a.status = 'active';
+      await em.getRepository(AdminEntity).save(a);
+      await this.audit.record(
+        {
+          actorId: user.sub,
+          action: 'admin.restore',
+          targetType: 'admin',
+          targetId: id,
+          oldValue: { status: oldStatus },
+          newValue: { status: 'active' },
+        },
+        em,
+      );
+    });
     return { ok: true };
   }
 
@@ -173,11 +263,25 @@ export class AdminAdminsController {
   @RequirePermission('admins.delete')
   async softDelete(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     if (id === user.sub) throw new ForbiddenException({ i18nKey: 'admin.cannot_self_modify' });
-    const a = await this.ensureTargetIsAdmin(id);
-    a.status = 'deleted';
-    a.email = `deleted-${id}@removed.local`;
-    a.display_name = '(deleted)';
-    await this.admins.save(a);
+    await this.dataSource.transaction(async (em) => {
+      const a = await this.ensureTargetIsAdmin(id, em);
+      const before = { status: a.status, email: a.email, display_name: a.display_name };
+      a.status = 'deleted';
+      a.email = `deleted-${id}@removed.local`;
+      a.display_name = '(deleted)';
+      await em.getRepository(AdminEntity).save(a);
+      await this.audit.record(
+        {
+          actorId: user.sub,
+          action: 'admin.delete',
+          targetType: 'admin',
+          targetId: id,
+          oldValue: before,
+          newValue: { status: 'deleted', email: a.email, display_name: a.display_name },
+        },
+        em,
+      );
+    });
     return { ok: true };
   }
 
@@ -192,8 +296,9 @@ export class AdminAdminsController {
     }
   }
 
-  private async ensureTargetIsAdmin(id: string): Promise<AdminEntity> {
-    const a = await this.admins.findOne({ where: { id, role: 'admin' } });
+  private async ensureTargetIsAdmin(id: string, em?: EntityManager): Promise<AdminEntity> {
+    const repo = em ? em.getRepository(AdminEntity) : this.admins;
+    const a = await repo.findOne({ where: { id, role: 'admin' } });
     if (!a) throw new NotFoundException({ i18nKey: 'admin.not_found' });
     return a;
   }

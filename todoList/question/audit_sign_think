@@ -1,0 +1,27 @@
+I want the Recommended option. 
+Also I need extra fields called "signdata", "plainhash" , "certificate" to verify noone modify or change this audit row.
+plainhash can be the hash of the entire fields data of audit row except signdata,plainhash,certificate.
+signdata is the sign of the plainhash with the certificate.
+certificate can be application user's certificate or admin certificate. it depends on who calls the backend endpoint.
+
+So the goal is like the following:
+Step1. Let's say the application is published and  many users use it.
+Also someday, someone( admin or anymous who steal admin certificate ) manually edit this audit row.
+Step2. After some days , there happens big problem.
+We need to find the application user who did illegal conversation or illegal action via appliction.
+
+Step3. We then scans the audit log and find the audit log which contains illegal content.
+we can guess the person who did illegal actions via certificate fields because signdata and plainhash proves it.
+Step4. If we found through Step3, it's ok. Problem solved and we can go to beach for play without problem.
+But if we found no problem, then how we do?
+Step5. We can guess that anymous ( superadmin,subadmin, user, someone who steals the certificate ) modify or change the audit logs.
+we can find broken audit row, for example someone modify or change the audit row fields manually then this audit row can be called broken because row's conetent doesn't match with plainhas ,signdata, certificate information.  There should be algorithm that supports it.
+
+Currently application users don't provide certificate. Also All admins signin the admin panel without certificate.
+
+So I want you make sample certificate for application users and all admins and do the logic for above.
+
+In the future I will put the logic to ask the application users provide his certificate.
+Also ask the admin users signin the admin panel with his own certificate.
+
+There should 

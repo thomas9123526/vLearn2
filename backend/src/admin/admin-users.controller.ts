@@ -10,12 +10,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { UserInfoEntity } from '../database/entities/user-info.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { PermissionGuard, RequirePermission } from './permissions/permission.guard';
+import { AdminAuditLogService } from './audit/admin-audit-log.service';
 
 class SuspendUserDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() @MaxLength(500)
@@ -39,6 +42,8 @@ export class AdminUsersController {
   constructor(
     @InjectRepository(UserInfoEntity)
     private readonly userInfos: Repository<UserInfoEntity>,
+    private readonly audit: AdminAuditLogService,
+    private readonly dataSource: DataSource,
   ) {}
 
   @Get()
@@ -94,29 +99,75 @@ export class AdminUsersController {
   @Post(':id/suspend')
   @RequirePermission('users.suspend')
   @ApiOperation({ summary: 'Suspend (block) a user — sub-admins use this to stop abusers' })
-  async suspend(@Param('id') id: string, @Body() dto: SuspendUserDto) {
-    const i = await this.userInfos.findOne({ where: { user_id: id } });
-    if (!i) throw new NotFoundException({ i18nKey: 'user.not_found' });
-    if (i.role !== 'user') {
-      throw new BadRequestException({ i18nKey: 'user.cannot_suspend_admin' });
-    }
-    i.status = 'suspended';
-    i.suspended_reason = dto.reason ?? null;
-    i.suspended_until = dto.until ? new Date(dto.until) : null;
-    await this.userInfos.save(i);
+  async suspend(
+    @CurrentUser() actor: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: SuspendUserDto,
+  ) {
+    await this.dataSource.transaction(async (em) => {
+      const repo = em.getRepository(UserInfoEntity);
+      const i = await repo.findOne({ where: { user_id: id } });
+      if (!i) throw new NotFoundException({ i18nKey: 'user.not_found' });
+      if (i.role !== 'user') {
+        throw new BadRequestException({ i18nKey: 'user.cannot_suspend_admin' });
+      }
+      const before = {
+        status: i.status,
+        suspended_reason: i.suspended_reason,
+        suspended_until: i.suspended_until,
+      };
+      i.status = 'suspended';
+      i.suspended_reason = dto.reason ?? null;
+      i.suspended_until = dto.until ? new Date(dto.until) : null;
+      await repo.save(i);
+      await this.audit.record(
+        {
+          actorId: actor.sub,
+          action: 'user.suspend',
+          targetType: 'user',
+          targetId: id,
+          oldValue: before,
+          newValue: {
+            status: 'suspended',
+            suspended_reason: i.suspended_reason,
+            suspended_until: i.suspended_until,
+          },
+        },
+        em,
+      );
+    });
     return { ok: true };
   }
 
   @Post(':id/restore')
   @RequirePermission('users.suspend')
   @ApiOperation({ summary: 'Restore a previously suspended user' })
-  async restore(@Param('id') id: string) {
-    const i = await this.userInfos.findOne({ where: { user_id: id } });
-    if (!i) throw new NotFoundException({ i18nKey: 'user.not_found' });
-    i.status = 'active';
-    i.suspended_reason = null;
-    i.suspended_until = null;
-    await this.userInfos.save(i);
+  async restore(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {
+    await this.dataSource.transaction(async (em) => {
+      const repo = em.getRepository(UserInfoEntity);
+      const i = await repo.findOne({ where: { user_id: id } });
+      if (!i) throw new NotFoundException({ i18nKey: 'user.not_found' });
+      const before = {
+        status: i.status,
+        suspended_reason: i.suspended_reason,
+        suspended_until: i.suspended_until,
+      };
+      i.status = 'active';
+      i.suspended_reason = null;
+      i.suspended_until = null;
+      await repo.save(i);
+      await this.audit.record(
+        {
+          actorId: actor.sub,
+          action: 'user.restore',
+          targetType: 'user',
+          targetId: id,
+          oldValue: before,
+          newValue: { status: 'active', suspended_reason: null, suspended_until: null },
+        },
+        em,
+      );
+    });
     return { ok: true };
   }
 }
