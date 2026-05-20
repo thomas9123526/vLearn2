@@ -1,15 +1,14 @@
 @echo off
 REM ─────────────────────────────────────────────────────────────────────────
-REM  vLearn2 — Stop any backend already listening on PORT, then start dev
+REM  vLearn2 — Start NestJS in debug mode (Node inspector on 9229)
 REM
-REM  Why: when nest start --watch wedges, ctrl-C sometimes leaves the node
-REM  process holding the port. Re-running `npm run start:dev` then crashes
-REM  with EADDRINUSE. This script kills whoever owns the port and relaunches.
+REM  Use with Cursor/VS Code:
+REM    1. Run this script (or F5 → "Backend: NestJS (debug + watch)")
+REM    2. Set breakpoints in backend/src/**/*.ts
+REM    3. If you launched via this bat only, use Run → "Backend: attach (9229)"
 REM
-REM  Default port: 5101 (match backend/.env PORT). Override: set PORT=3000
-REM
-REM  Port match is exact (Get-NetTCPConnection), so port 3000 will NOT also
-REM  kill a process listening on 30000.
+REM  Override port:  set PORT=5101 && start_debug.bat
+REM  Flutter app should use: http://localhost:%PORT%/api
 REM ─────────────────────────────────────────────────────────────────────────
 setlocal
 
@@ -26,32 +25,26 @@ if not exist "node_modules" (
   call npm install
   if errorlevel 1 (
     popd
-    echo [ERROR] npm install failed.
     pause
     exit /b 1
   )
-)
-
-if not exist ".env" (
-  echo.
-  echo [WARNING] backend\.env is missing. Copy .env.example and fill in secrets.
-  echo.
 )
 
 echo.
 echo === Stopping any process listening on port %PORT% ===
 powershell -NoProfile -Command "$conns = Get-NetTCPConnection -LocalPort %PORT% -State Listen -ErrorAction SilentlyContinue; if (-not $conns) { Write-Host '  (nothing to stop)' } else { $conns | ForEach-Object { $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue; Write-Host ('  killing PID {0} ({1})' -f $_.OwningProcess, $p.ProcessName); Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } }"
 
-REM Give the OS a moment to release the socket before re-binding.
 timeout /t 1 /nobreak >nul
 
 echo.
-echo === Starting backend (npm run start:dev) ===
-echo Working dir:  %CD%
-echo Listening on: http://localhost:%PORT%
+echo === Starting backend DEBUG (npm run start:debug) ===
+echo API:        http://localhost:%PORT%/api
+echo Swagger:    http://localhost:%PORT%/api/docs
+echo Inspector:  chrome://inspect  or attach VS Code to port 9229
+echo Working dir: %CD%
 echo.
 
-call npm run start:dev
+call npm run start:debug
 set "RC=%ERRORLEVEL%"
 
 popd
