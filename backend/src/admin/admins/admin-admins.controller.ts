@@ -67,7 +67,8 @@ export class AdminAdminsController {
       admins.map(async (a) => ({
         id: a.id,
         email: a.email,
-        displayName: a.display_name,
+        display_name: a.display_name,
+        role: a.role,
         status: a.status,
         permissions: [...(await this.permissions.getForUser(a.id))],
       })),

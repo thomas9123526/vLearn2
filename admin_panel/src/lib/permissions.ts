@@ -5,7 +5,7 @@ import { api } from './api';
 
 export interface PermissionDef {
   key: string;
-  category: 'content' | 'users' | 'analytics' | 'system' | 'admin';
+  category: 'content' | 'prompts' | 'users' | 'analytics' | 'system' | 'admin';
   description: string;
   grantable_to_subadmin: boolean;
   implies?: string[];
