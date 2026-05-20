@@ -52,6 +52,19 @@ class AuthInterceptor extends Interceptor {
       return handler.next(err);
     }
 
+    // A 401 on a request that never carried a Bearer header just means
+    // "anonymous request denied" — there is no session to tear down. If
+    // we called onSessionInvalid() here we'd clobber a sign-in that is
+    // currently in flight: background providers (e.g. backendFlagsProvider
+    // hitting /app-config from inside the compression interceptor) can
+    // race the sign-in POST, return 401 first, and force-sign-out the
+    // freshly-issued tokens moments after _persistAndFetch wrote them.
+    final hadBearer =
+        err.requestOptions.headers['Authorization']?.toString().startsWith('Bearer ') ?? false;
+    if (!hadBearer) {
+      return handler.next(err);
+    }
+
     final refreshToken = await tokenStore.readRefresh();
     if (refreshToken == null || refreshToken.isEmpty) {
       // No refresh token to use — session is over.
