@@ -120,10 +120,10 @@ export class SessionScoreEntity {
   @Column({ type: 'jsonb', nullable: true })
   listening_metrics!: Record<string, unknown> | null;
 
-  @Column({ type: 'text', array: true, default: () => "ARRAY[]::text[]" })
+  @Column({ type: 'text', array: true, default: () => 'ARRAY[]::text[]' })
   strengths!: string[];
 
-  @Column({ type: 'text', array: true, default: () => "ARRAY[]::text[]" })
+  @Column({ type: 'text', array: true, default: () => 'ARRAY[]::text[]' })
   improvements!: string[];
 
   @Column({ type: 'text', nullable: true })

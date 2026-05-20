@@ -11,19 +11,33 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { UserInfoEntity } from '../database/entities/user-info.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
-import { PermissionGuard, RequirePermission } from './permissions/permission.guard';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from './permissions/permission.guard';
 import { AdminAuditLogService } from './audit/admin-audit-log.service';
 
 class SuspendUserDto {
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @MaxLength(500)
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
   reason?: string;
-  @ApiProperty({ required: false, description: 'ISO timestamp; omit for indefinite' })
+  @ApiProperty({
+    required: false,
+    description: 'ISO timestamp; omit for indefinite',
+  })
   @IsOptional()
   @IsString()
   until?: string;
@@ -91,14 +105,19 @@ export class AdminUsersController {
   @Get(':id')
   @RequirePermission('users.view')
   async get(@Param('id') id: string) {
-    const i = await this.userInfos.findOne({ where: { user_id: id }, relations: ['user'] });
+    const i = await this.userInfos.findOne({
+      where: { user_id: id },
+      relations: ['user'],
+    });
     if (!i) throw new NotFoundException({ i18nKey: 'user.not_found' });
     return i;
   }
 
   @Post(':id/suspend')
   @RequirePermission('users.suspend')
-  @ApiOperation({ summary: 'Suspend (block) a user — sub-admins use this to stop abusers' })
+  @ApiOperation({
+    summary: 'Suspend (block) a user — sub-admins use this to stop abusers',
+  })
   async suspend(
     @CurrentUser() actor: JwtPayload,
     @Param('id') id: string,
@@ -163,7 +182,11 @@ export class AdminUsersController {
           targetType: 'user',
           targetId: id,
           oldValue: before,
-          newValue: { status: 'active', suspended_reason: null, suspended_until: null },
+          newValue: {
+            status: 'active',
+            suspended_reason: null,
+            suspended_until: null,
+          },
         },
         em,
       );

@@ -15,7 +15,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource, Repository, In } from 'typeorm';
-import { ApiBearerAuth, ApiOperation, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiProperty,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   IsBoolean,
   IsOptional,
@@ -31,7 +37,10 @@ import {
   NewsReadStatusEntity,
 } from '../database/entities/news.entity';
 import type { NewsStatus } from '../database/entities/news.entity';
-import { PermissionGuard, RequirePermission } from '../admin/permissions/permission.guard';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from '../admin/permissions/permission.guard';
 import { AdminAuditLogService } from '../admin/audit/admin-audit-log.service';
 
 class I18nTextDto {
@@ -42,17 +51,39 @@ class I18nTextDto {
 
 class CreateNewsDto {
   @ApiProperty() @IsString() slug!: string;
-  @ApiProperty({ type: I18nTextDto }) @ValidateNested() @Type(() => I18nTextDto) title!: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto }) @ValidateNested() @Type(() => I18nTextDto) body!: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() summary?: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  title!: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  body!: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto, required: false })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  @IsOptional()
+  summary?: I18nTextDto;
   @ApiProperty({ required: false }) @IsBoolean() @IsOptional() pinned?: boolean;
 }
 
 class UpdateNewsDto {
   @ApiProperty({ required: false }) @IsString() @IsOptional() slug?: string;
-  @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() title?: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() body?: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() summary?: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto, required: false })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  @IsOptional()
+  title?: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto, required: false })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  @IsOptional()
+  body?: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto, required: false })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  @IsOptional()
+  summary?: I18nTextDto;
   @ApiProperty({ required: false }) @IsBoolean() @IsOptional() pinned?: boolean;
 }
 
@@ -165,7 +196,8 @@ export class NewsService {
     return this.dataSource.transaction(async (em) => {
       const repo = em.getRepository(NewsPostEntity);
       const existing = await repo.findOne({ where: { slug: dto.slug } });
-      if (existing) throw new BadRequestException({ i18nKey: 'news.slug_taken' });
+      if (existing)
+        throw new BadRequestException({ i18nKey: 'news.slug_taken' });
       const post = repo.create({
         slug: dto.slug,
         title: dto.title,
@@ -182,7 +214,11 @@ export class NewsService {
           action: 'news.create',
           targetType: 'news',
           targetId: saved.id,
-          newValue: { slug: saved.slug, pinned: saved.pinned, status: saved.status },
+          newValue: {
+            slug: saved.slug,
+            pinned: saved.pinned,
+            status: saved.status,
+          },
         },
         em,
       );
@@ -201,7 +237,8 @@ export class NewsService {
 
       if (dto.slug && dto.slug !== post.slug) {
         const collision = await repo.findOne({ where: { slug: dto.slug } });
-        if (collision) throw new BadRequestException({ i18nKey: 'news.slug_taken' });
+        if (collision)
+          throw new BadRequestException({ i18nKey: 'news.slug_taken' });
         before.slug = post.slug;
         after.slug = dto.slug;
         post.slug = dto.slug;
@@ -331,7 +368,9 @@ export class NewsController {
   constructor(private readonly svc: NewsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List published news posts with per-user read flags' })
+  @ApiOperation({
+    summary: 'List published news posts with per-user read flags',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   list(
@@ -352,7 +391,9 @@ export class NewsController {
   }
 
   @Post('read-all')
-  @ApiOperation({ summary: 'Mark every currently-published post as read for this user' })
+  @ApiOperation({
+    summary: 'Mark every currently-published post as read for this user',
+  })
   readAll(@CurrentUser() user: JwtPayload) {
     return this.svc.markAllRead(user.sub);
   }
@@ -406,7 +447,11 @@ export class AdminNewsController {
 
   @Patch(':id')
   @RequirePermission('news.edit')
-  update(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: UpdateNewsDto) {
+  update(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: UpdateNewsDto,
+  ) {
     return this.svc.update(id, dto, user.sub);
   }
 

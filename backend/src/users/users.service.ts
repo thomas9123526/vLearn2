@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -27,7 +32,10 @@ export class UsersService {
     return this.toProfile(await this.findById(id));
   }
 
-  async updateProfile(id: string, dto: UpdateProfileDto): Promise<UserProfileDto> {
+  async updateProfile(
+    id: string,
+    dto: UpdateProfileDto,
+  ): Promise<UserProfileDto> {
     const user = await this.findById(id);
     if (dto.displayName !== undefined) user.name = dto.displayName;
     if (dto.gender !== undefined) user.gender = dto.gender;
@@ -35,22 +43,32 @@ export class UsersService {
     if (dto.avatarEmoji !== undefined) user.info.avatar_emoji = dto.avatarEmoji;
     if (dto.uiLanguage !== undefined) user.info.ui_language = dto.uiLanguage;
     if (dto.activeTheme !== undefined) user.info.active_theme = dto.activeTheme;
-    if (dto.activePersonaId !== undefined) user.info.active_persona_id = dto.activePersonaId;
-    if (dto.onboardingDone !== undefined) user.info.onboarding_done = dto.onboardingDone;
+    if (dto.activePersonaId !== undefined)
+      user.info.active_persona_id = dto.activePersonaId;
+    if (dto.onboardingDone !== undefined)
+      user.info.onboarding_done = dto.onboardingDone;
 
     // Password change requires current password proof-of-control.
     // password_hash has select:false so we re-query with explicit selection.
     if (dto.newPassword !== undefined) {
       if (!dto.currentPassword) {
-        throw new BadRequestException({ i18nKey: 'user.current_password_required' });
+        throw new BadRequestException({
+          i18nKey: 'user.current_password_required',
+        });
       }
       const withHash = await this.users.findOne({
         where: { id },
         select: ['id', 'password_hash'],
       });
       if (!withHash) throw new NotFoundException({ i18nKey: 'user.not_found' });
-      const ok = await bcrypt.compare(dto.currentPassword, withHash.password_hash);
-      if (!ok) throw new UnauthorizedException({ i18nKey: 'user.current_password_wrong' });
+      const ok = await bcrypt.compare(
+        dto.currentPassword,
+        withHash.password_hash,
+      );
+      if (!ok)
+        throw new UnauthorizedException({
+          i18nKey: 'user.current_password_wrong',
+        });
       user.password_hash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
     }
 

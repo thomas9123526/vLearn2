@@ -51,10 +51,18 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         "updated_at" TIMESTAMPTZ DEFAULT now()
       );
     `);
-    await q.query(`CREATE INDEX "idx_users_xp_total" ON "users"("xp_total" DESC);`);
-    await q.query(`CREATE INDEX "idx_users_streak_days" ON "users"("streak_days" DESC);`);
-    await q.query(`CREATE INDEX "idx_users_status" ON "users"("status") WHERE "status" != 'active';`);
-    await q.query(`CREATE UNIQUE INDEX "uniq_one_superadmin" ON "users"("role") WHERE "role" = 'superadmin';`);
+    await q.query(
+      `CREATE INDEX "idx_users_xp_total" ON "users"("xp_total" DESC);`,
+    );
+    await q.query(
+      `CREATE INDEX "idx_users_streak_days" ON "users"("streak_days" DESC);`,
+    );
+    await q.query(
+      `CREATE INDEX "idx_users_status" ON "users"("status") WHERE "status" != 'active';`,
+    );
+    await q.query(
+      `CREATE UNIQUE INDEX "uniq_one_superadmin" ON "users"("role") WHERE "role" = 'superadmin';`,
+    );
 
     // ─── refresh_tokens ────────────────────────────────────
     await q.query(`
@@ -66,7 +74,9 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         "created_at" TIMESTAMPTZ DEFAULT now()
       );
     `);
-    await q.query(`CREATE INDEX "idx_refresh_tokens_user_id" ON "refresh_tokens"("user_id");`);
+    await q.query(
+      `CREATE INDEX "idx_refresh_tokens_user_id" ON "refresh_tokens"("user_id");`,
+    );
 
     // ─── personas ──────────────────────────────────────────
     await q.query(`
@@ -119,9 +129,15 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         "created_at" TIMESTAMPTZ DEFAULT now()
       );
     `);
-    await q.query(`CREATE INDEX "idx_scenarios_category" ON "scenarios"("category");`);
-    await q.query(`CREATE INDEX "idx_scenarios_difficulty" ON "scenarios"("difficulty");`);
-    await q.query(`CREATE INDEX "idx_scenarios_status" ON "scenarios"("status");`);
+    await q.query(
+      `CREATE INDEX "idx_scenarios_category" ON "scenarios"("category");`,
+    );
+    await q.query(
+      `CREATE INDEX "idx_scenarios_difficulty" ON "scenarios"("difficulty");`,
+    );
+    await q.query(
+      `CREATE INDEX "idx_scenarios_status" ON "scenarios"("status");`,
+    );
 
     // ─── courses ───────────────────────────────────────────
     await q.query(`
@@ -150,7 +166,9 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         UNIQUE ("course_id", "scenario_id")
       );
     `);
-    await q.query(`CREATE INDEX "idx_course_scenarios_order" ON "course_scenarios"("course_id", "order_index");`);
+    await q.query(
+      `CREATE INDEX "idx_course_scenarios_order" ON "course_scenarios"("course_id", "order_index");`,
+    );
 
     // ─── conversation_sessions ─────────────────────────────
     await q.query(`
@@ -169,8 +187,12 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         "xp_earned" SMALLINT DEFAULT 0
       );
     `);
-    await q.query(`CREATE INDEX "idx_sessions_user_id" ON "conversation_sessions"("user_id");`);
-    await q.query(`CREATE INDEX "idx_sessions_started_at" ON "conversation_sessions"("started_at");`);
+    await q.query(
+      `CREATE INDEX "idx_sessions_user_id" ON "conversation_sessions"("user_id");`,
+    );
+    await q.query(
+      `CREATE INDEX "idx_sessions_started_at" ON "conversation_sessions"("started_at");`,
+    );
 
     // ─── conversation_messages ─────────────────────────────
     await q.query(`
@@ -184,7 +206,9 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         "created_at" TIMESTAMPTZ DEFAULT now()
       );
     `);
-    await q.query(`CREATE INDEX "idx_messages_session_id" ON "conversation_messages"("session_id");`);
+    await q.query(
+      `CREATE INDEX "idx_messages_session_id" ON "conversation_messages"("session_id");`,
+    );
 
     // ─── session_scores ────────────────────────────────────
     await q.query(`
@@ -227,7 +251,9 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         UNIQUE ("user_id", "snapshot_date")
       );
     `);
-    await q.query(`CREATE INDEX "idx_skill_snapshots_user_date" ON "skill_snapshots"("user_id", "snapshot_date");`);
+    await q.query(
+      `CREATE INDEX "idx_skill_snapshots_user_date" ON "skill_snapshots"("user_id", "snapshot_date");`,
+    );
 
     // ─── user_progress ─────────────────────────────────────
     await q.query(`
@@ -260,7 +286,9 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         UNIQUE ("user_id", "scenario_id")
       );
     `);
-    await q.query(`CREATE INDEX "idx_completions_user_id" ON "user_scenario_completions"("user_id");`);
+    await q.query(
+      `CREATE INDEX "idx_completions_user_id" ON "user_scenario_completions"("user_id");`,
+    );
 
     // ─── achievements ──────────────────────────────────────
     await q.query(`
@@ -301,8 +329,12 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         "created_at" TIMESTAMPTZ DEFAULT now()
       );
     `);
-    await q.query(`CREATE INDEX "idx_guard_violations_user_id" ON "guard_violations"("user_id", "created_at" DESC);`);
-    await q.query(`CREATE INDEX "idx_guard_violations_severity" ON "guard_violations"("severity", "created_at" DESC);`);
+    await q.query(
+      `CREATE INDEX "idx_guard_violations_user_id" ON "guard_violations"("user_id", "created_at" DESC);`,
+    );
+    await q.query(
+      `CREATE INDEX "idx_guard_violations_severity" ON "guard_violations"("severity", "created_at" DESC);`,
+    );
 
     // ─── app_config ────────────────────────────────────────
     await q.query(`
@@ -318,7 +350,9 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         "updated_by" UUID REFERENCES "users"("id") ON DELETE SET NULL
       );
     `);
-    await q.query(`CREATE INDEX "idx_app_config_category" ON "app_config"("category");`);
+    await q.query(
+      `CREATE INDEX "idx_app_config_category" ON "app_config"("category");`,
+    );
 
     // ─── admin_audit_log ───────────────────────────────────
     await q.query(`
@@ -334,9 +368,15 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         "created_at" TIMESTAMPTZ DEFAULT now()
       );
     `);
-    await q.query(`CREATE INDEX "idx_admin_audit_log_user_time" ON "admin_audit_log"("user_id", "created_at" DESC);`);
-    await q.query(`CREATE INDEX "idx_admin_audit_log_target" ON "admin_audit_log"("target_type", "target_id", "created_at" DESC);`);
-    await q.query(`CREATE INDEX "idx_admin_audit_log_action_time" ON "admin_audit_log"("action", "created_at" DESC);`);
+    await q.query(
+      `CREATE INDEX "idx_admin_audit_log_user_time" ON "admin_audit_log"("user_id", "created_at" DESC);`,
+    );
+    await q.query(
+      `CREATE INDEX "idx_admin_audit_log_target" ON "admin_audit_log"("target_type", "target_id", "created_at" DESC);`,
+    );
+    await q.query(
+      `CREATE INDEX "idx_admin_audit_log_action_time" ON "admin_audit_log"("action", "created_at" DESC);`,
+    );
 
     // ─── admin_permissions ─────────────────────────────────
     await q.query(`
@@ -348,8 +388,12 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         PRIMARY KEY ("user_id", "permission")
       );
     `);
-    await q.query(`CREATE INDEX "idx_admin_permissions_user" ON "admin_permissions"("user_id");`);
-    await q.query(`CREATE INDEX "idx_admin_permissions_perm" ON "admin_permissions"("permission");`);
+    await q.query(
+      `CREATE INDEX "idx_admin_permissions_user" ON "admin_permissions"("user_id");`,
+    );
+    await q.query(
+      `CREATE INDEX "idx_admin_permissions_perm" ON "admin_permissions"("permission");`,
+    );
 
     // ─── uploaded_files ────────────────────────────────────
     await q.query(`
@@ -369,8 +413,12 @@ export class InitialSchema1715800000000 implements MigrationInterface {
         "created_at" TIMESTAMPTZ DEFAULT now()
       );
     `);
-    await q.query(`CREATE INDEX "idx_uploaded_files_hash" ON "uploaded_files"("content_hash");`);
-    await q.query(`CREATE INDEX "idx_uploaded_files_uploader" ON "uploaded_files"("uploader_id", "created_at" DESC);`);
+    await q.query(
+      `CREATE INDEX "idx_uploaded_files_hash" ON "uploaded_files"("content_hash");`,
+    );
+    await q.query(
+      `CREATE INDEX "idx_uploaded_files_uploader" ON "uploaded_files"("uploader_id", "created_at" DESC);`,
+    );
   }
 
   public async down(q: QueryRunner): Promise<void> {
@@ -391,7 +439,9 @@ export class InitialSchema1715800000000 implements MigrationInterface {
     await q.query(`DROP TABLE IF EXISTS "course_scenarios";`);
     await q.query(`DROP TABLE IF EXISTS "courses";`);
     await q.query(`DROP TABLE IF EXISTS "scenarios";`);
-    await q.query(`ALTER TABLE IF EXISTS "users" DROP CONSTRAINT IF EXISTS "fk_users_active_persona";`);
+    await q.query(
+      `ALTER TABLE IF EXISTS "users" DROP CONSTRAINT IF EXISTS "fk_users_active_persona";`,
+    );
     await q.query(`DROP TABLE IF EXISTS "personas";`);
     await q.query(`DROP TABLE IF EXISTS "refresh_tokens";`);
     await q.query(`DROP TABLE IF EXISTS "users";`);

@@ -22,25 +22,34 @@ export class PermissionGuard implements CanActivate {
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    const required = this.reflector.getAllAndOverride<string[]>(
-      PERMISSIONS_METADATA_KEY,
-      [ctx.getHandler(), ctx.getClass()],
-    ) ?? [];
+    const required =
+      this.reflector.getAllAndOverride<string[]>(PERMISSIONS_METADATA_KEY, [
+        ctx.getHandler(),
+        ctx.getClass(),
+      ]) ?? [];
     if (required.length === 0) return true;
 
-    const req = ctx.switchToHttp().getRequest<{ user?: { sub: string; role: string } }>();
+    const req = ctx
+      .switchToHttp()
+      .getRequest<{ user?: { sub: string; role: string } }>();
     const user = req.user;
     if (!user) throw new UnauthorizedException();
 
     if (user.role === 'superadmin') return true;
     if (user.role !== 'admin') {
-      throw new ForbiddenException({ i18nKey: 'admin.not_admin', missing: required });
+      throw new ForbiddenException({
+        i18nKey: 'admin.not_admin',
+        missing: required,
+      });
     }
 
     const granted = await this.permissions.getForUser(user.sub);
     const missing = required.filter((p) => !granted.has(p));
     if (missing.length > 0) {
-      throw new ForbiddenException({ i18nKey: 'admin.missing_permission', missing });
+      throw new ForbiddenException({
+        i18nKey: 'admin.missing_permission',
+        missing,
+      });
     }
     return true;
   }

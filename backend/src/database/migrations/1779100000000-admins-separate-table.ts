@@ -55,12 +55,24 @@ export class AdminsSeparateTable1779100000000 implements MigrationInterface {
     // Postgres names constraints automatically as "<table>_<col>_fkey" unless
     // you name them explicitly. The initial migration didn't name them, so
     // we drop by the conventional name. IF EXISTS keeps this idempotent.
-    await q.query(`ALTER TABLE "admin_permissions" DROP CONSTRAINT IF EXISTS "admin_permissions_user_id_fkey";`);
-    await q.query(`ALTER TABLE "admin_permissions" DROP CONSTRAINT IF EXISTS "admin_permissions_granted_by_fkey";`);
-    await q.query(`ALTER TABLE "admin_audit_log" DROP CONSTRAINT IF EXISTS "admin_audit_log_user_id_fkey";`);
-    await q.query(`ALTER TABLE "news_posts" DROP CONSTRAINT IF EXISTS "news_posts_author_id_fkey";`);
-    await q.query(`ALTER TABLE "app_config" DROP CONSTRAINT IF EXISTS "app_config_updated_by_fkey";`);
-    await q.query(`ALTER TABLE "uploaded_files" DROP CONSTRAINT IF EXISTS "uploaded_files_uploader_id_fkey";`);
+    await q.query(
+      `ALTER TABLE "admin_permissions" DROP CONSTRAINT IF EXISTS "admin_permissions_user_id_fkey";`,
+    );
+    await q.query(
+      `ALTER TABLE "admin_permissions" DROP CONSTRAINT IF EXISTS "admin_permissions_granted_by_fkey";`,
+    );
+    await q.query(
+      `ALTER TABLE "admin_audit_log" DROP CONSTRAINT IF EXISTS "admin_audit_log_user_id_fkey";`,
+    );
+    await q.query(
+      `ALTER TABLE "news_posts" DROP CONSTRAINT IF EXISTS "news_posts_author_id_fkey";`,
+    );
+    await q.query(
+      `ALTER TABLE "app_config" DROP CONSTRAINT IF EXISTS "app_config_updated_by_fkey";`,
+    );
+    await q.query(
+      `ALTER TABLE "uploaded_files" DROP CONSTRAINT IF EXISTS "uploaded_files_uploader_id_fkey";`,
+    );
 
     // Some older Postgres versions name these slightly differently when the
     // table or column has been renamed. Belt-and-suspenders: scan and drop
@@ -118,13 +130,19 @@ export class AdminsSeparateTable1779100000000 implements MigrationInterface {
     // refresh_tokens still has ON DELETE CASCADE to users(id), so any user-
     // table refresh tokens for these admin rows get cleaned up automatically.
     // Admin-side sessions will be re-created via /admin/auth/signin.
-    await q.query(`DELETE FROM "users" WHERE "role" IN ('admin', 'superadmin');`);
+    await q.query(
+      `DELETE FROM "users" WHERE "role" IN ('admin', 'superadmin');`,
+    );
 
     // Tighten the role check on users now that admin/superadmin are no
     // longer valid there. (Defensive — keeps a future bug from inserting
     // an admin row into the wrong table.)
-    await q.query(`ALTER TABLE "users" DROP CONSTRAINT IF EXISTS "chk_users_role";`);
-    await q.query(`ALTER TABLE "users" ADD CONSTRAINT "chk_users_role" CHECK ("role" IN ('user'));`);
+    await q.query(
+      `ALTER TABLE "users" DROP CONSTRAINT IF EXISTS "chk_users_role";`,
+    );
+    await q.query(
+      `ALTER TABLE "users" ADD CONSTRAINT "chk_users_role" CHECK ("role" IN ('user'));`,
+    );
 
     // Drop the partial unique index that enforced "only one superadmin in
     // users". The new constraint lives in `admins` if we ever want it.
@@ -133,8 +151,12 @@ export class AdminsSeparateTable1779100000000 implements MigrationInterface {
 
   public async down(q: QueryRunner): Promise<void> {
     // Reverse: copy admins rows back into users, then drop admin tables.
-    await q.query(`ALTER TABLE "users" DROP CONSTRAINT IF EXISTS "chk_users_role";`);
-    await q.query(`ALTER TABLE "users" ADD CONSTRAINT "chk_users_role" CHECK ("role" IN ('user','admin','superadmin'));`);
+    await q.query(
+      `ALTER TABLE "users" DROP CONSTRAINT IF EXISTS "chk_users_role";`,
+    );
+    await q.query(
+      `ALTER TABLE "users" ADD CONSTRAINT "chk_users_role" CHECK ("role" IN ('user','admin','superadmin'));`,
+    );
 
     await q.query(`
       INSERT INTO "users" (
@@ -148,8 +170,12 @@ export class AdminsSeparateTable1779100000000 implements MigrationInterface {
       ON CONFLICT ("email") DO NOTHING;
     `);
 
-    await q.query(`ALTER TABLE "admin_audit_log" DROP CONSTRAINT IF EXISTS "admin_audit_log_user_id_fkey";`);
-    await q.query(`ALTER TABLE "admin_permissions" DROP CONSTRAINT IF EXISTS "admin_permissions_user_id_fkey";`);
+    await q.query(
+      `ALTER TABLE "admin_audit_log" DROP CONSTRAINT IF EXISTS "admin_audit_log_user_id_fkey";`,
+    );
+    await q.query(
+      `ALTER TABLE "admin_permissions" DROP CONSTRAINT IF EXISTS "admin_permissions_user_id_fkey";`,
+    );
 
     await q.query(`DROP TABLE IF EXISTS "admin_refresh_tokens";`);
     await q.query(`DROP TABLE IF EXISTS "admins";`);

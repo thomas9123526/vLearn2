@@ -77,7 +77,9 @@ class ProgressService {
     const existing = await this.snapshots.findOne({
       where: { user_id: userId, snapshot_date: today },
     });
-    const merged = existing ?? this.snapshots.create({ user_id: userId, snapshot_date: today });
+    const merged =
+      existing ??
+      this.snapshots.create({ user_id: userId, snapshot_date: today });
     for (const key of [
       'pronunciation',
       'fluency',
@@ -89,12 +91,17 @@ class ProgressService {
       const raw = body[key];
       if (raw == null) continue;
       if (typeof raw !== 'number' || raw < 0 || raw > 100) {
-        throw new BadRequestException({ i18nKey: 'progress.score_out_of_range', key });
+        throw new BadRequestException({
+          i18nKey: 'progress.score_out_of_range',
+          key,
+        });
       }
       // Running average — keep newer evidence weighted higher.
       if (existing && existing[key] != null) {
         const prev = existing[key];
-        (merged as Record<typeof key, number>)[key] = Math.round(prev * 0.7 + raw * 0.3);
+        (merged as Record<typeof key, number>)[key] = Math.round(
+          prev * 0.7 + raw * 0.3,
+        );
       } else {
         (merged as Record<typeof key, number>)[key] = Math.round(raw);
       }
@@ -112,7 +119,9 @@ class ProgressController {
   constructor(private readonly svc: ProgressService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get my aggregated progress + latest skill snapshot' })
+  @ApiOperation({
+    summary: 'Get my aggregated progress + latest skill snapshot',
+  })
   get(@CurrentUser() user: JwtPayload) {
     return this.svc.getProgress(user.sub);
   }
@@ -130,7 +139,9 @@ class ProgressController {
   }
 
   @Post('snapshots')
-  @ApiOperation({ summary: 'Submit today\'s skill snapshot (app-side heuristics)' })
+  @ApiOperation({
+    summary: "Submit today's skill snapshot (app-side heuristics)",
+  })
   postSnapshot(
     @CurrentUser() user: JwtPayload,
     @Body()

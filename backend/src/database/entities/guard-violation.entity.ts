@@ -25,7 +25,7 @@ export class GuardViolationEntity {
   @Column({ type: 'text' })
   attempted_content!: string;
 
-  @Column({ type: 'text', array: true, default: () => "ARRAY[]::text[]" })
+  @Column({ type: 'text', array: true, default: () => 'ARRAY[]::text[]' })
   matched_terms!: string[];
 
   @Column({ type: 'varchar', length: 10 })

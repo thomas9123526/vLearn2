@@ -19,7 +19,10 @@ import { AppConfigEntity } from '../database/entities/app-config.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
-import { PermissionGuard, RequirePermission } from '../admin/permissions/permission.guard';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from '../admin/permissions/permission.guard';
 import { AdminAuditLogService } from '../admin/audit/admin-audit-log.service';
 
 /// Live in-memory cache for the gzip-enable flag. The compression filter in
@@ -42,13 +45,18 @@ class AppConfigService {
   }
 
   async refreshGzipCache(): Promise<void> {
-    const row = await this.repo.findOne({ where: { key: 'system.gzip_enabled' } });
+    const row = await this.repo.findOne({
+      where: { key: 'system.gzip_enabled' },
+    });
     if (row && typeof row.value === 'boolean') {
       GzipFlagCache.enabled = row.value;
     }
   }
 
-  async appVisibleFlags(): Promise<{ version: string; flags: Record<string, unknown> }> {
+  async appVisibleFlags(): Promise<{
+    version: string;
+    flags: Record<string, unknown>;
+  }> {
     const rows = await this.repo.find({ where: { is_visible_to_app: true } });
     const flags: Record<string, unknown> = {};
     let max = new Date(0);
@@ -69,13 +77,20 @@ class AppConfigService {
     return row;
   }
 
-  async update(key: string, value: unknown, updatedBy: string): Promise<AppConfigEntity> {
+  async update(
+    key: string,
+    value: unknown,
+    updatedBy: string,
+  ): Promise<AppConfigEntity> {
     return this.dataSource.transaction(async (em) => {
       const repo = em.getRepository(AppConfigEntity);
       const row = await repo.findOne({ where: { key } });
       if (!row) throw new NotFoundException({ i18nKey: 'config.not_found' });
       if (!this.typeMatches(row.value_type, value)) {
-        throw new BadRequestException({ i18nKey: 'config.type_mismatch', expected: row.value_type });
+        throw new BadRequestException({
+          i18nKey: 'config.type_mismatch',
+          expected: row.value_type,
+        });
       }
       const oldValue = row.value;
       row.value = value;
@@ -128,12 +143,18 @@ class AppConfigService {
 
   private typeMatches(t: string, v: unknown): boolean {
     switch (t) {
-      case 'boolean': return typeof v === 'boolean';
-      case 'string':  return typeof v === 'string';
-      case 'number':  return typeof v === 'number';
-      case 'array':   return Array.isArray(v);
-      case 'object':  return typeof v === 'object' && v !== null && !Array.isArray(v);
-      default: return true;
+      case 'boolean':
+        return typeof v === 'boolean';
+      case 'string':
+        return typeof v === 'string';
+      case 'number':
+        return typeof v === 'number';
+      case 'array':
+        return Array.isArray(v);
+      case 'object':
+        return typeof v === 'object' && v !== null && !Array.isArray(v);
+      default:
+        return true;
     }
   }
 }
@@ -146,7 +167,9 @@ class AppConfigController {
   constructor(private readonly svc: AppConfigService) {}
 
   @Get()
-  @ApiOperation({ summary: 'All visibility flags for the Flutter app to cache' })
+  @ApiOperation({
+    summary: 'All visibility flags for the Flutter app to cache',
+  })
   flags() {
     return this.svc.appVisibleFlags();
   }

@@ -1,9 +1,18 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsISO8601, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsISO8601,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionGuard, RequirePermission } from '../permissions/permission.guard';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from '../permissions/permission.guard';
 import { AdminAuditLogService } from './admin-audit-log.service';
 
 class ListAuditQueryDto {
@@ -26,7 +35,9 @@ export class AdminAuditController {
 
   @Get()
   @RequirePermission('audit.view')
-  @ApiOperation({ summary: 'List admin audit-log entries with filters and pagination' })
+  @ApiOperation({
+    summary: 'List admin audit-log entries with filters and pagination',
+  })
   async list(@Query() q: ListAuditQueryDto) {
     const page = Math.max(q.page ?? 1, 1);
     const limit = Math.min(Math.max(q.limit ?? 50, 1), 200);

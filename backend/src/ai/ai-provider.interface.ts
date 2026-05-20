@@ -71,7 +71,9 @@ export abstract class AiProvider {
   abstract readonly capabilities: ProviderCapabilities;
 
   abstract chat(req: ChatRequest): Promise<ChatResponse>;
-  abstract structured<T>(req: StructuredRequest): Promise<StructuredResponse<T>>;
+  abstract structured<T>(
+    req: StructuredRequest,
+  ): Promise<StructuredResponse<T>>;
 }
 
 export const AI_PROVIDER = 'AI_PROVIDER';

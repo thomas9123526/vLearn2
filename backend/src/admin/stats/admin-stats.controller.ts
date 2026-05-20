@@ -6,7 +6,10 @@ import { UserInfoEntity } from '../../database/entities/user-info.entity';
 import { ConversationSessionEntity } from '../../database/entities/conversation.entity';
 import { ScenarioEntity } from '../../database/entities/scenario.entity';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionGuard, RequirePermission } from '../permissions/permission.guard';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from '../permissions/permission.guard';
 
 interface AdminStatsResponse {
   users_total: number;
@@ -41,7 +44,9 @@ export class AdminStatsController {
         this.userInfos.count({ where: { role: 'user' } }),
         this.userInfos
           .createQueryBuilder('i')
-          .where(`i.role = 'user' AND i.last_active_date >= :since`, { since: thirtyDaysAgo })
+          .where(`i.role = 'user' AND i.last_active_date >= :since`, {
+            since: thirtyDaysAgo,
+          })
           .getCount(),
         this.sessions.count(),
         this.scenarios.count({ where: { status: 'published' } }),

@@ -54,7 +54,12 @@ import { AuthModule } from '../auth/auth.module';
       }),
     }),
   ],
-  providers: [AdminPermissionsService, PermissionGuard, AdminAuthService, AdminAuditLogService],
+  providers: [
+    AdminPermissionsService,
+    PermissionGuard,
+    AdminAuthService,
+    AdminAuditLogService,
+  ],
   controllers: [
     AdminAuthController,
     AdminAdminsController,
@@ -67,6 +72,11 @@ import { AuthModule } from '../auth/auth.module';
     AdminCategoriesController,
     AdminAuditController,
   ],
-  exports: [AdminPermissionsService, PermissionGuard, AdminAuthService, AdminAuditLogService],
+  exports: [
+    AdminPermissionsService,
+    PermissionGuard,
+    AdminAuthService,
+    AdminAuditLogService,
+  ],
 })
 export class AdminModule {}

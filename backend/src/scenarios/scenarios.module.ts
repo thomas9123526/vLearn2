@@ -1,7 +1,21 @@
-import { Module, Injectable, Controller, Get, Query, Param, NotFoundException, UseGuards } from '@nestjs/common';
+import {
+  Module,
+  Injectable,
+  Controller,
+  Get,
+  Query,
+  Param,
+  NotFoundException,
+  UseGuards,
+} from '@nestjs/common';
 import { TypeOrmModule, InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -16,9 +30,12 @@ class ScenariosService {
     const qb = this.repo
       .createQueryBuilder('s')
       .where("s.status = 'published'");
-    if (filters.category) qb.andWhere('s.category = :c', { c: filters.category });
-    if (filters.difficulty !== undefined) qb.andWhere('s.difficulty = :d', { d: filters.difficulty });
-    if (filters.q) qb.andWhere(`s.title ->> 'en' ILIKE :q`, { q: `%${filters.q}%` });
+    if (filters.category)
+      qb.andWhere('s.category = :c', { c: filters.category });
+    if (filters.difficulty !== undefined)
+      qb.andWhere('s.difficulty = :d', { d: filters.difficulty });
+    if (filters.q)
+      qb.andWhere(`s.title ->> 'en' ILIKE :q`, { q: `%${filters.q}%` });
     return qb.orderBy('s.order_index', 'ASC').getMany();
   }
 

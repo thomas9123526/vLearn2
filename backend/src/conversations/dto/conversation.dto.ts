@@ -1,9 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class StartSessionDto {
-  @ApiProperty({ required: false, description: 'Scenario id; omit for free talk' })
-  @IsOptional() @IsUUID()
+  @ApiProperty({
+    required: false,
+    description: 'Scenario id; omit for free talk',
+  })
+  @IsOptional()
+  @IsUUID()
   scenarioId?: string;
 
   @ApiProperty()
@@ -17,17 +28,25 @@ export class StartSessionDto {
 
 export class SendMessageDto {
   @ApiProperty()
-  @IsString() @MinLength(1) @MaxLength(5000)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(5000)
   content!: string;
 
   @ApiProperty({ required: false })
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   audioUrl?: string;
 }
 
 export class EndSessionDto {
-  @ApiProperty({ required: false, default: 'completed', enum: ['completed', 'abandoned'] })
-  @IsOptional() @IsIn(['completed', 'abandoned'])
+  @ApiProperty({
+    required: false,
+    default: 'completed',
+    enum: ['completed', 'abandoned'],
+  })
+  @IsOptional()
+  @IsIn(['completed', 'abandoned'])
   status?: 'completed' | 'abandoned';
 }
 

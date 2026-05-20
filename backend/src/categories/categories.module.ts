@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  Injectable,
-  Module,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Injectable, Module, UseGuards } from '@nestjs/common';
 import { TypeOrmModule, InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';

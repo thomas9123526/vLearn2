@@ -1,15 +1,18 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserInfoEntity } from '../database/entities/user-info.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionGuard, RequirePermission } from './permissions/permission.guard';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from './permissions/permission.guard';
 
 type Metric = 'xp_total' | 'streak_days' | 'current_level';
 
@@ -39,7 +42,11 @@ export class AdminLeaderboardController {
   @Get()
   @RequirePermission('leaderboard.view')
   @ApiOperation({ summary: 'Top users by chosen metric' })
-  @ApiQuery({ name: 'metric', required: false, enum: ['xp_total', 'streak_days', 'current_level'] })
+  @ApiQuery({
+    name: 'metric',
+    required: false,
+    enum: ['xp_total', 'streak_days', 'current_level'],
+  })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'language', required: false })
   async top(

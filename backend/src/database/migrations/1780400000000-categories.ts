@@ -36,11 +36,31 @@ export class Categories1780400000000 implements MigrationInterface {
 
     // Seed the four legacy categories. ON CONFLICT keeps the migration
     // idempotent when reused in fresh-database test setups.
-    const seed: Array<{ slug: string; title: Record<string, string>; order: number }> = [
-      { slug: 'travel',   title: { en: 'Travel',   ko: '여행',   zh: '旅行' }, order: 10 },
-      { slug: 'business', title: { en: 'Business', ko: '비즈니스', zh: '商务' }, order: 20 },
-      { slug: 'social',   title: { en: 'Social',   ko: '소셜',   zh: '社交' }, order: 30 },
-      { slug: 'daily',    title: { en: 'Daily',    ko: '일상',   zh: '日常' }, order: 40 },
+    const seed: Array<{
+      slug: string;
+      title: Record<string, string>;
+      order: number;
+    }> = [
+      {
+        slug: 'travel',
+        title: { en: 'Travel', ko: '여행', zh: '旅行' },
+        order: 10,
+      },
+      {
+        slug: 'business',
+        title: { en: 'Business', ko: '비즈니스', zh: '商务' },
+        order: 20,
+      },
+      {
+        slug: 'social',
+        title: { en: 'Social', ko: '소셜', zh: '社交' },
+        order: 30,
+      },
+      {
+        slug: 'daily',
+        title: { en: 'Daily', ko: '일상', zh: '日常' },
+        order: 40,
+      },
     ];
     for (const c of seed) {
       await queryRunner.query(

@@ -1,9 +1,4 @@
-import {
-  Column,
-  Entity,
-  Index,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import type { I18nText } from './scenario.entity';
 
 export type CourseStatus = 'draft' | 'published' | 'archived';

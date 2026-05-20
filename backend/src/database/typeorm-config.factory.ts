@@ -21,5 +21,8 @@ export const typeormConfigFactory = (
   migrationsTableName: 'vl_migrations',
   migrationsRun: false,
   synchronize: false,
-  logging: config.get<string>('DB_LOGGING') === 'true' ? ['error', 'query'] : ['error'],
+  logging:
+    config.get<string>('DB_LOGGING') === 'true'
+      ? ['error', 'query']
+      : ['error'],
 });

@@ -14,16 +14,35 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiProperty } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiProperty,
+} from '@nestjs/swagger';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsEmail,
+  IsString,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 import * as bcrypt from 'bcrypt';
 import { AdminEntity } from '../../database/entities/admin.entity';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../../auth/strategies/jwt.strategy';
 import { AdminPermissionsService } from '../permissions/admin-permissions.service';
-import { PermissionGuard, RequirePermission } from '../permissions/permission.guard';
-import { GRANTABLE_PERMISSION_KEYS, PERMISSION_CATALOG, PERMISSION_KEYS } from '../permissions/catalog';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from '../permissions/permission.guard';
+import {
+  GRANTABLE_PERMISSION_KEYS,
+  PERMISSION_CATALOG,
+  PERMISSION_KEYS,
+} from '../permissions/catalog';
 import { AdminAuditLogService } from '../audit/admin-audit-log.service';
 
 class CreateSubAdminDto {
@@ -31,13 +50,16 @@ class CreateSubAdminDto {
   @ApiProperty() @IsString() @MinLength(12) @MaxLength(128) password!: string;
   @ApiProperty() @IsString() @MinLength(2) @MaxLength(100) displayName!: string;
   @ApiProperty({ type: [String], required: false })
-  @IsArray() @IsString({ each: true })
+  @IsArray()
+  @IsString({ each: true })
   permissions: string[] = [];
 }
 
 class ReplacePermissionsDto {
   @ApiProperty({ type: [String] })
-  @IsArray() @IsString({ each: true }) @ArrayMinSize(0)
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMinSize(0)
   permissions!: string[];
 }
 
@@ -63,7 +85,10 @@ export class AdminAdminsController {
 
   @Get('me/permissions')
   @RequirePermission() // any logged-in admin reads their own perms
-  @ApiOperation({ summary: 'Current admin\'s effective permission set (used by the admin panel UI)' })
+  @ApiOperation({
+    summary:
+      "Current admin's effective permission set (used by the admin panel UI)",
+  })
   async myPermissions(@CurrentUser() user: JwtPayload): Promise<string[]> {
     // Superadmin holds every permission implicitly — the frontend already
     // short-circuits on role, but be explicit for direct callers.
@@ -93,8 +118,13 @@ export class AdminAdminsController {
 
   @Post()
   @RequirePermission('admins.create')
-  @ApiOperation({ summary: 'Create a new sub-admin with an initial permission set' })
-  async create(@CurrentUser() user: JwtPayload, @Body() dto: CreateSubAdminDto) {
+  @ApiOperation({
+    summary: 'Create a new sub-admin with an initial permission set',
+  })
+  async create(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: CreateSubAdminDto,
+  ) {
     if (user.role !== 'superadmin') {
       throw new ForbiddenException({ i18nKey: 'admin.superadmin_only' });
     }
@@ -114,7 +144,12 @@ export class AdminAdminsController {
           role: 'admin',
         }),
       );
-      await this.permissions.replaceAll(created.id, dto.permissions, user.sub, em);
+      await this.permissions.replaceAll(
+        created.id,
+        dto.permissions,
+        user.sub,
+        em,
+      );
       await this.audit.record(
         {
           actorId: user.sub,
@@ -129,7 +164,11 @@ export class AdminAdminsController {
         },
         em,
       );
-      return { id: created.id, email: created.email, permissions: dto.permissions };
+      return {
+        id: created.id,
+        email: created.email,
+        permissions: dto.permissions,
+      };
     });
   }
 
@@ -215,7 +254,8 @@ export class AdminAdminsController {
   @RequirePermission('admins.suspend')
   @ApiOperation({ summary: 'Suspend a sub-admin' })
   async suspend(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
-    if (id === user.sub) throw new ForbiddenException({ i18nKey: 'admin.cannot_self_modify' });
+    if (id === user.sub)
+      throw new ForbiddenException({ i18nKey: 'admin.cannot_self_modify' });
     await this.dataSource.transaction(async (em) => {
       const a = await this.ensureTargetIsAdmin(id, em);
       const oldStatus = a.status;
@@ -262,10 +302,15 @@ export class AdminAdminsController {
   @Delete(':id')
   @RequirePermission('admins.delete')
   async softDelete(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
-    if (id === user.sub) throw new ForbiddenException({ i18nKey: 'admin.cannot_self_modify' });
+    if (id === user.sub)
+      throw new ForbiddenException({ i18nKey: 'admin.cannot_self_modify' });
     await this.dataSource.transaction(async (em) => {
       const a = await this.ensureTargetIsAdmin(id, em);
-      const before = { status: a.status, email: a.email, display_name: a.display_name };
+      const before = {
+        status: a.status,
+        email: a.email,
+        display_name: a.display_name,
+      };
       a.status = 'deleted';
       a.email = `deleted-${id}@removed.local`;
       a.display_name = '(deleted)';
@@ -277,7 +322,11 @@ export class AdminAdminsController {
           targetType: 'admin',
           targetId: id,
           oldValue: before,
-          newValue: { status: 'deleted', email: a.email, display_name: a.display_name },
+          newValue: {
+            status: 'deleted',
+            email: a.email,
+            display_name: a.display_name,
+          },
         },
         em,
       );
@@ -288,15 +337,24 @@ export class AdminAdminsController {
   private validatePermissions(perms: string[]) {
     const unknown = perms.filter((p) => !PERMISSION_KEYS.has(p));
     if (unknown.length > 0) {
-      throw new BadRequestException({ i18nKey: 'admin.unknown_permissions', unknown });
+      throw new BadRequestException({
+        i18nKey: 'admin.unknown_permissions',
+        unknown,
+      });
     }
     const ungrantable = perms.filter((p) => !GRANTABLE_PERMISSION_KEYS.has(p));
     if (ungrantable.length > 0) {
-      throw new BadRequestException({ i18nKey: 'admin.ungrantable', ungrantable });
+      throw new BadRequestException({
+        i18nKey: 'admin.ungrantable',
+        ungrantable,
+      });
     }
   }
 
-  private async ensureTargetIsAdmin(id: string, em?: EntityManager): Promise<AdminEntity> {
+  private async ensureTargetIsAdmin(
+    id: string,
+    em?: EntityManager,
+  ): Promise<AdminEntity> {
     const repo = em ? em.getRepository(AdminEntity) : this.admins;
     const a = await repo.findOne({ where: { id, role: 'admin' } });
     if (!a) throw new NotFoundException({ i18nKey: 'admin.not_found' });

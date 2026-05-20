@@ -97,7 +97,14 @@ export class AdminAuthService {
   async signIn(email: string, password: string): Promise<AdminAuthResponse> {
     const admin = await this.admins.findOne({
       where: { email },
-      select: ['id', 'email', 'password_hash', 'display_name', 'role', 'status'],
+      select: [
+        'id',
+        'email',
+        'password_hash',
+        'display_name',
+        'role',
+        'status',
+      ],
     });
     if (!admin) {
       throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
@@ -155,7 +162,8 @@ export class AdminAuthService {
       permissions: perms,
       actor: 'admin',
     };
-    const accessExpires = this.config.get<string>('JWT_ACCESS_EXPIRES') ?? '15m';
+    const accessExpires =
+      this.config.get<string>('JWT_ACCESS_EXPIRES') ?? '15m';
     const refreshExpires =
       this.config.get<string>('JWT_REFRESH_EXPIRES') ?? '7d';
     const accessToken = await this.jwt.signAsync(payload, {

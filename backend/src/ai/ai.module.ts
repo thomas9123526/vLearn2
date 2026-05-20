@@ -36,7 +36,9 @@ import { PromptTemplateEntity } from '../database/entities/prompt-template.entit
             logger.log(`Using OpenAICompatibleProvider (label=${openai.name})`);
             return openai;
           default:
-            logger.warn(`Unknown AI_PROVIDER='${kind}', falling back to anthropic`);
+            logger.warn(
+              `Unknown AI_PROVIDER='${kind}', falling back to anthropic`,
+            );
             return anthropic;
         }
       },

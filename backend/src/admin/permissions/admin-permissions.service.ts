@@ -45,12 +45,19 @@ export class AdminPermissionsService {
     this.invalidate(userId);
   }
 
-  async revoke(userId: string, permissions: string[], em?: EntityManager): Promise<void> {
+  async revoke(
+    userId: string,
+    permissions: string[],
+    em?: EntityManager,
+  ): Promise<void> {
     if (permissions.length === 0) return;
     await this.repoFor(em)
       .createQueryBuilder()
       .delete()
-      .where('user_id = :uid AND permission IN (:...perms)', { uid: userId, perms: permissions })
+      .where('user_id = :uid AND permission IN (:...perms)', {
+        uid: userId,
+        perms: permissions,
+      })
       .execute();
     this.invalidate(userId);
   }

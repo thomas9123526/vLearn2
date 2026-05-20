@@ -1,8 +1,19 @@
-import { Module, Injectable, Controller, Get, Param, NotFoundException, UseGuards } from '@nestjs/common';
+import {
+  Module,
+  Injectable,
+  Controller,
+  Get,
+  Param,
+  NotFoundException,
+  UseGuards,
+} from '@nestjs/common';
 import { TypeOrmModule, InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CourseEntity, CourseScenarioEntity } from '../database/entities/course.entity';
+import {
+  CourseEntity,
+  CourseScenarioEntity,
+} from '../database/entities/course.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -40,9 +51,9 @@ class CoursesService {
     const scenarios = scenarioIds.length
       ? await this.scenarios.find({ where: { id: In(scenarioIds) } })
       : [];
-    const orderedScenarios = memberships.map((m) =>
-      scenarios.find((s) => s.id === m.scenario_id),
-    ).filter(Boolean);
+    const orderedScenarios = memberships
+      .map((m) => scenarios.find((s) => s.id === m.scenario_id))
+      .filter(Boolean);
     return { ...course, scenarios: orderedScenarios };
   }
 }
@@ -68,7 +79,13 @@ class CoursesController {
 }
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CourseEntity, CourseScenarioEntity, ScenarioEntity])],
+  imports: [
+    TypeOrmModule.forFeature([
+      CourseEntity,
+      CourseScenarioEntity,
+      ScenarioEntity,
+    ]),
+  ],
   providers: [CoursesService],
   controllers: [CoursesController],
   exports: [CoursesService],

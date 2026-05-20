@@ -1,5 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { AI_PROVIDER, AiProvider, ChatMessage, AiProviderError } from './ai-provider.interface';
+import {
+  AI_PROVIDER,
+  AiProvider,
+  ChatMessage,
+  AiProviderError,
+} from './ai-provider.interface';
 import { PromptBuilderService } from './prompt-builder.service';
 import type { PersonaEntity } from '../database/entities/persona.entity';
 import type { ScenarioEntity } from '../database/entities/scenario.entity';
@@ -46,7 +51,9 @@ export class ConversationOrchestrator {
       }
       return text;
     } catch (e) {
-      this.logger.warn(`AI chat failed (${(e as AiProviderError).kind}): falling back to canned reply`);
+      this.logger.warn(
+        `AI chat failed (${(e as AiProviderError).kind}): falling back to canned reply`,
+      );
       return this.fallbackReply(args.history);
     }
   }
@@ -55,7 +62,10 @@ export class ConversationOrchestrator {
    * Generates a grammar analysis. Returns null when AI is unavailable so the
    * scoring pipeline can use algorithmic-only scores.
    */
-  async scoreGrammar(userMessages: string[], level: number): Promise<{
+  async scoreGrammar(
+    userMessages: string[],
+    level: number,
+  ): Promise<{
     grammar_score: number;
     errors_found: string[];
     strengths: string[];
@@ -122,16 +132,20 @@ export class ConversationOrchestrator {
         enablePromptCache: this.ai.capabilities.supportsPromptCache,
       });
       const text = res.content
-          .replace(/^["'`\s]+|["'`\s]+$/g, '')
-          .replace(/\s+/g, ' ')
-          .trim();
+        .replace(/^["'`\s]+|["'`\s]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
       if (!text) {
-        this.logger.warn('AI suggestion returned empty text; using canned suggestion');
+        this.logger.warn(
+          'AI suggestion returned empty text; using canned suggestion',
+        );
         return this.fallbackSuggestion(args.history);
       }
       return text;
     } catch (e) {
-      this.logger.warn(`AI suggestion failed (${(e as AiProviderError).kind}): using canned suggestion`);
+      this.logger.warn(
+        `AI suggestion failed (${(e as AiProviderError).kind}): using canned suggestion`,
+      );
       return this.fallbackSuggestion(args.history);
     }
   }
@@ -139,7 +153,9 @@ export class ConversationOrchestrator {
   private fallbackSuggestion(history: ChatMessage[]): string {
     // If the assistant just asked a question, suggest a friendly opener.
     // Otherwise nudge the user to ask the tutor a question.
-    const lastAssistant = [...history].reverse().find((m) => m.role === 'assistant');
+    const lastAssistant = [...history]
+      .reverse()
+      .find((m) => m.role === 'assistant');
     const content = lastAssistant?.content.trim() ?? '';
     if (content.endsWith('?')) {
       return "I'm not sure — could you give me an example?";

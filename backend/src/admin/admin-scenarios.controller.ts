@@ -39,7 +39,10 @@ import { CategoryEntity } from '../database/entities/category.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
-import { PermissionGuard, RequirePermission } from './permissions/permission.guard';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from './permissions/permission.guard';
 import { AdminAuditLogService } from './audit/admin-audit-log.service';
 
 class I18nTextDto implements I18nText {
@@ -53,30 +56,92 @@ class CreateScenarioDto {
   /** Category slug — resolved server-side to category_id. Must reference an active row in vl_categories. */
   @ApiProperty() @IsString() category!: string;
   @ApiProperty() @IsInt() @Min(1) @Max(5) difficulty!: number;
-  @ApiProperty({ type: I18nTextDto }) @ValidateNested() @Type(() => I18nTextDto) title!: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto }) @ValidateNested() @Type(() => I18nTextDto) description!: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto }) @ValidateNested() @Type(() => I18nTextDto) scene_description!: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto }) @ValidateNested() @Type(() => I18nTextDto) user_role!: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto }) @ValidateNested() @Type(() => I18nTextDto) tutor_role!: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  title!: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  description!: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  scene_description!: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  user_role!: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  tutor_role!: I18nTextDto;
   @ApiProperty({ type: [Object] }) @IsArray() objectives!: ScenarioObjective[];
   @ApiProperty({ type: [Object] }) @IsArray() key_phrases!: KeyPhrase[];
-  @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(1) estimated_minutes?: number;
-  @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(0) xp_reward?: number;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  estimated_minutes?: number;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  xp_reward?: number;
 }
 
 class UpdateScenarioDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() slug?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() category?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(1) @Max(5) difficulty?: number;
-  @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() title?: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() description?: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() scene_description?: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() user_role?: I18nTextDto;
-  @ApiProperty({ type: I18nTextDto, required: false }) @ValidateNested() @Type(() => I18nTextDto) @IsOptional() tutor_role?: I18nTextDto;
-  @ApiProperty({ required: false }) @IsOptional() @IsArray() objectives?: ScenarioObjective[];
-  @ApiProperty({ required: false }) @IsOptional() @IsArray() key_phrases?: KeyPhrase[];
-  @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(1) estimated_minutes?: number;
-  @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(0) xp_reward?: number;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  difficulty?: number;
+  @ApiProperty({ type: I18nTextDto, required: false })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  @IsOptional()
+  title?: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto, required: false })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  @IsOptional()
+  description?: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto, required: false })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  @IsOptional()
+  scene_description?: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto, required: false })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  @IsOptional()
+  user_role?: I18nTextDto;
+  @ApiProperty({ type: I18nTextDto, required: false })
+  @ValidateNested()
+  @Type(() => I18nTextDto)
+  @IsOptional()
+  tutor_role?: I18nTextDto;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsArray()
+  objectives?: ScenarioObjective[];
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsArray()
+  key_phrases?: KeyPhrase[];
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  estimated_minutes?: number;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  xp_reward?: number;
 }
 
 /**
@@ -100,7 +165,9 @@ export class AdminScenariosController {
   @Get()
   @RequirePermission('scenarios.view')
   async list(@Query('status') status?: string, @Query('q') q?: string) {
-    const qb = this.scenarios.createQueryBuilder('s').orderBy('s.created_at', 'DESC');
+    const qb = this.scenarios
+      .createQueryBuilder('s')
+      .orderBy('s.created_at', 'DESC');
     if (status) qb.andWhere('s.status = :s', { s: status });
     if (q) qb.andWhere(`s.title ->> 'en' ILIKE :q`, { q: `%${q}%` });
     return qb.getMany();
@@ -116,11 +183,15 @@ export class AdminScenariosController {
 
   @Post()
   @RequirePermission('scenarios.edit')
-  async create(@CurrentUser() user: JwtPayload, @Body() dto: CreateScenarioDto) {
+  async create(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: CreateScenarioDto,
+  ) {
     return this.dataSource.transaction(async (em) => {
       const repo = em.getRepository(ScenarioEntity);
       const existing = await repo.findOne({ where: { slug: dto.slug } });
-      if (existing) throw new BadRequestException({ i18nKey: 'scenario.slug_taken' });
+      if (existing)
+        throw new BadRequestException({ i18nKey: 'scenario.slug_taken' });
       const cat = await this.resolveCategoryBySlug(dto.category, em);
       const s = repo.create({
         slug: dto.slug,
@@ -178,7 +249,10 @@ export class AdminScenariosController {
         const cat = await this.resolveCategoryBySlug(dto.category, em);
         nextCategoryId = cat.id;
       }
-      for (const [k, v] of Object.entries(dto) as [keyof UpdateScenarioDto, unknown][]) {
+      for (const [k, v] of Object.entries(dto) as [
+        keyof UpdateScenarioDto,
+        unknown,
+      ][]) {
         if (v === undefined) continue;
         const current = (s as unknown as Record<string, unknown>)[k as string];
         if (deepEqual(current, v)) continue;
@@ -278,11 +352,14 @@ export class AdminScenariosController {
 
   @Post(':id/image')
   @RequirePermission('scenarios.upload_image')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   async uploadImage(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
-    @UploadedFile() file: { originalname: string; buffer: Buffer; mimetype: string },
+    @UploadedFile()
+    file: { originalname: string; buffer: Buffer; mimetype: string },
   ) {
     if (!file) throw new BadRequestException({ i18nKey: 'upload.no_file' });
     if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) {
@@ -318,7 +395,10 @@ export class AdminScenariosController {
     });
   }
 
-  private async findById(id: string, em?: EntityManager): Promise<ScenarioEntity> {
+  private async findById(
+    id: string,
+    em?: EntityManager,
+  ): Promise<ScenarioEntity> {
     const repo = em ? em.getRepository(ScenarioEntity) : this.scenarios;
     const s = await repo.findOne({ where: { id } });
     if (!s) throw new NotFoundException({ i18nKey: 'scenario.not_found' });

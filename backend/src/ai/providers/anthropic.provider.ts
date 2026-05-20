@@ -54,7 +54,10 @@ export class AnthropicProvider extends AiProvider {
               },
             ]
           : req.systemPrompt,
-        messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: req.messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
         max_tokens: req.maxTokens ?? 400,
         temperature: req.temperature ?? 0.8,
       });
@@ -119,11 +122,26 @@ export class AnthropicProvider extends AiProvider {
     if (e instanceof Anthropic.APIError) {
       switch (e.status) {
         case 401:
-          return new AiProviderError('unauthorized', false, 'Anthropic API key invalid', e);
+          return new AiProviderError(
+            'unauthorized',
+            false,
+            'Anthropic API key invalid',
+            e,
+          );
         case 429:
-          return new AiProviderError('rate_limit', true, 'Anthropic rate limit', e);
+          return new AiProviderError(
+            'rate_limit',
+            true,
+            'Anthropic rate limit',
+            e,
+          );
         case 529:
-          return new AiProviderError('overloaded', true, 'Anthropic overloaded', e);
+          return new AiProviderError(
+            'overloaded',
+            true,
+            'Anthropic overloaded',
+            e,
+          );
       }
     }
     if (e instanceof Error) {

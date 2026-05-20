@@ -1,5 +1,8 @@
 import { DataSource } from 'typeorm';
-import { CourseEntity, CourseScenarioEntity } from '../../entities/course.entity';
+import {
+  CourseEntity,
+  CourseScenarioEntity,
+} from '../../entities/course.entity';
 import { ScenarioEntity } from '../../entities/scenario.entity';
 
 interface CourseSeed {
@@ -76,15 +79,18 @@ export async function seedCourses(ds: DataSource): Promise<void> {
       const slug = c.scenario_slugs[i];
       const scenario = await scenarioRepo.findOne({ where: { slug } });
       if (!scenario) {
-        // eslint-disable-next-line no-console
-        console.warn(`  ! Course '${c.slug}' references missing scenario '${slug}'`);
+        console.warn(
+          `  ! Course '${c.slug}' references missing scenario '${slug}'`,
+        );
         continue;
       }
-      await csRepo.save(csRepo.create({
-        course_id: course.id,
-        scenario_id: scenario.id,
-        order_index: i,
-      }));
+      await csRepo.save(
+        csRepo.create({
+          course_id: course.id,
+          scenario_id: scenario.id,
+          order_index: i,
+        }),
+      );
       totalXp += scenario.xp_reward;
     }
     course.total_xp = totalXp;

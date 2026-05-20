@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { PersonaEntity } from '../database/entities/persona.entity';
-import type { ScenarioEntity, I18nText } from '../database/entities/scenario.entity';
+import type {
+  ScenarioEntity,
+  I18nText,
+} from '../database/entities/scenario.entity';
 import {
   PromptKind,
   PromptTemplateEntity,
@@ -34,12 +37,20 @@ export class PromptBuilderService {
     userLevel: number,
     userNativeLanguage: string,
   ): Promise<string> {
-    const ctx = this.tutorContext(persona, scenario, userLevel, userNativeLanguage);
+    const ctx = this.tutorContext(
+      persona,
+      scenario,
+      userLevel,
+      userNativeLanguage,
+    );
     const tpl = await this.loadTemplate('tutor_system');
     return this.render(tpl ?? DEFAULT_TUTOR_SYSTEM, ctx);
   }
 
-  async buildGrammarPrompt(userMessages: string[], level: number): Promise<string> {
+  async buildGrammarPrompt(
+    userMessages: string[],
+    level: number,
+  ): Promise<string> {
     const ctx: Record<string, string> = {
       'user.level': String(level),
       'user.level_label': levelLabelFor(level),
@@ -86,12 +97,14 @@ export class PromptBuilderService {
     userLevel: number,
     userNativeLanguage: string,
   ): Record<string, string> {
-    const en = (v: unknown) =>
-      (v as I18nText | undefined)?.en ?? '';
+    const en = (v: unknown) => (v as I18nText | undefined)?.en ?? '';
     const specialties = (persona.specialties ?? []).join(', ');
     const sc = scenario;
     const objectives = sc
-      ? (sc.objectives ?? []).map((o) => en(o)).filter(Boolean).join(', ')
+      ? (sc.objectives ?? [])
+          .map((o) => en(o))
+          .filter(Boolean)
+          .join(', ')
       : '';
     const keyPhrases = sc
       ? (sc.key_phrases ?? []).map((p) => p.phrase).join(', ')
@@ -117,8 +130,9 @@ export class PromptBuilderService {
   /// `{{group.field}}` → ctx['group.field']. Unknown keys collapse to ''.
   /// Whitespace inside the braces is tolerated.
   private render(template: string, ctx: Record<string, string>): string {
-    return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_m, key: string) =>
-      ctx[key] ?? '',
+    return template.replace(
+      /\{\{\s*([\w.]+)\s*\}\}/g,
+      (_m, key: string) => ctx[key] ?? '',
     );
   }
 

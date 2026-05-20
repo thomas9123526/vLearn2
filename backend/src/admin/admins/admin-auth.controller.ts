@@ -1,10 +1,4 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -27,14 +21,22 @@ import { AdminAuthService } from './admin-auth.service';
 
 class AdminSignupDto {
   @ApiProperty({ example: 'founder@example.com' })
-  @IsEmail() email!: string;
+  @IsEmail()
+  email!: string;
 
   @ApiProperty()
-  @IsString() @MinLength(12) @MaxLength(128)
-  @Matches(/[a-z]/) @Matches(/[A-Z]/) @Matches(/[0-9]/)
+  @IsString()
+  @MinLength(12)
+  @MaxLength(128)
+  @Matches(/[a-z]/)
+  @Matches(/[A-Z]/)
+  @Matches(/[0-9]/)
   password!: string;
 
-  @ApiProperty() @IsString() @MinLength(2) @MaxLength(100)
+  @ApiProperty()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
   displayName!: string;
 }
 
@@ -48,7 +50,9 @@ class AdminRefreshDto {
 }
 
 class AdminSignOutDto {
-  @ApiProperty({ required: false }) @IsOptional() @IsString()
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
   refreshToken?: string;
 }
 

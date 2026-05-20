@@ -76,12 +76,18 @@ export class AdminAuditLogService {
       .createQueryBuilder('a')
       .leftJoin('vl_admins', 'actor', 'actor.id = a.user_id');
 
-    if (filters.actor) base.andWhere('a.user_id = :actor', { actor: filters.actor });
-    if (filters.action) base.andWhere('a.action = :action', { action: filters.action });
-    if (filters.targetType) base.andWhere('a.target_type = :tt', { tt: filters.targetType });
-    if (filters.targetId) base.andWhere('a.target_id = :tid', { tid: filters.targetId });
-    if (filters.since) base.andWhere('a.created_at >= :since', { since: filters.since });
-    if (filters.until) base.andWhere('a.created_at < :until', { until: filters.until });
+    if (filters.actor)
+      base.andWhere('a.user_id = :actor', { actor: filters.actor });
+    if (filters.action)
+      base.andWhere('a.action = :action', { action: filters.action });
+    if (filters.targetType)
+      base.andWhere('a.target_type = :tt', { tt: filters.targetType });
+    if (filters.targetId)
+      base.andWhere('a.target_id = :tid', { tid: filters.targetId });
+    if (filters.since)
+      base.andWhere('a.created_at >= :since', { since: filters.since });
+    if (filters.until)
+      base.andWhere('a.created_at < :until', { until: filters.until });
 
     const total = await base.clone().getCount();
 

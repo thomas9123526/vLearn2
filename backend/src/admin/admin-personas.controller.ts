@@ -16,7 +16,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsArray,
@@ -37,7 +42,10 @@ import { PersonaEntity } from '../database/entities/persona.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
-import { PermissionGuard, RequirePermission } from './permissions/permission.guard';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from './permissions/permission.guard';
 import { AdminAuditLogService } from './audit/admin-audit-log.service';
 
 /**
@@ -76,17 +84,45 @@ class CreatePersonaDto {
   @IsOptional()
   @IsIn(['female', 'male', 'neutral'])
   gender?: 'female' | 'male' | 'neutral';
-  @ApiProperty({ required: false }) @IsOptional() @IsBoolean() is_active?: boolean;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  is_active?: boolean;
 }
 
 class UpdatePersonaDto {
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @Length(2, 50) slug?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @Length(1, 50) name?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @Length(1, 100) accent?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @Length(1, 100) style?: string;
-  @ApiProperty({ required: false, type: [String] }) @IsOptional() @IsArray() specialties?: string[];
-  @ApiProperty({ required: false }) @IsOptional() @IsHexColor() gradient_from?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsHexColor() gradient_to?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @Length(2, 50)
+  slug?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @Length(1, 50)
+  name?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  accent?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  style?: string;
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  specialties?: string[];
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsHexColor()
+  gradient_from?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsHexColor()
+  gradient_to?: string;
   @ApiProperty({ required: false })
   @Transform(emptyToNull)
   @IsOptional()
@@ -103,7 +139,10 @@ class UpdatePersonaDto {
   @IsOptional()
   @IsIn(['female', 'male', 'neutral'])
   gender?: 'female' | 'male' | 'neutral';
-  @ApiProperty({ required: false }) @IsOptional() @IsBoolean() is_active?: boolean;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  is_active?: boolean;
 }
 
 @ApiTags('Admin / Personas')
@@ -186,7 +225,10 @@ export class AdminPersonasController {
       const p = await this.findById(id, em);
       const before: Record<string, unknown> = {};
       const after: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(dto) as [keyof UpdatePersonaDto, unknown][]) {
+      for (const [k, v] of Object.entries(dto) as [
+        keyof UpdatePersonaDto,
+        unknown,
+      ][]) {
         if (v === undefined) continue;
         const current = (p as unknown as Record<string, unknown>)[k as string];
         if (deepEqual(current, v)) continue;
@@ -274,11 +316,14 @@ export class AdminPersonasController {
    */
   @Post(':id/image')
   @RequirePermission('personas.edit')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   async uploadImage(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
-    @UploadedFile() file: { originalname: string; buffer: Buffer; mimetype: string },
+    @UploadedFile()
+    file: { originalname: string; buffer: Buffer; mimetype: string },
   ) {
     if (!file) throw new BadRequestException({ i18nKey: 'upload.no_file' });
     if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) {
@@ -317,7 +362,10 @@ export class AdminPersonasController {
     });
   }
 
-  private async findById(id: string, em?: EntityManager): Promise<PersonaEntity> {
+  private async findById(
+    id: string,
+    em?: EntityManager,
+  ): Promise<PersonaEntity> {
     const repo = em ? em.getRepository(PersonaEntity) : this.personas;
     const p = await repo.findOne({ where: { id } });
     if (!p) throw new NotFoundException({ i18nKey: 'persona.not_found' });

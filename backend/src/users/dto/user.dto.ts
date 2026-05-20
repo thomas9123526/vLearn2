@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class UserProfileDto {
   @ApiProperty() id!: string;
@@ -20,27 +26,39 @@ export class UserProfileDto {
 }
 
 export class UpdateProfileDto {
-  @IsOptional() @IsString() @MinLength(2) @MaxLength(100)
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
   @ApiProperty({ required: false })
   displayName?: string;
 
-  @IsOptional() @IsString() @MaxLength(10)
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
   @ApiProperty({ required: false })
   avatarEmoji?: string;
 
-  @IsOptional() @IsIn(['male', 'female', 'nonbinary', 'unspecified'])
-  @ApiProperty({ required: false, enum: ['male', 'female', 'nonbinary', 'unspecified'] })
+  @IsOptional()
+  @IsIn(['male', 'female', 'nonbinary', 'unspecified'])
+  @ApiProperty({
+    required: false,
+    enum: ['male', 'female', 'nonbinary', 'unspecified'],
+  })
   gender?: string;
 
-  @IsOptional() @IsIn(['en', 'ko', 'zh'])
+  @IsOptional()
+  @IsIn(['en', 'ko', 'zh'])
   @ApiProperty({ required: false, enum: ['en', 'ko', 'zh'] })
   uiLanguage?: string;
 
-  @IsOptional() @IsIn(['apricot', 'sage', 'iris', 'obsidian'])
+  @IsOptional()
+  @IsIn(['apricot', 'sage', 'iris', 'obsidian'])
   @ApiProperty({ required: false })
   activeTheme?: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   @ApiProperty({ required: false })
   activePersonaId?: string;
 
@@ -50,13 +68,17 @@ export class UpdateProfileDto {
 
   /// Plain-text new password. Server hashes it before storing.
   /// Validated against the current password for safety.
-  @IsOptional() @IsString() @MinLength(8) @MaxLength(128)
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
   @ApiProperty({ required: false })
   newPassword?: string;
 
   /// Required when `newPassword` is set — proves the caller controls the
   /// account, not just the access token (which a stolen device could have).
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   @ApiProperty({ required: false })
   currentPassword?: string;
 }

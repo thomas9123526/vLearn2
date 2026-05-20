@@ -56,7 +56,9 @@ class AchievementsController {
 }
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AchievementEntity, UserAchievementEntity])],
+  imports: [
+    TypeOrmModule.forFeature([AchievementEntity, UserAchievementEntity]),
+  ],
   providers: [AchievementsService],
   controllers: [AchievementsController],
   exports: [AchievementsService],

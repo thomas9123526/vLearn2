@@ -44,8 +44,11 @@ export class AuthService {
 
   // ─── Sign-up (regular user) ─────────────────────────────
   async signUp(dto: SignUpDto): Promise<AuthResponseDto> {
-    const existing = await this.users.findOne({ where: { cid_username: dto.cidUsername } });
-    if (existing) throw new ConflictException({ i18nKey: 'auth.cid_username_taken' });
+    const existing = await this.users.findOne({
+      where: { cid_username: dto.cidUsername },
+    });
+    if (existing)
+      throw new ConflictException({ i18nKey: 'auth.cid_username_taken' });
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     const user = await this.users.save(
@@ -63,7 +66,9 @@ export class AuthService {
     );
 
     // Bootstrap an empty user_progress row
-    await this.userProgress.save(this.userProgress.create({ user_id: user.id }));
+    await this.userProgress.save(
+      this.userProgress.create({ user_id: user.id }),
+    );
 
     return this.issueTokensAndShape(user);
   }
@@ -71,8 +76,11 @@ export class AuthService {
   // ─── Sign-in ────────────────────────────────────────────
   async signIn(dto: SignInDto): Promise<AuthResponseDto> {
     // eager loading populates user.info (status, role, suspension fields)
-    const user = await this.users.findOne({ where: { cid_username: dto.cidUsername } });
-    if (!user) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
+    const user = await this.users.findOne({
+      where: { cid_username: dto.cidUsername },
+    });
+    if (!user)
+      throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
 
     if (user.info.status === 'deleted') {
       throw new ForbiddenException({ i18nKey: 'account.deleted' });
@@ -93,10 +101,12 @@ export class AuthService {
       where: { id: user.id },
       select: ['id', 'password_hash', 'name', 'cid', 'cid_username'],
     });
-    if (!userWithHash) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
+    if (!userWithHash)
+      throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
 
     const ok = await bcrypt.compare(dto.password, userWithHash.password_hash);
-    if (!ok) throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
+    if (!ok)
+      throw new UnauthorizedException({ i18nKey: 'auth.invalid_credentials' });
 
     userWithHash.info = user.info;
     return this.issueTokensAndShape(userWithHash);
@@ -108,7 +118,8 @@ export class AuthService {
     const stored = await this.refreshTokens.findOne({
       where: { token_hash: tokenHash, expires_at: MoreThan(new Date()) },
     });
-    if (!stored) throw new UnauthorizedException({ i18nKey: 'auth.invalid_refresh' });
+    if (!stored)
+      throw new UnauthorizedException({ i18nKey: 'auth.invalid_refresh' });
 
     const user = await this.users.findOne({ where: { id: stored.user_id } });
     if (!user) throw new UnauthorizedException();
@@ -130,7 +141,9 @@ export class AuthService {
   }
 
   // ─── Helpers ────────────────────────────────────────────
-  private async issueTokensAndShape(user: UserEntity): Promise<AuthResponseDto> {
+  private async issueTokensAndShape(
+    user: UserEntity,
+  ): Promise<AuthResponseDto> {
     const pair = await this.issueTokens(user);
     return {
       ...pair,
@@ -150,8 +163,10 @@ export class AuthService {
       permissions,
       actor: 'user' as const,
     };
-    const accessExpiresStr = this.config.get<string>('JWT_ACCESS_EXPIRES') ?? '15m';
-    const refreshExpiresStr = this.config.get<string>('JWT_REFRESH_EXPIRES') ?? '7d';
+    const accessExpiresStr =
+      this.config.get<string>('JWT_ACCESS_EXPIRES') ?? '15m';
+    const refreshExpiresStr =
+      this.config.get<string>('JWT_REFRESH_EXPIRES') ?? '7d';
 
     const accessToken = await this.jwt.signAsync(payload, {
       secret: this.config.get<string>('JWT_ACCESS_SECRET'),
@@ -193,7 +208,12 @@ export class AuthService {
     if (!m) return 900;
     const n = parseInt(m[1], 10);
     const unit = m[2];
-    const multipliers: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+    const multipliers: Record<string, number> = {
+      s: 1,
+      m: 60,
+      h: 3600,
+      d: 86400,
+    };
     return n * (multipliers[unit] ?? 1);
   }
 

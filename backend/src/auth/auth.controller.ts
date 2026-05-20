@@ -52,7 +52,9 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
-  @ApiOperation({ summary: 'Rotate refresh token for a new access/refresh pair' })
+  @ApiOperation({
+    summary: 'Rotate refresh token for a new access/refresh pair',
+  })
   @ApiOkResponse({ type: TokenPairDto })
   @HttpCode(HttpStatus.OK)
   refresh(@Body() dto: RefreshDto): Promise<TokenPairDto> {

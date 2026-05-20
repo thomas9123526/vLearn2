@@ -40,7 +40,8 @@ export class OpenAICompatibleProvider extends AiProvider {
     });
     this.name = config.get<string>('AI_PROVIDER_LABEL') ?? 'openai-compatible';
     this.chatModel = config.get<string>('AI_CHAT_MODEL') ?? 'llama3.1:70b';
-    this.analysisModel = config.get<string>('AI_ANALYSIS_MODEL') ?? 'llama3.1:8b';
+    this.analysisModel =
+      config.get<string>('AI_ANALYSIS_MODEL') ?? 'llama3.1:8b';
   }
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
@@ -104,7 +105,11 @@ export class OpenAICompatibleProvider extends AiProvider {
       try {
         parsed = JSON.parse(raw);
       } catch {
-        throw new AiProviderError('invalid_response', true, 'Could not parse model JSON');
+        throw new AiProviderError(
+          'invalid_response',
+          true,
+          'Could not parse model JSON',
+        );
       }
       return {
         data: parsed as T,
@@ -142,7 +147,10 @@ export class OpenAICompatibleProvider extends AiProvider {
       .replace(/[\s\S]*?<\/think>/gi, '')
       .replace(/^thinking:\s*/i, '')
       .trim();
-    const lines = stripped.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = stripped
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     return lines.length > 0 ? lines[lines.length - 1] : stripped;
   }
 
@@ -150,11 +158,26 @@ export class OpenAICompatibleProvider extends AiProvider {
     if (e instanceof OpenAI.APIError) {
       switch (e.status) {
         case 401:
-          return new AiProviderError('unauthorized', false, 'OpenAI-compatible auth failed', e);
+          return new AiProviderError(
+            'unauthorized',
+            false,
+            'OpenAI-compatible auth failed',
+            e,
+          );
         case 429:
-          return new AiProviderError('rate_limit', true, 'OpenAI-compatible rate limit', e);
+          return new AiProviderError(
+            'rate_limit',
+            true,
+            'OpenAI-compatible rate limit',
+            e,
+          );
         case 503:
-          return new AiProviderError('overloaded', true, 'Backend overloaded', e);
+          return new AiProviderError(
+            'overloaded',
+            true,
+            'Backend overloaded',
+            e,
+          );
       }
     }
     if (e instanceof Error) {

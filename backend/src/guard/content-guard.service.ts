@@ -33,12 +33,15 @@ export class ContentGuardService {
     const langs = ['en', 'ko', 'zh', 'custom'];
     for (const lang of langs) {
       try {
-        const filename = lang === 'custom' ? 'custom.json' : `profanity_${lang}.json`;
+        const filename =
+          lang === 'custom' ? 'custom.json' : `profanity_${lang}.json`;
         const path = join(__dirname, 'wordlists', filename);
         const data = JSON.parse(readFileSync(path, 'utf-8')) as Wordlist;
         this.wordlists.set(lang, data);
       } catch (e) {
-        this.logger.warn(`Could not load ${lang} wordlist: ${(e as Error).message}`);
+        this.logger.warn(
+          `Could not load ${lang} wordlist: ${(e as Error).message}`,
+        );
       }
     }
     this.logger.log(`Loaded ${this.wordlists.size} wordlists`);
@@ -76,14 +79,16 @@ export class ContentGuardService {
   }
 
   private normalize(text: string): string {
-    return text
-      .toLowerCase()
-      .normalize('NFKC')
-      // Strip combining marks
-      .replace(/\p{M}/gu, '')
-      // Collapse whitespace
-      .replace(/\s+/g, ' ')
-      .trim();
+    return (
+      text
+        .toLowerCase()
+        .normalize('NFKC')
+        // Strip combining marks
+        .replace(/\p{M}/gu, '')
+        // Collapse whitespace
+        .replace(/\s+/g, ' ')
+        .trim()
+    );
   }
 
   private matches(normalized: string, term: string): boolean {
@@ -93,7 +98,10 @@ export class ContentGuardService {
     }
     // single word: word-boundary regex
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}([^\\p{L}\\p{N}]|$)`, 'u');
+    const re = new RegExp(
+      `(^|[^\\p{L}\\p{N}])${escaped}([^\\p{L}\\p{N}]|$)`,
+      'u',
+    );
     return re.test(normalized);
   }
 }

@@ -4,7 +4,12 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { Injectable, NotFoundException, Param } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { PersonaEntity } from '../database/entities/persona.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -24,7 +29,8 @@ class PersonasService {
 
   async get(id: string) {
     const p = await this.repo.findOne({ where: { id } });
-    if (!p || !p.is_active) throw new NotFoundException({ i18nKey: 'persona.not_found' });
+    if (!p || !p.is_active)
+      throw new NotFoundException({ i18nKey: 'persona.not_found' });
     return p;
   }
 }

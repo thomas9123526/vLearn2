@@ -30,11 +30,17 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CategoryEntity } from '../database/entities/category.entity';
-import { ScenarioEntity, type I18nText } from '../database/entities/scenario.entity';
+import {
+  ScenarioEntity,
+  type I18nText,
+} from '../database/entities/scenario.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
-import { PermissionGuard, RequirePermission } from './permissions/permission.guard';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from './permissions/permission.guard';
 import { AdminAuditLogService } from './audit/admin-audit-log.service';
 
 class I18nTextDto implements I18nText {
@@ -51,7 +57,9 @@ class CreateCategoryDto {
   @ApiProperty()
   @IsString()
   @Length(2, 50)
-  @Matches(/^[a-z0-9_-]+$/, { message: 'slug must be lowercase a-z, 0-9, _ or -' })
+  @Matches(/^[a-z0-9_-]+$/, {
+    message: 'slug must be lowercase a-z, 0-9, _ or -',
+  })
   slug!: string;
 
   @ApiProperty({ type: I18nTextDto })
@@ -188,7 +196,10 @@ export class AdminCategoriesController {
       const c = await this.findById(id, em);
       const before: Record<string, unknown> = {};
       const after: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(dto) as [keyof UpdateCategoryDto, unknown][]) {
+      for (const [k, v] of Object.entries(dto) as [
+        keyof UpdateCategoryDto,
+        unknown,
+      ][]) {
         if (v === undefined) continue;
         const current = (c as unknown as Record<string, unknown>)[k as string];
         if (deepEqual(current, v)) continue;
@@ -196,7 +207,8 @@ export class AdminCategoriesController {
         after[k as string] = v;
       }
       if (dto.title !== undefined) c.title = dto.title;
-      if (dto.description !== undefined) c.description = dto.description ?? null;
+      if (dto.description !== undefined)
+        c.description = dto.description ?? null;
       if (dto.order_index !== undefined) c.order_index = dto.order_index;
       if (dto.is_active !== undefined) c.is_active = dto.is_active;
       const saved = await repo.save(c);

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
 import {
@@ -39,12 +43,16 @@ export class ConversationsService {
   ) {}
 
   async start(userId: string, dto: StartSessionDto): Promise<SessionDto> {
-    const persona = await this.personas.findOne({ where: { id: dto.personaId } });
+    const persona = await this.personas.findOne({
+      where: { id: dto.personaId },
+    });
     if (!persona) throw new NotFoundException({ i18nKey: 'persona.not_found' });
 
     let scenario: ScenarioEntity | null = null;
     if (dto.scenarioId) {
-      scenario = await this.scenarios.findOne({ where: { id: dto.scenarioId } });
+      scenario = await this.scenarios.findOne({
+        where: { id: dto.scenarioId },
+      });
       if (!scenario || scenario.status !== 'published') {
         throw new NotFoundException({ i18nKey: 'scenario.not_found' });
       }
@@ -82,7 +90,9 @@ export class ConversationsService {
     scenarioId?: string,
     status?: string,
   ): Promise<SessionDto[]> {
-    const where: FindOptionsWhere<ConversationSessionEntity> = { user_id: userId };
+    const where: FindOptionsWhere<ConversationSessionEntity> = {
+      user_id: userId,
+    };
     if (scenarioId) where.scenario_id = scenarioId;
     if (status) where.status = status as SessionStatus;
     const rows = await this.sessions.find({
@@ -93,7 +103,10 @@ export class ConversationsService {
     return rows.map((s) => this.toSessionDto(s));
   }
 
-  async getSession(userId: string, id: string): Promise<SessionDto & { messages: MessageDto[] }> {
+  async getSession(
+    userId: string,
+    id: string,
+  ): Promise<SessionDto & { messages: MessageDto[] }> {
     const session = await this.sessions.findOne({ where: { id } });
     if (!session) throw new NotFoundException({ i18nKey: 'session.not_found' });
     if (session.user_id !== userId) throw new ForbiddenException();
@@ -126,9 +139,10 @@ export class ConversationsService {
       where: { session_id: sessionId },
       order: { sequence: 'ASC' },
     });
-    const nextSeq = priorMessages.length > 0
-      ? priorMessages[priorMessages.length - 1].sequence + 1
-      : 0;
+    const nextSeq =
+      priorMessages.length > 0
+        ? priorMessages[priorMessages.length - 1].sequence + 1
+        : 0;
 
     const userMsg = await this.messages.save(
       this.messages.create({
@@ -140,7 +154,9 @@ export class ConversationsService {
       }),
     );
 
-    const persona = await this.personas.findOne({ where: { id: session.persona_id } });
+    const persona = await this.personas.findOne({
+      where: { id: session.persona_id },
+    });
     const scenario = session.scenario_id
       ? await this.scenarios.findOne({ where: { id: session.scenario_id } })
       : null;
@@ -192,7 +208,10 @@ export class ConversationsService {
    * the orchestrator for a short line the user could say next. The mobile
    * UI shows this as a suggestion chip after ~20s of silence.
    */
-  async suggestNextLine(userId: string, sessionId: string): Promise<{ suggestion: string }> {
+  async suggestNextLine(
+    userId: string,
+    sessionId: string,
+  ): Promise<{ suggestion: string }> {
     const session = await this.sessions.findOne({ where: { id: sessionId } });
     if (!session) throw new NotFoundException({ i18nKey: 'session.not_found' });
     if (session.user_id !== userId) throw new ForbiddenException();
@@ -200,7 +219,9 @@ export class ConversationsService {
       throw new ForbiddenException({ i18nKey: 'session.not_active' });
     }
 
-    const persona = await this.personas.findOne({ where: { id: session.persona_id } });
+    const persona = await this.personas.findOne({
+      where: { id: session.persona_id },
+    });
     if (!persona) throw new NotFoundException({ i18nKey: 'persona.not_found' });
 
     const scenario = session.scenario_id
@@ -239,7 +260,10 @@ export class ConversationsService {
    * user-initiated action on user-owned data (and the admin log is keyed
    * on an admin actor). HTTP-level Nest logs capture the call.
    */
-  async deleteSession(userId: string, sessionId: string): Promise<{ ok: true }> {
+  async deleteSession(
+    userId: string,
+    sessionId: string,
+  ): Promise<{ ok: true }> {
     const session = await this.sessions.findOne({ where: { id: sessionId } });
     if (!session) throw new NotFoundException({ i18nKey: 'session.not_found' });
     if (session.user_id !== userId) throw new ForbiddenException();
@@ -280,7 +304,9 @@ export class ConversationsService {
     // Simple XP rule: 1 XP per word spoken, capped at scenario reward when known
     let xp = Math.min(session.word_count, 200);
     if (session.scenario_id) {
-      const scenario = await this.scenarios.findOne({ where: { id: session.scenario_id } });
+      const scenario = await this.scenarios.findOne({
+        where: { id: session.scenario_id },
+      });
       if (scenario) xp = Math.min(xp, scenario.xp_reward);
     }
     session.xp_earned = xp;
@@ -298,7 +324,7 @@ export class ConversationsService {
       return 'Could you tell me a bit more? I want to hear what you have to say.';
     }
     if (lower.endsWith('?')) {
-      return 'That\'s a great question! Let me think… What do you think the answer might be?';
+      return "That's a great question! Let me think… What do you think the answer might be?";
     }
     return 'Nice! I understood that clearly. Can you tell me more about your experience with this?';
   }

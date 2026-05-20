@@ -9,20 +9,33 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { PromptTemplateEntity } from '../database/entities/prompt-template.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
-import { PermissionGuard, RequirePermission } from './permissions/permission.guard';
+import {
+  PermissionGuard,
+  RequirePermission,
+} from './permissions/permission.guard';
 import { AdminAuditLogService } from './audit/admin-audit-log.service';
 
 class UpdatePromptTemplateDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() label?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsString() description?: string | null;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() description?:
+    | string
+    | null;
   @ApiProperty({ required: false }) @IsOptional() @IsString() template?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsBoolean() is_active?: boolean;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  is_active?: boolean;
 }
 
 /**
@@ -54,14 +67,19 @@ export class AdminPromptTemplatesController {
   @RequirePermission('prompts.view')
   @ApiOperation({ summary: 'Get one prompt template by kind' })
   async get(@Param('kind') kind: string) {
-    const tpl = await this.templates.findOne({ where: { kind: kind as never } });
-    if (!tpl) throw new NotFoundException({ i18nKey: 'prompt_template.not_found' });
+    const tpl = await this.templates.findOne({
+      where: { kind: kind as never },
+    });
+    if (!tpl)
+      throw new NotFoundException({ i18nKey: 'prompt_template.not_found' });
     return tpl;
   }
 
   @Patch(':kind')
   @RequirePermission('prompts.edit')
-  @ApiOperation({ summary: 'Update prompt template fields (label/template/is_active)' })
+  @ApiOperation({
+    summary: 'Update prompt template fields (label/template/is_active)',
+  })
   async update(
     @CurrentUser() user: JwtPayload,
     @Param('kind') kind: string,
@@ -70,7 +88,8 @@ export class AdminPromptTemplatesController {
     return this.dataSource.transaction(async (em) => {
       const repo = em.getRepository(PromptTemplateEntity);
       const tpl = await repo.findOne({ where: { kind: kind as never } });
-      if (!tpl) throw new NotFoundException({ i18nKey: 'prompt_template.not_found' });
+      if (!tpl)
+        throw new NotFoundException({ i18nKey: 'prompt_template.not_found' });
 
       const before: Record<string, unknown> = {};
       const after: Record<string, unknown> = {};

@@ -9,12 +9,18 @@ import {
 } from 'class-validator';
 
 export class SignUpDto {
-  @ApiProperty({ example: 'A1234567', description: 'National ID / citizen ID (max 10 chars)' })
+  @ApiProperty({
+    example: 'A1234567',
+    description: 'National ID / citizen ID (max 10 chars)',
+  })
   @IsString()
   @MaxLength(10)
   cid!: string;
 
-  @ApiProperty({ example: 'alex_kr', description: 'Login username (max 12 chars)' })
+  @ApiProperty({
+    example: 'alex_kr',
+    description: 'Login username (max 12 chars)',
+  })
   @IsString()
   @MinLength(2)
   @MaxLength(50)
@@ -42,7 +48,10 @@ export class SignUpDto {
 }
 
 export class SignInDto {
-  @ApiProperty({ example: 'alex_kr', description: 'Login username (cid_username)' })
+  @ApiProperty({
+    example: 'alex_kr',
+    description: 'Login username (cid_username)',
+  })
   @IsString()
   cidUsername!: string;
 
