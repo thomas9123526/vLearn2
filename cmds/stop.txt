@@ -38,3 +38,9 @@ Note: If multiple processes bind the same port (e.g. node on 0.0.0.0:5101 and Co
 
 cd c:\project\vLearn2\admin_panel
 npx next dev -p 4101
+
+cd c:\project\vLearn2\flutter_app
+flutter pub get
+flutter build windows --release --dart-define=API_BASE_URL=http://localhost:3000/api
+
+flutter_app\build\windows\x64\runner\Release\flutter_app.exe
