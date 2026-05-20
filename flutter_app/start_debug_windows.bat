@@ -12,7 +12,8 @@ REM
 REM  Hit `r` in the terminal to hot-reload, `R` to hot-restart, `q` to quit.
 REM ─────────────────────────────────────────────────────────────────────────
 setlocal
-set "API_BASE_URL=http://localhost:3000/api"
+REM Match backend/.env PORT (default there is 5101, not 3000).
+set "API_BASE_URL=http://localhost:5101/api"
 
 pushd "%~dp0" || (
   echo [ERROR] Could not enter %~dp0.

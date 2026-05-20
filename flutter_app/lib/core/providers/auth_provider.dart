@@ -63,14 +63,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
     bool rememberMe = true,
   }) async {
     state = AuthState.checking();
+    late final Map<String, dynamic> tokens;
     try {
-      final tokens = await _ref.read(authApiProvider).signIn(
+      tokens = await _ref.read(authApiProvider).signIn(
             cidUsername: cidUsername,
             password: password,
           );
-      await _persistAndFetch(tokens);
     } on Exception catch (e) {
       state = AuthState.error(e);
+      return;
+    }
+
+    try {
+      await _persistAndFetch(tokens);
+    } on Exception catch (e) {
+      // Sign-in succeeded but profile/token persistence failed — do not
+      // surface this as "wrong password" on the sign-in screen.
+      await _ref.read(tokenStoreProvider).clear();
+      state = AuthState.error(
+        e,
+        i18nKey: 'auth.post_signin_failed',
+      );
       return;
     }
 

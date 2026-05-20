@@ -90,7 +90,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         logRawError('sign_in_screen', raw);
         if (mounted) {
           setState(() {
-            _politeError = politeMessageFor(raw, context: ErrorContext.signIn);
+            _politeError = politeMessageFor(
+              raw,
+              context: ErrorContext.signIn,
+              i18nKey: next.errorI18nKey,
+            );
           });
         }
       } else if (next.status == AuthStatus.checking ||
