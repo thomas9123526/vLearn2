@@ -21,6 +21,8 @@ export const PERMISSION_CATALOG: PermissionDef[] = [
   { key: 'achievements.edit',      category: 'content',  description: 'Create and update achievements',                                   grantable_to_subadmin: true, implies: ['achievements.view'] },
   { key: 'achievements.grant',     category: 'content',  description: 'Manually grant achievements to users',                             grantable_to_subadmin: true },
   { key: 'personas.edit',          category: 'content',  description: 'Edit persona settings and portraits',                              grantable_to_subadmin: true },
+  { key: 'prompts.view',           category: 'content',  description: 'View AI prompt templates (tutor, grammar, feedback)',              grantable_to_subadmin: true },
+  { key: 'prompts.edit',           category: 'content',  description: 'Edit AI prompt templates and toggle which are active',             grantable_to_subadmin: true, implies: ['prompts.view'] },
   { key: 'wordlist.edit',          category: 'content',  description: 'Edit the profanity wordlist (custom.json)',                        grantable_to_subadmin: true },
   { key: 'news.view',              category: 'content',  description: 'View all news posts including drafts',                              grantable_to_subadmin: true },
   { key: 'news.edit',              category: 'content',  description: 'Create, update, publish, archive news posts',                       grantable_to_subadmin: true, implies: ['news.view'] },

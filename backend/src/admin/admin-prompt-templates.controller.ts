@@ -39,14 +39,14 @@ export class AdminPromptTemplatesController {
   ) {}
 
   @Get()
-  @RequirePermission('config.edit')
+  @RequirePermission('prompts.view')
   @ApiOperation({ summary: 'List all prompt templates' })
   async list() {
     return this.templates.find({ order: { kind: 'ASC' } });
   }
 
   @Get(':kind')
-  @RequirePermission('config.edit')
+  @RequirePermission('prompts.view')
   @ApiOperation({ summary: 'Get one prompt template by kind' })
   async get(@Param('kind') kind: string) {
     const tpl = await this.templates.findOne({ where: { kind: kind as never } });
@@ -55,7 +55,7 @@ export class AdminPromptTemplatesController {
   }
 
   @Patch(':kind')
-  @RequirePermission('config.edit')
+  @RequirePermission('prompts.edit')
   @ApiOperation({ summary: 'Update prompt template fields (label/template/is_active)' })
   async update(
     @Param('kind') kind: string,

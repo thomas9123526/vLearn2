@@ -57,7 +57,7 @@ const PLACEHOLDERS: Record<PromptTemplate['kind'], string[]> = {
 };
 
 export default function PromptTemplatesPage() {
-  const canEdit = usePermission('config.edit');
+  const canEdit = usePermission('prompts.edit');
 
   const { data, isLoading, error } = useQuery<PromptTemplate[]>({
     queryKey: ['admin-prompt-templates'],

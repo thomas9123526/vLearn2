@@ -44,3 +44,24 @@ flutter pub get
 flutter build windows --release --dart-define=API_BASE_URL=http://localhost:3000/api
 
 flutter_app\build\windows\x64\runner\Release\flutter_app.exe
+
+
+
+
+
+
+If you'd rather do it by hand without the script:
+
+Get-NetTCPConnection -LocalPort 5101 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+cd c:\project\vLearn2\backend
+npm run start:dev
+
+
+Use the helper script — it kills whatever's holding port 5101 and runs npm run start:dev (which reloads .env):
+
+cd c:\project\vLearn2\backend
+$env:PORT = 5101
+.\stop_start_service.bat
+
+
+npx next dev -p 4101 -H 0.0.0.0
