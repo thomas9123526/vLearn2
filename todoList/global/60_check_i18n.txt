@@ -1,0 +1,2 @@
+I want implement i18n.
+Find the solutions and if possible implement it.

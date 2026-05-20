@@ -1,8 +1,8 @@
 # there's network error when signup admin panel on the another computer
 
 Session: `859710bb-e71a-42d3-b4d0-af5e037a10f3`
-Last updated: 2026-05-20T08:08:38.744Z
-Turns: 30
+Last updated: 2026-05-20T08:32:22.416Z
+Turns: 33
 
 ## User
 
@@ -3480,3 +3480,80 @@ Re-running pipe-test after cleaning the bad-named file.
 ## Assistant
 
 Slug is clean (`theres-network-error-when-signup-admin-panel-on`) and the captured prompt no longer leaks the IDE tag. Now wiring the hook into `settings.local.json`, placed *before* the auto-commit so the file lands in the same commit.
+
+## Assistant
+
+Hook is live. Quick summary:
+
+**What runs now, every time you submit a prompt and Claude finishes responding:**
+
+1. [.claude/scripts/save-conversation.mjs](.claude/scripts/save-conversation.mjs) reads the session transcript, derives a slug from your first prompt of the session, and writes the full conversation (your prompts + Claude's replies, harness-injected tags stripped) to `todoList_report/question/<slug>.md`. **One file per session**, overwritten each turn so it stays current.
+2. The existing auto-commit hook runs *after* and picks up the new file in the same commit.
+
+**Configuration:**
+
+- [.claude/settings.local.json](.claude/settings.local.json) — added the new `node` command before the existing `bash` auto-commit in the same `Stop` hook group (sequential, in order). This file is gitignored (personal).
+- [.claude/scripts/save-conversation.mjs](.claude/scripts/save-conversation.mjs) — the script (committed alongside `auto-commit.sh`).
+
+**Notes:**
+
+- Slug = first ~8 words of your first prompt of the session, lowercased and kebab-cased (e.g., `theres-network-error-when-signup-admin-panel-on.md`). It's a heuristic — not a true semantic abstract; rename the file if you want something tidier.
+- The pipe-test already produced [todoList_report/question/theres-network-error-when-signup-admin-panel-on.md](todoList_report/question/theres-network-error-when-signup-admin-panel-on.md) covering this whole session. The manually-written [admin-panel-lan-access-subadmin-perms-and-storage-stack.md](todoList_report/question/admin-panel-lan-access-subadmin-perms-and-storage-stack.md) from earlier still exists — they're duplicates for this session. Keep the one you prefer.
+- The settings watcher was already watching `.claude/settings.local.json` (the auto-commit hook lived there), so the new hook should pick up without a restart. If it doesn't fire on the next turn, open `/hooks` once to force a reload — I can't do that for you.
+
+## User
+
+I want know Audit log tabs of admin panel. I'm new to concept. What tables are related?
+and how the audit log works and when "audit log tabs" show the content?
+
+## Assistant
+
+Short answer: **the Audit log is scaffolded but not yet implemented**. The schema is in place, but nothing reads or writes it, and the admin-panel tab is a static placeholder. Here's the full picture.
+
+## What an audit log is (general concept)
+
+An admin **audit log** records every privileged action an admin performs — *who* did *what* to *which* record, *when*, and (usually) *what changed*. It's used for accountability ("who suspended this user?"), forensics ("when was this scenario deleted?"), and compliance. Each row is append-only — you write a new entry on every action, you don't update or delete.
+
+## The one related table
+
+There's a single table: **`vl_admin_audit_log`** (originally named `admin_audit_log`, renamed in migration [1779800000000-add-vl-prefix.ts](backend/src/database/migrations/1779800000000-add-vl-prefix.ts)). Its TypeORM mapping is [AdminAuditLogEntity](backend/src/database/entities/admin-audit-log.entity.ts).
+
+Columns (per [the initial-schema migration:325-339](backend/src/database/migrations/1715800000000-initial-schema.ts#L325-L339)):
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | uuid PK | row id |
+| `user_id` | uuid, FK → `vl_admins.id` (set NULL on admin delete) | *who* performed the action |
+| `action` | varchar(50) | what (e.g. `"suspend"`, `"grant_permissions"`, `"update_prompt"`) — a free-form short verb |
+| `target_type` | varchar(20) | *what kind* of thing was acted on (e.g. `"user"`, `"scenario"`, `"prompt_template"`) |
+| `target_id` | varchar(100) | id of the target row (varchar, not uuid, so non-uuid targets are supported) |
+| `old_value` | jsonb | snapshot of the record before the change |
+| `new_value` | jsonb | snapshot of the record after the change |
+| `metadata` | jsonb | optional extras (IP address, reason, etc.) |
+| `created_at` | timestamptz | when it happened |
+
+Indexes (in the same migration) cover the three query patterns you'd want — by actor + time, by target + time, by action + time.
+
+The FK to admins was re-pointed when the admins table was split out from users — see [1779100000000-admins-separate-table.ts:87-95](backend/src/database/migrations/1779100000000-admins-separate-table.ts#L87-L95).
+
+## How it works *today*
+
+It doesn't, yet. Three things are missing:
+
+1. **No writer.** A grep for `AdminAuditLogEntity` finds only the entity file, the entity index, and the migrations — no service injects the repository, no controller inserts rows. Every admin action (Suspend admin, Grant permissions, Edit prompt template, etc.) goes through unchanged without writing an audit row. So the table is **empty** in any running instance right now.
+2. **No reader.** There's no `GET /admin/audit` endpoint, no service, no DTO. The permission key [`audit.view`](backend/src/admin/permissions/catalog.ts#L48) exists in the catalog (so you can grant it in the Edit Permission dialog), but currently it gates a page that fetches nothing.
+3. **The tab is a literal stub.** [audit/page.tsx:14-22](admin_panel/src/app/(dashboard)/audit/page.tsx#L14-L22) just shows a card with this text:
+   > *"The `admin_audit_log` table already exists in the DB, but no `/admin/audit` endpoint reads it yet. When that ships, this page will paginate with filters by actor / action / target / date range."*
+
+So the answer to **"when does the Audit log tab show content?"** is: **never, currently**. The tab renders the placeholder no matter who you are or what you've done. It'll start showing content once someone implements the writer and the reader.
+
+## What would need to happen to make it functional
+
+If you (or whoever owns this) wanted to ship it, the work is roughly:
+
+1. **AuditLogService** (backend) with a method like `record({ actorId, action, targetType, targetId, oldValue, newValue, metadata })`. Inject `Repository<AdminAuditLogEntity>` and `INSERT`.
+2. **Call sites** — anywhere an admin mutates data: `AdminAdminsController.suspend/restore/replacePerms`, `AdminPromptTemplatesController.update`, `AdminScenariosController.{create,update,delete,publish}`, `AdminPersonasController.update`, `AdminNewsController.{create,update,delete}`, etc. Each should call `auditLog.record(...)` after the DB write.
+3. **GET /admin/audit** — paginated list, filters by `user_id`, `action`, `target_type`/`target_id`, date range. Gate with `@RequirePermission('audit.view')`.
+4. **Replace the placeholder** in `audit/page.tsx` with a TanStack-Query table + filter controls calling the new endpoint.
+
+That's a focused feature — probably one session of work to get a v1 that records the most common actions. Want me to do it?
