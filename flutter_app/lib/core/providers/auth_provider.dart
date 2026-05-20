@@ -4,6 +4,7 @@ import '../api/auth_api.dart';
 import '../api/app_apis.dart';
 import '../auth/remembered_credentials.dart';
 import '../models/models.dart';
+import '../storage/auth_history.dart';
 
 class AuthState {
   const AuthState({
@@ -135,6 +136,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _ref.read(tokenStoreProvider).writePair(access: access, refresh: refresh);
     final profile = await _ref.read(usersApiProvider).profile();
     state = AuthState.signedIn(UserProfile.fromJson(profile));
+    // Splash CTA reads this on next cold-start to pick /signin vs /signup.
+    // Best-effort: a failed write must never derail a successful auth.
+    try {
+      await _ref.read(authHistoryProvider).markSignedIn();
+    } on Exception {
+      // ignore
+    }
   }
 }
 

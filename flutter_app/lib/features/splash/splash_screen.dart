@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router/app_router.dart';
+import '../../core/storage/auth_history.dart';
 
 /// Splash screen — port of `vLearn2Spec/design_handoff_freetalk/reference/splash.jsx`.
 ///
@@ -17,17 +20,19 @@ import '../../core/router/app_router.dart';
 ///   t=0.9s+  — each glyph starts an infinite 4–6s bob (slight rotate + Y drift)
 ///   continuous — monogram dot blinks on a 1.6s cycle
 ///
-/// The route is mounted at `/` and the auth/onboarding redirect logic in
-/// `app_router.dart` handles where the user lands next, so this widget
-/// stays purely visual — no button, no navigation.
-class SplashScreen extends StatefulWidget {
+/// The route is mounted at `/`. Returning users (the device has ever held a
+/// valid token — see [AuthHistory]) are auto-routed to `/signin` once the
+/// entrance choreography has played, so they get a moment of branding and
+/// then drop straight onto sign-in without having to tap. First-time users
+/// stay on the splash until they hit "Tap to begin", which pushes /signup.
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with TickerProviderStateMixin {
   /// One-shot controller driving every entrance (glyphs, wordmark, slogan).
   /// Spans the longest entrance delay (0.45s) plus the entrance duration
@@ -50,8 +55,41 @@ class _SplashScreenState extends State<SplashScreen>
     duration: const Duration(milliseconds: 1600),
   )..repeat();
 
+  /// Tristate: `null` while we read SharedPreferences; `true` once we know the
+  /// device has signed in before (auto-redirect to /signin); `false` for a
+  /// fresh install (keep the Tap-to-begin CTA → /signup).
+  bool? _returning;
+
+  /// Fires after the entrance choreography finishes; only present when
+  /// `_returning == true`. Cancelled on dispose so we don't navigate after
+  /// the user has already moved on.
+  Timer? _autoNavTimer;
+
+  /// Hold long enough for the entrance to finish (1.5s controller) plus a
+  /// short beat so the wordmark actually registers visually before we pull
+  /// the user into sign-in.
+  static const _autoNavDelay = Duration(milliseconds: 2000);
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveReturning();
+  }
+
+  Future<void> _resolveReturning() async {
+    final returning = await ref.read(authHistoryProvider).hasEverSignedIn();
+    if (!mounted) return;
+    setState(() => _returning = returning);
+    if (!returning) return;
+    _autoNavTimer = Timer(_autoNavDelay, () {
+      if (!mounted) return;
+      context.go(AppRoute.signIn);
+    });
+  }
+
   @override
   void dispose() {
+    _autoNavTimer?.cancel();
     _entrance.dispose();
     _bob.dispose();
     _blink.dispose();
@@ -136,13 +174,19 @@ class _SplashScreenState extends State<SplashScreen>
                       isDesktop: isDesktop,
                     ),
                     SizedBox(height: isDesktop ? 44 : 36),
-                    _TapToBeginButton(
-                      controller: _entrance,
-                      ink: ink,
-                      bg: scheme.surface,
-                      accent: accent,
-                      isDesktop: isDesktop,
-                    ),
+                    // Only first-time users get the CTA. Returning users get
+                    // auto-routed to /signin by [_resolveReturning]; while
+                    // the SharedPreferences read is still in flight we keep
+                    // the slot empty so the button doesn't appear and then
+                    // vanish on a returning device.
+                    if (_returning == false)
+                      _TapToBeginButton(
+                        controller: _entrance,
+                        ink: ink,
+                        bg: scheme.surface,
+                        accent: accent,
+                        isDesktop: isDesktop,
+                      ),
                   ],
                 ),
               ),
@@ -731,7 +775,7 @@ class _Slogan extends StatelessWidget {
 /// entrance at 0.45s. Tapping pushes /signup — matches the JSX `nav('signup')`.
 /// Returning users with a valid token never see this button: the router
 /// redirects them past `/` once auth resolves (see app_router.dart).
-class _TapToBeginButton extends StatefulWidget {
+class _TapToBeginButton extends ConsumerStatefulWidget {
   const _TapToBeginButton({
     required this.controller,
     required this.ink,
@@ -746,11 +790,25 @@ class _TapToBeginButton extends StatefulWidget {
   final bool isDesktop;
 
   @override
-  State<_TapToBeginButton> createState() => _TapToBeginButtonState();
+  ConsumerState<_TapToBeginButton> createState() => _TapToBeginButtonState();
 }
 
-class _TapToBeginButtonState extends State<_TapToBeginButton> {
+class _TapToBeginButtonState extends ConsumerState<_TapToBeginButton> {
   bool _hovered = false;
+  bool _navigating = false;
+
+  /// Returning users land on /signin; first-time users on /signup. The
+  /// AuthHistory flag is written on every successful signin/signup (see
+  /// auth_provider._persistAndFetch), so anyone who's ever held a token on
+  /// this install is treated as returning. Reinstall resets the flag —
+  /// they'll see /signup once, then either screen cross-links to the other.
+  Future<void> _begin() async {
+    if (_navigating) return;
+    setState(() => _navigating = true);
+    final returning = await ref.read(authHistoryProvider).hasEverSignedIn();
+    if (!mounted) return;
+    context.go(returning ? AppRoute.signIn : AppRoute.signUp);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -782,7 +840,7 @@ class _TapToBeginButtonState extends State<_TapToBeginButton> {
                   borderRadius: BorderRadius.circular(999),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(999),
-                    onTap: () => context.go(AppRoute.signUp),
+                    onTap: _navigating ? null : _begin,
                     child: Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: widget.isDesktop ? 28 : 22,
