@@ -1,5 +1,5 @@
-Based on this material "C:\Users\aaa\Downloads\Virtual Conversation\design_handoff_freetalk", there are missing parts regarding animation in the current app.
-For example when u see the "C:\Users\aaa\Downloads\Virtual Conversation\design_handoff_freetalk\FreeTalk _standalone.html" at the first time, you can see various icon animations on the android and windows app screen.
+Based on this material "C:\project\vLearn2\vLearn2Spec\design_handoff_freetalk", there are missing parts regarding animation in the current app.
+For example when u see the "C:\project\vLearn2\vLearn2Spec\design_handoff_freetalk\FreeTalk_standalone.html" at the first time, you can see various icon animations on the android and windows app screen.
 But out app doesn't have ths part on the splash screen.
 Can you analyse this and give me solutions how we can achieve it or not.
-There are many animations if you see "C:\Users\aaa\Downloads\Virtual Conversation\design_handoff_freetalk\FreeTalk _standalone.html" and this material "C:\Users\aaa\Downloads\Virtual Conversation\design_handoff_freetalk".
+There are many animations if you see "C:\project\vLearn2\vLearn2Spec\design_handoff_freetalk\FreeTalk_standalone.html" and this material "C:\project\vLearn2\vLearn2Spec\design_handoff_freetalk".

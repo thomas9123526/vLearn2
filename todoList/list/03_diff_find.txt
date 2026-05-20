@@ -1,2 +1,2 @@
-Can u find differences between out application and the first start design material "C:\project\vLearn2\vLearn2Spec\design_handoff_freetalk".
+Can u find differences between our application and the first start design material "C:\project\vLearn2\vLearn2Spec\design_handoff_freetalk". 
 Give me informations.
