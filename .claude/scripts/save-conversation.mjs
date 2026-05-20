@@ -67,6 +67,22 @@ function slugify(text) {
   return slug || 'untitled';
 }
 
+/**
+ * Local-time filename prefix like `2026-05-20_22-30-15_`. Sorts
+ * chronologically when ls'd. Uses `-` for the time separators because
+ * `:` is illegal in Windows filenames.
+ */
+function timestampPrefix(now = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const y = now.getFullYear();
+  const mo = pad(now.getMonth() + 1);
+  const d = pad(now.getDate());
+  const h = pad(now.getHours());
+  const mi = pad(now.getMinutes());
+  const s = pad(now.getSeconds());
+  return `${y}-${mo}-${d}_${h}-${mi}-${s}_`;
+}
+
 async function main() {
   let hookInput;
   try {
@@ -135,7 +151,7 @@ async function main() {
   }
 
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
-  const outFile = join(OUT_DIR, `${slug}.md`);
+  const outFile = join(OUT_DIR, `${timestampPrefix()}${slug}.md`);
   writeFileSync(outFile, md.join('\n'), 'utf8');
 }
 

@@ -11,6 +11,7 @@ import '../../features/home/home_screen.dart';
 import '../../features/scenarios/scenarios_screen.dart';
 import '../../features/scenarios/scenario_brief_screen.dart';
 import '../../features/conversation/conversation_screen.dart';
+import '../../features/conversation/conversation_history_screen.dart';
 import '../../features/news/news_detail_screen.dart';
 import '../../features/news/news_list_screen.dart';
 import '../../features/setup/models_not_installed_screen.dart';
@@ -34,6 +35,7 @@ class AppRoute {
   static const settings = '/settings';
   static const profileEdit = '/settings/profile';
   static String conversation(String sessionId) => '/conversation/$sessionId';
+  static const conversationHistory = '/conversations/history';
   static String report(String sessionId) => '/report/$sessionId';
   static String course(String idOrSlug) => '/courses/$idOrSlug';
   static String scenarioBrief(String idOrSlug) => '/scenarios/$idOrSlug/brief';
@@ -104,6 +106,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/conversation/:sessionId',
         builder: (_, s) =>
             ConversationScreen(sessionId: s.pathParameters['sessionId']!),
+      ),
+      GoRoute(
+        path: AppRoute.conversationHistory,
+        builder: (_, _) => const ConversationHistoryScreen(),
       ),
       GoRoute(
         path: '/report/:sessionId',

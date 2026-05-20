@@ -1,4 +1,4 @@
-import { Module, Controller, Get, Post, Body, Param, UseGuards, Query } from '@nestjs/common';
+import { Module, Controller, Get, Post, Delete, Body, Param, UseGuards, Query } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -7,7 +7,9 @@ import type { JwtPayload } from '../auth/strategies/jwt.strategy';
 import {
   ConversationSessionEntity,
   ConversationMessageEntity,
+  SessionScoreEntity,
 } from '../database/entities/conversation.entity';
+import { GuardViolationEntity } from '../database/entities/guard-violation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
 import { UserEntity } from '../database/entities/user.entity';
@@ -74,6 +76,15 @@ class ConversationsController {
     return this.svc.endSession(user.sub, id, dto);
   }
 
+  @Delete('sessions/:id')
+  @ApiOperation({
+    summary:
+      'Delete the session and its messages/scores (guard violations are kept, FK nulled)',
+  })
+  remove(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.svc.deleteSession(user.sub, id);
+  }
+
   @Post('sessions/:id/suggest')
   @ApiOperation({
     summary: 'Get a short suggested user line (used by tutor-mode idle prompt)',
@@ -88,6 +99,8 @@ class ConversationsController {
     TypeOrmModule.forFeature([
       ConversationSessionEntity,
       ConversationMessageEntity,
+      SessionScoreEntity,
+      GuardViolationEntity,
       ScenarioEntity,
       PersonaEntity,
       UserEntity,

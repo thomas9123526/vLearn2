@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
 import {
   ConversationSessionEntity,
   ConversationMessageEntity,
+  SessionScoreEntity,
   SessionStatus,
 } from '../database/entities/conversation.entity';
+import { GuardViolationEntity } from '../database/entities/guard-violation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
 import { UserEntity } from '../database/entities/user.entity';
@@ -33,6 +35,7 @@ export class ConversationsService {
     @InjectRepository(UserEntity)
     private readonly users: Repository<UserEntity>,
     private readonly orchestrator: ConversationOrchestrator,
+    private readonly dataSource: DataSource,
   ) {}
 
   async start(userId: string, dto: StartSessionDto): Promise<SessionDto> {
@@ -222,6 +225,40 @@ export class ConversationsService {
       })),
     });
     return { suggestion };
+  }
+
+  /**
+   * Hard-deletes a session along with its messages and computed scores.
+   *
+   * Guard-violation rows are KEPT — they're a moderation / compliance
+   * artifact that shouldn't disappear when a user erases their history.
+   * The `session_id` column on `vl_guard_violations` is nullable for
+   * exactly this case, so we NULL it out instead of cascading.
+   *
+   * Owner-only. We don't write to the admin audit log because this is a
+   * user-initiated action on user-owned data (and the admin log is keyed
+   * on an admin actor). HTTP-level Nest logs capture the call.
+   */
+  async deleteSession(userId: string, sessionId: string): Promise<{ ok: true }> {
+    const session = await this.sessions.findOne({ where: { id: sessionId } });
+    if (!session) throw new NotFoundException({ i18nKey: 'session.not_found' });
+    if (session.user_id !== userId) throw new ForbiddenException();
+
+    await this.dataSource.transaction(async (em) => {
+      await em
+        .getRepository(GuardViolationEntity)
+        .update({ session_id: sessionId }, { session_id: null });
+      await em
+        .getRepository(ConversationMessageEntity)
+        .delete({ session_id: sessionId });
+      await em
+        .getRepository(SessionScoreEntity)
+        .delete({ session_id: sessionId });
+      await em
+        .getRepository(ConversationSessionEntity)
+        .delete({ id: sessionId });
+    });
+    return { ok: true };
   }
 
   async endSession(

@@ -34,6 +34,7 @@ class LayoutConfigNotifier extends AsyncNotifier<LayoutConfig> {
     'progress.weekly_chart': true,
     'progress.achievements': true,
     'conversation.mode_toggle': true,
+    'conversation.history': true,
     'settings.theme_selector': true,
     'settings.tutor_carousel': true,
     'tabs.home': true,

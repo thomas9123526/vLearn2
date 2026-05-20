@@ -129,33 +129,46 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     final scheme = Theme.of(context).colorScheme;
     final bubbleStyle = ref.watch(bubbleStyleProvider);
     final isTutorMode = data.maybeWhen(
-      data: (d) => (_viewMode ?? d.session.mode) == 'face',
+      data: (d) => (_viewMode ?? d.session.mode) == 'face' && d.session.status == 'active',
+      orElse: () => false,
+    );
+    final isReadOnly = data.maybeWhen(
+      data: (d) => d.session.status != 'active',
       orElse: () => false,
     );
 
     return Scaffold(
       // Tutor mode is fullscreen — chrome lives inside [TutorModeView].
+      // Read-only sessions always render the chat layout: it has the AppBar
+      // we need for the status banner, and Tutor mode's mic / send chrome
+      // makes no sense for a finished session.
       appBar: isTutorMode
           ? null
           : AppBar(
               title: data.maybeWhen(
-                data: (d) => Text('Turn ${d.session.turnCount}'),
+                data: (d) => Text(
+                  isReadOnly
+                      ? 'Past conversation'
+                      : 'Turn ${d.session.turnCount}',
+                ),
                 orElse: () => const Text('Conversation'),
               ),
               actions: [
-                data.maybeWhen(
-                  data: (_) => IconButton(
-                    tooltip: 'Tutor mode',
-                    icon: const Icon(Icons.face_retouching_natural),
-                    onPressed: () => setState(() => _viewMode = 'face'),
+                if (!isReadOnly)
+                  data.maybeWhen(
+                    data: (_) => IconButton(
+                      tooltip: 'Tutor mode',
+                      icon: const Icon(Icons.face_retouching_natural),
+                      onPressed: () => setState(() => _viewMode = 'face'),
+                    ),
+                    orElse: () => const SizedBox.shrink(),
                   ),
-                  orElse: () => const SizedBox.shrink(),
-                ),
-                TextButton.icon(
-                  onPressed: _ending ? null : _end,
-                  icon: const Icon(Icons.flag_outlined),
-                  label: const Text('End'),
-                ),
+                if (!isReadOnly)
+                  TextButton.icon(
+                    onPressed: _ending ? null : _end,
+                    icon: const Icon(Icons.flag_outlined),
+                    label: const Text('End'),
+                  ),
               ],
             ),
       body: data.when(
@@ -169,8 +182,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
           );
         },
         data: (d) {
+          final readOnly = d.session.status != 'active';
           final mode = _viewMode ?? d.session.mode;
-          if (mode == 'face') {
+          if (mode == 'face' && !readOnly) {
             return _TutorModeWrapper(
               sessionId: widget.sessionId,
               personaId: d.session.personaId,
@@ -191,6 +205,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             scheme: scheme,
             input: _input,
             onSend: () => _send(_input.text),
+            readOnly: readOnly,
+            status: d.session.status,
           );
         },
       ),
@@ -209,6 +225,8 @@ class _ChatModeBody extends StatelessWidget {
     required this.scheme,
     required this.input,
     required this.onSend,
+    this.readOnly = false,
+    this.status,
   });
 
   final ScrollController scroll;
@@ -219,13 +237,26 @@ class _ChatModeBody extends StatelessWidget {
   final TextEditingController input;
   final VoidCallback onSend;
 
+  /// When true, hides the send composer and shows a banner explaining the
+  /// session is finished. Used for completed and abandoned sessions opened
+  /// from the history screen.
+  final bool readOnly;
+  final String? status;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        if (readOnly) _ReadOnlyBanner(status: status, scheme: scheme),
         Expanded(
           child: messages.isEmpty
-              ? const Center(child: Text('Send your first message to get started.'))
+              ? Center(
+                  child: Text(
+                    readOnly
+                        ? 'This session has no messages.'
+                        : 'Send your first message to get started.',
+                  ),
+                )
               : ListView.builder(
                   controller: scroll,
                   padding: const EdgeInsets.all(16),
@@ -236,38 +267,71 @@ class _ChatModeBody extends StatelessWidget {
                   ),
                 ),
         ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: input,
-                    minLines: 1,
-                    maxLines: 4,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => onSend(),
-                    decoration: const InputDecoration(hintText: 'Type your message…'),
+        if (!readOnly)
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: input,
+                      minLines: 1,
+                      maxLines: 4,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => onSend(),
+                      decoration: const InputDecoration(hintText: 'Type your message…'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: sending ? null : onSend,
-                  icon: sending
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary),
-                        )
-                      : const Icon(Icons.send),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: sending ? null : onSend,
+                    icon: sending
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary),
+                          )
+                        : const Icon(Icons.send),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
       ],
+    );
+  }
+}
+
+class _ReadOnlyBanner extends StatelessWidget {
+  const _ReadOnlyBanner({required this.status, required this.scheme});
+
+  final String? status;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = status == 'abandoned' ? 'Abandoned' : 'Completed';
+    return Container(
+      width: double.infinity,
+      color: scheme.surfaceContainerHighest,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Icon(Icons.history, size: 16, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$label · read-only',
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

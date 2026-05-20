@@ -56,6 +56,7 @@ export const FLAG_CATALOG: FlagDescriptor[] = [
   { key: 'conversation.mode_toggle', label: 'Chat / Face mode toggle', tier: 'big', tab: 'conversation' },
   { key: 'conversation.mic_button', label: 'Mic / voice input', tier: 'big', tab: 'conversation' },
   { key: 'conversation.live_caption', label: 'Live caption in Face mode', tier: 'fine', tab: 'conversation' },
+  { key: 'conversation.history', label: 'Conversation history screen', tier: 'big', tab: 'conversation' },
 
   // ── Progress ────────────────────────────────────────────────────────────
   { key: 'progress.level_badge', label: 'CEFR level card', tier: 'big', tab: 'progress' },

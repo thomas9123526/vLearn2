@@ -1,3 +1,7 @@
 I want configure claude that each time i ask or help for claude via prompt, it automatically save our conversation with  my prompt used to todoList_report\question\xxx.md 
 xxx can be abstract name of our conversation.
 
+I configured claude to put conversation as md inside question folder before.
+I want append one more thing to this.
+The md filename is not organized. 
+I want prepend datetime as yyyy-MM-dd_hh:mm:ss to the existing name.

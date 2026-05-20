@@ -62,6 +62,7 @@ const CATALOG: ConfigSeed[] = [
   { key: 'conversation.face_mode_available',  value: true, value_type: 'boolean', category: 'conversation', description: 'Face mode reachable at all' },
   { key: 'conversation.mic_button',           value: true, value_type: 'boolean', category: 'conversation', description: 'Mic button (also gated by STT availability)' },
   { key: 'conversation.live_caption',         value: true, value_type: 'boolean', category: 'conversation', description: 'Live caption on Face mode' },
+  { key: 'conversation.history',              value: true, value_type: 'boolean', category: 'conversation', description: 'Conversation history screen and Settings entry point' },
 
   // ── Settings ─────────────────────────────────────────────
   { key: 'settings.profile_section',     value: true, value_type: 'boolean', category: 'settings', description: 'Profile section (avatar + name)' },
