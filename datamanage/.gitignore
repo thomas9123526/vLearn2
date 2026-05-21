@@ -1,0 +1,27 @@
+# CMake build output
+build/
+out/
+cmake-build-*/
+
+# Visual Studio / IDE state
+.vs/
+*.user
+*.suo
+*.sdf
+*.opensdf
+CMakeSettings.json
+
+# Admin certs and keys live outside the repo — never commit a private key.
+ca/
+*.key
+*.pem
+*.p12
+*.pfx
+admin*.crt
+
+# Local config that may contain absolute paths from the admin's machine.
+config.json
+
+# Bundles produced by `DataManage pack` — output, not source.
+output/
+*.ddp
