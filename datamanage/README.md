@@ -10,15 +10,15 @@ the project builds offline on a fresh Windows 10 box with just
 
 ## Status
 
-**Stage 1 of 9: project scaffold.**
-The window opens, the menu works, About dialog displays. No real
-packing yet.
+**Stage 2 of 9: file format + manifest types.**
+GUI window opens, manifest round-trips through JSON, smoke test
+passes. Still no real packing — that's Stage 3.
 
 | # | Stage | Lands |
 | --- | --- | --- |
 | 1 | Project scaffold (Win32 GUI + CLI fallback) | **done** |
-| 2 | `.ddp` file format definition (header + manifest) | next |
-| 3 | Packer MVP — walk dirs, build manifest, write uncompressed .ddp | |
+| 2 | `.ddp` file format definition (header + manifest) | **done** |
+| 3 | Packer MVP — walk dirs, build manifest, write uncompressed .ddp | next |
 | 4 | Compression — vendor zstd, compress data blocks | |
 | 5 | CA setup — PowerShell scripts: root CA + admin sub-CAs | |
 | 6 | Signing — ECDSA P-256 over (header ‖ manifest ‖ data) | |
@@ -104,20 +104,32 @@ Exit codes propagate correctly in both shells regardless. If CLI use
 becomes common, a separate CONSOLE-subsystem `DataManage_cli.exe`
 target can be added.
 
+## Smoke test
+
+A separate `manifest_smoke_test.exe` exercises the JSON round-trip
+and the manifest validation rules (rejects `..`, absolute paths,
+malformed hashes, unknown algorithms). Builds alongside the main GUI
+target.
+
+```powershell
+.\build-x64\bin\manifest_smoke_test.exe
+# manifest smoke test: PASS
+```
+
 ## Offline build
 
-After Stages 2–7 land, all third-party source lives under `vendor/`:
+Third-party source under `vendor/` (committed to the repo so builds
+are offline-capable on a fresh Windows 10 box):
 
-| Lib | License | Purpose | Lands at |
+| Lib | License | Purpose | Status |
 | --- | --- | --- | --- |
-| `nlohmann_json` | MIT | single-header JSON for the manifest | Stage 2 |
+| `nlohmann_json` v3.11.3 | MIT | single-header JSON for the manifest | **vendored** |
 | `mbedtls` | Apache 2.0 | AES-256-GCM, ECDSA P-256, ECDH P-256, X.509 | Stage 4 / 6 / 7 |
 | `zstd` | BSD 3-clause | block compression | Stage 4 |
 
-Stage 1 itself has **zero external dependencies** — Win32 API + C++
-standard library only. Clone the repo, install VS 2022 with the
-desktop C++ workload, run the cmake commands above. No internet
-required.
+Stages 1 + 2 build on a fresh Windows 10 + VS 2022 machine with no
+internet access — `nlohmann/json` is the only external dependency so
+far and it's a single `.hpp` file already checked in.
 
 ## Pack format (preview — finalised in Stage 2)
 

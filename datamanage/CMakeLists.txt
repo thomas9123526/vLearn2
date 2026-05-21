@@ -25,10 +25,17 @@ if(MSVC)
     )
 endif()
 
+# Vendored single-header JSON library — used by manifest.cpp to
+# round-trip the .ddp manifest. INTERFACE library: header-only, no
+# compiled translation units.
+add_library(nlohmann_json INTERFACE)
+target_include_directories(nlohmann_json INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/nlohmann_json
+)
+
 # Future vendored libraries (each lands offline in its own stage):
 #   add_subdirectory(vendor/mbedtls)            # Stage 4, 6, 7
 #   add_subdirectory(vendor/zstd/build/cmake)   # Stage 4
-#   add_subdirectory(vendor/nlohmann_json)      # Stage 2
 
 # WIN32 subsystem: no console window pops on launch. The exe falls back
 # to AttachConsole(ATTACH_PARENT_PROCESS) when invoked from a shell with
@@ -37,10 +44,12 @@ add_executable(DataManage WIN32
     src/main.cpp
     src/app.cpp
     src/cli.cpp
+    src/manifest.cpp
     resources/app.rc
 )
 
 target_include_directories(DataManage PRIVATE src)
+target_link_libraries(DataManage PRIVATE nlohmann_json)
 
 # rc.exe needs to find app.manifest as a sibling of app.rc. CMake invokes
 # rc from the build dir, so point it at the source dir explicitly.
@@ -63,6 +72,23 @@ if(MSVC)
 endif()
 
 set_target_properties(DataManage PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY                "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG          "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE        "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin"
+)
+
+# Console-subsystem smoke test for the manifest round-trip. Built
+# alongside the main GUI target; pipes stdout/stderr normally so CI
+# (and humans running it from PowerShell) get clean output. Exits 0
+# on success, non-zero on any assertion failure.
+add_executable(manifest_smoke_test
+    src/manifest_smoke_test.cpp
+    src/manifest.cpp
+)
+target_include_directories(manifest_smoke_test PRIVATE src)
+target_link_libraries(manifest_smoke_test PRIVATE nlohmann_json)
+set_target_properties(manifest_smoke_test PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY                "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_DEBUG          "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE        "${CMAKE_BINARY_DIR}/bin"
