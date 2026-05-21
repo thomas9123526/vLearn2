@@ -87,6 +87,41 @@ dev_dependencies:
   # retrofit_generator pinned in §03 once Retrofit clients are wired
   freezed: ^2.5.2
   json_serializable: ^6.8.0
+  # Native-side splash. Generates launch_background drawables (per density,
+  # per light/dark) and the Android-12+ SplashScreen API attributes from the
+  # `flutter_native_splash:` block below. Run `dart run
+  # flutter_native_splash:create` after editing the config; it rewrites the
+  # Android/iOS splash assets in place.
+  flutter_native_splash: ^2.4.4
+
+# Native-side splash configuration. Run `dart run
+# flutter_native_splash:create` after changing anything here to regenerate
+# the Android/iOS splash assets.
+#
+# Strategy: color-only for now. We pick the surface colors that match the
+# Flutter splash background so the user sees a clean fill instantly on
+# cold start instead of the white-flash on dark mode that the default
+# `drawable/launch_background.xml` produced. No image yet — the wordmark +
+# monogram still live in the Flutter splash, but the surrounding color
+# matches across the engine-boot handoff so the seam is invisible.
+#
+# To add a centered monogram later: export the badge as a 384×384 PNG and
+# add `image:` (light) / `image_dark:` (dark) + `android_12.image`. The
+# generator will place it in the right density folders.
+flutter_native_splash:
+  # Light surface = #FFFFFF (sunrise / mint / lavender themes all use it).
+  color: "#FFFFFF"
+  # Dark surface = #1E1C2E (midnight theme).
+  color_dark: "#1E1C2E"
+  # Android-12+ uses the system SplashScreen API. Keep the same colors so
+  # the OS-mandated splash matches the Flutter splash that follows.
+  android_12:
+    color: "#FFFFFF"
+    color_dark: "#1E1C2E"
+  # Only generating Android + iOS — skip web/desktop where boot is instant.
+  android: true
+  ios: true
+  web: false
 
 flutter:
   uses-material-design: true

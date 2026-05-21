@@ -35,11 +35,14 @@ class SplashScreen extends ConsumerStatefulWidget {
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with TickerProviderStateMixin {
   /// One-shot controller driving every entrance (glyphs, wordmark, slogan).
-  /// Spans the longest entrance delay (0.45s) plus the entrance duration
-  /// (0.9s) → 1.5s total runway.
+  /// Was 1500ms to match the design's full 0.45s-delay + 0.9s-fade runway;
+  /// shortened to 900ms so returning users land on sign-in faster. The
+  /// per-element `Interval`s are normalised to 0..1 of this duration so
+  /// the choreography scales proportionally — the visual sequence is
+  /// identical, just played at ~1.67×.
   late final AnimationController _entrance = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1500),
+    duration: const Duration(milliseconds: 900),
   )..forward();
 
   /// Long-running controller for the infinite glyph bob. Each glyph reads a
@@ -65,10 +68,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   /// the user has already moved on.
   Timer? _autoNavTimer;
 
-  /// Hold long enough for the entrance to finish (1.5s controller) plus a
+  /// Hold long enough for the entrance to finish (900ms controller) plus a
   /// short beat so the wordmark actually registers visually before we pull
-  /// the user into sign-in.
-  static const _autoNavDelay = Duration(milliseconds: 2000);
+  /// the user into sign-in. Tightened from 2000ms — the old timing left
+  /// returning users staring at a finished animation for ~600ms before
+  /// navigation.
+  static const _autoNavDelay = Duration(milliseconds: 1100);
 
   @override
   void initState() {
