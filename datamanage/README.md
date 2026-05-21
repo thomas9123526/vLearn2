@@ -10,13 +10,12 @@ the project builds offline on a fresh Windows 10 box with just
 
 ## Status
 
-**Stage 4 of 9: compression.**
-Each blob now optionally passes through zlib DEFLATE before write.
-`pack_mode.compress = "zlib"` in config.json flips `FLAG_COMPRESSED`
-in the header and sets `compression: "zlib"` in the manifest. The
-SHA-256 in the manifest is always of the **plaintext**, so the
-Flutter unpacker (Stage 8) verifies the decompressed bytes
-independent of the algorithm used.
+**Stage 5 of 9: CA setup.**
+Two PowerShell scripts under `ca/` produce the PKI: a root CA
+(self-signed, ECDSA P-256, ~20 yr) and per-admin sub-CAs signed by
+the root (ECDSA P-256, ~5 yr). Generated keys + certs live under
+`ca/issued/` and never get committed. See `ca/README.md` for the
+workflow.
 
 | # | Stage | Lands |
 | --- | --- | --- |
@@ -24,8 +23,8 @@ independent of the algorithm used.
 | 2 | `.ddp` file format definition (header + manifest) | **done** |
 | 3 | Packer MVP — walk dirs, build manifest, write uncompressed .ddp | **done** |
 | 4 | Compression — vendor zlib, DEFLATE per blob | **done** |
-| 5 | CA setup — PowerShell scripts: root CA + admin sub-CAs | next |
-| 6 | Signing — ECDSA P-256 over (header ‖ manifest ‖ data) | |
+| 5 | CA setup — PowerShell scripts: root CA + admin sub-CAs | **done** |
+| 6 | Signing — ECDSA P-256 over (header ‖ manifest ‖ data) | next |
 | 7 | Encryption — AES-256-GCM + ECDH-wrapped session key | |
 | 8 | Flutter `DataUnpackFactory` — verify → decompress → write | |
 | 9 | App reads `.ddp` from external storage and unpacks | |

@@ -12,13 +12,18 @@ cmake-build-*/
 *.opensdf
 CMakeSettings.json
 
-# Admin certs and keys live outside the repo — never commit a private key.
-ca/
+# CA scripts under ca/ stay tracked. The certs + keys they generate
+# (ca/issued/) never get committed — those land per-deployment and
+# the root CA private key in particular must stay offline.
+ca/issued/
+
+# Defensive: even outside ca/, never commit a private key or PEM.
 *.key
 *.pem
 *.p12
 *.pfx
-admin*.crt
+*.csr
+*.srl
 
 # Local config that may contain absolute paths from the admin's machine.
 config.json
