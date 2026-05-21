@@ -43,13 +43,17 @@ using PackProgress =
 // skipped silently). The `mode` argument controls per-blob
 // transformations: `mode.compress == "zlib"` runs each file through
 // DEFLATE before write; `mode.encrypt` lands in Stage 7 and currently
-// must be "none". Throws std::runtime_error on any I/O failure,
-// path-traversal attempt, or unsupported algorithm. Returns stats on
-// success.
+// must be "none". `signing` is optional — when both `cert_path` and
+// `key_path` are non-empty the pack is signed with ECDSA P-256 over
+// (header ‖ manifest ‖ data ‖ cert) and the cert is embedded in
+// section [4]. Throws std::runtime_error on any I/O failure,
+// path-traversal attempt, unsupported algorithm, or signing error.
+// Returns stats on success.
 PackResult packBundle(const BundleConfig& bundle,
                       const std::string& output_dir,
                       const PackProgress& progress = {},
-                      const PackMode& mode = {});
+                      const PackMode& mode = {},
+                      const SigningConfig& signing = {});
 
 // Convenience: pack every bundle in the config. Stops on first error
 // and rethrows. Returns one PackResult per bundle in config.bundles

@@ -10,12 +10,14 @@ the project builds offline on a fresh Windows 10 box with just
 
 ## Status
 
-**Stage 5 of 9: CA setup.**
-Two PowerShell scripts under `ca/` produce the PKI: a root CA
-(self-signed, ECDSA P-256, ~20 yr) and per-admin sub-CAs signed by
-the root (ECDSA P-256, ~5 yr). Generated keys + certs live under
-`ca/issued/` and never get committed. See `ca/README.md` for the
-workflow.
+**Stage 6 of 9: signing.**
+When `config.json.signing.{cert_path,key_path}` are present, the
+packer loads the admin's ECDSA P-256 sub-CA cert + key (PEM), embeds
+the cert (DER) as section [4], computes SHA-256 over
+`header‖manifest‖data‖cert`, signs that digest with the admin's key,
+and appends the signature (DER ECDSA) as section [5]. The pack-time
+header has `sig_len`/`sig_offset` set; the **hashable** view of the
+header zeroes them so the unpacker can reconstruct identical bytes.
 
 | # | Stage | Lands |
 | --- | --- | --- |
@@ -24,8 +26,8 @@ workflow.
 | 3 | Packer MVP — walk dirs, build manifest, write uncompressed .ddp | **done** |
 | 4 | Compression — vendor zlib, DEFLATE per blob | **done** |
 | 5 | CA setup — PowerShell scripts: root CA + admin sub-CAs | **done** |
-| 6 | Signing — ECDSA P-256 over (header ‖ manifest ‖ data) | next |
-| 7 | Encryption — AES-256-GCM + ECDH-wrapped session key | |
+| 6 | Signing — ECDSA P-256 over (header ‖ manifest ‖ data ‖ cert) | **done** |
+| 7 | Encryption — AES-256-GCM + ECDH-wrapped session key | next |
 | 8 | Flutter `DataUnpackFactory` — verify → decompress → write | |
 | 9 | App reads `.ddp` from external storage and unpacks | |
 

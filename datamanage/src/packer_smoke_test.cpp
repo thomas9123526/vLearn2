@@ -17,6 +17,9 @@
 #include "packer.h"
 #include "sha256.h"
 
+#include <mbedtls/pk.h>
+#include <mbedtls/x509_crt.h>
+
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -214,9 +217,140 @@ void exerciseRoundTrip(const std::string& label,
     fs::remove_all(out_root, ec);
 }
 
+// Verify a signed pack end-to-end: parse the embedded cert, reconstruct
+// the bytes that were signed (= header with sig_len/sig_offset zeroed,
+// then manifest, data, cert), re-hash with SHA-256, and verify the
+// ECDSA signature against the cert's pubkey.
+void exerciseSigningRoundTrip(const std::string& cert_path,
+                              const std::string& key_path) {
+    using namespace datamanage;
+
+    if (!std::filesystem::exists(cert_path) ||
+        !std::filesystem::exists(key_path)) {
+        std::printf("[signing] SKIP — cert/key not at %s / %s\n",
+                    cert_path.c_str(), key_path.c_str());
+        std::printf("[signing] (run datamanage/ca/make_root_ca.ps1 + "
+                    "issue_admin_ca.ps1 -Name alice to enable)\n");
+        return;
+    }
+
+    fs::path src_root = makeTempDir();
+    fs::path out_root = makeTempDir();
+
+    try {
+        materialise(src_root);
+
+        BundleConfig bundle;
+        bundle.name       = "signed_bundle";
+        bundle.source_dir = src_root.string();
+        bundle.out_folder = "signed";
+
+        PackMode mode;
+        mode.compress = "zlib";
+        mode.encrypt  = "none";
+
+        SigningConfig signing;
+        signing.cert_path = cert_path;
+        signing.key_path  = key_path;
+
+        const auto result =
+            packBundle(bundle, out_root.string(), {}, mode, signing);
+
+        const auto pack_bytes = readAll(result.output_path);
+
+        format::Header hdr{};
+        std::memcpy(&hdr, pack_bytes.data(), sizeof(hdr));
+        CHECK(hdr.cert_len > 0, "signing: cert_len > 0");
+        CHECK(hdr.sig_len > 0,  "signing: sig_len > 0");
+        CHECK(hdr.cert_offset == hdr.data_offset + hdr.data_len,
+              "signing: cert immediately follows data");
+        CHECK(hdr.sig_offset == hdr.cert_offset + hdr.cert_len,
+              "signing: signature immediately follows cert");
+        CHECK(pack_bytes.size() ==
+                  hdr.sig_offset + hdr.sig_len,
+              "signing: file size accounts for cert + sig");
+
+        // Parse the embedded DER cert.
+        mbedtls_x509_crt cert;
+        mbedtls_x509_crt_init(&cert);
+        const int parse_rc = mbedtls_x509_crt_parse_der(
+            &cert,
+            pack_bytes.data() + hdr.cert_offset,
+            hdr.cert_len);
+        CHECK(parse_rc == 0, "signing: embedded cert parses as DER");
+
+        // Reconstruct the digest the signer hashed: same header with
+        // sig_len + sig_offset zeroed.
+        format::Header hdr_for_hash = hdr;
+        hdr_for_hash.sig_len    = 0;
+        hdr_for_hash.sig_offset = 0;
+
+        Sha256 sha;
+        sha.update(&hdr_for_hash, sizeof(hdr_for_hash));
+        sha.update(pack_bytes.data() + hdr.manifest_offset,
+                   hdr.manifest_len);
+        sha.update(pack_bytes.data() + hdr.data_offset,
+                   hdr.data_len);
+        sha.update(pack_bytes.data() + hdr.cert_offset,
+                   hdr.cert_len);
+        const auto digest = sha.finalizeBytes();
+
+        // Verify the ECDSA signature against the cert's pubkey.
+        const int verify_rc = mbedtls_pk_verify(
+            &cert.pk, MBEDTLS_MD_SHA256,
+            digest.data(), digest.size(),
+            pack_bytes.data() + hdr.sig_offset,
+            hdr.sig_len);
+        CHECK(verify_rc == 0,
+              "signing: signature verifies against embedded cert");
+
+        // Negative case: flip a byte in the manifest, re-hash, expect
+        // verification to fail. Confirms we'd actually catch tampering.
+        {
+            std::vector<uint8_t> tampered = pack_bytes;
+            tampered[hdr.manifest_offset + 5] ^= 0xFF;  // flip a byte
+            Sha256 sha2;
+            sha2.update(&hdr_for_hash, sizeof(hdr_for_hash));
+            sha2.update(tampered.data() + hdr.manifest_offset,
+                        hdr.manifest_len);
+            sha2.update(tampered.data() + hdr.data_offset,
+                        hdr.data_len);
+            sha2.update(tampered.data() + hdr.cert_offset,
+                        hdr.cert_len);
+            const auto bad_digest = sha2.finalizeBytes();
+            const int bad_rc = mbedtls_pk_verify(
+                &cert.pk, MBEDTLS_MD_SHA256,
+                bad_digest.data(), bad_digest.size(),
+                tampered.data() + hdr.sig_offset,
+                hdr.sig_len);
+            CHECK(bad_rc != 0,
+                  "signing: tampered manifest fails verification");
+        }
+
+        mbedtls_x509_crt_free(&cert);
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "EXCEPTION (signing): %s\n", e.what());
+        ++fails;
+    }
+
+    std::error_code ec;
+    fs::remove_all(src_root, ec);
+    fs::remove_all(out_root, ec);
+}
+
 int main() {
     exerciseRoundTrip("uncompressed", "none");
     exerciseRoundTrip("zlib",         "zlib");
+
+    // Path of the cert + key generated by Stage 5 scripts on this box.
+    // Derived from __FILE__ (the source file's path baked in at
+    // compile time) so it works regardless of the test's working
+    // directory. Skips itself cleanly if either file is missing.
+    const fs::path src_dir = fs::path(__FILE__).parent_path();
+    const fs::path ca_root = src_dir / ".." / "ca" / "issued" / "admins" / "alice";
+    exerciseSigningRoundTrip(
+        (ca_root / "admin.crt").string(),
+        (ca_root / "admin.key").string());
 
     if (fails == 0) {
         std::printf("packer smoke test: PASS\n");

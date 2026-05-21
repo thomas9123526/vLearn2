@@ -70,6 +70,7 @@ add_executable(DataManage WIN32
     src/manifest.cpp
     src/packer.cpp
     src/sha256.cpp
+    src/signer.cpp
     resources/app.rc
 )
 
@@ -134,6 +135,7 @@ add_executable(packer_smoke_test
     src/manifest.cpp
     src/packer.cpp
     src/sha256.cpp
+    src/signer.cpp
 )
 target_include_directories(packer_smoke_test PRIVATE src)
 target_link_libraries(packer_smoke_test PRIVATE

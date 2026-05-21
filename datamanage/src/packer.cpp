@@ -14,6 +14,7 @@
 #include "format.h"
 #include "manifest.h"
 #include "sha256.h"
+#include "signer.h"
 
 namespace datamanage {
 
@@ -119,7 +120,8 @@ fs::path joinOutput(const std::string& output_dir,
 PackResult packBundle(const BundleConfig& bundle,
                       const std::string& output_dir,
                       const PackProgress& progress,
-                      const PackMode& mode) {
+                      const PackMode& mode,
+                      const SigningConfig& signing) {
     const fs::path source_root = fs::absolute(bundle.source_dir);
     const std::vector<fs::path> files = walkRegularFiles(source_root);
 
@@ -130,6 +132,18 @@ PackResult packBundle(const BundleConfig& bundle,
         throw std::runtime_error(
             "packer: encryption '" + mode.encrypt +
             "' is not implemented yet (Stage 7)");
+    }
+
+    // Signing is opt-in: when both cert_path and key_path are present
+    // we sign the pack; otherwise we emit an unsigned debug pack.
+    // The Flutter unpacker (Stage 8) refuses unsigned packs in
+    // production; this branch is only useful for local testing.
+    const bool sign_pack = !signing.cert_path.empty() &&
+                           !signing.key_path.empty();
+    std::unique_ptr<Signer> signer;
+    if (sign_pack) {
+        signer = std::make_unique<Signer>(signing.cert_path,
+                                          signing.key_path);
     }
 
     // First pass: hash plaintext, then optionally compress. The
@@ -184,7 +198,53 @@ PackResult packBundle(const BundleConfig& bundle,
     }
     if (progress) progress("", completed, files.size());
 
-    // Second pass: emit the .ddp file.
+    // Build the section layout. Header fields are computed up front
+    // so we can hash over them before writing.
+    const std::string manifest_json = manifestToJson(manifest);
+
+    const std::vector<uint8_t> empty_cert;
+    const std::vector<uint8_t>& cert =
+        sign_pack ? signer->certDer() : empty_cert;
+
+    format::Header hdr{};
+    hdr.magic           = format::MAGIC;
+    hdr.version         = format::VERSION_CURRENT;
+    hdr.flags           = use_zlib ? format::FLAG_COMPRESSED : 0u;
+    hdr.manifest_len    = static_cast<uint32_t>(manifest_json.size());
+    hdr.manifest_offset = format::kHeaderSize;
+    hdr.data_len        = data_cursor;
+    hdr.data_offset     = format::kHeaderSize + hdr.manifest_len;
+    hdr.cert_len        = static_cast<uint32_t>(cert.size());
+    hdr.cert_offset     = sign_pack ? (hdr.data_offset + hdr.data_len) : 0;
+    // sig_len + sig_offset start at zero so they're elided from the
+    // signature itself — see hdr_for_sig below.
+    hdr.sig_len         = 0;
+    hdr.sig_offset      = 0;
+
+    // Sign over (header_with_sig_zeroed ‖ manifest ‖ data ‖ cert).
+    // Zeroing the signature offset/length in the hashable header is
+    // the trick that lets the unpacker reconstruct the exact bytes
+    // we signed without a chicken-and-egg problem.
+    std::vector<uint8_t> sig_bytes;
+    if (sign_pack) {
+        Sha256 sha;
+        sha.update(&hdr, sizeof(hdr));
+        sha.update(manifest_json.data(), manifest_json.size());
+        for (const auto& blob : blobs) {
+            if (!blob.empty()) sha.update(blob.data(), blob.size());
+        }
+        if (!cert.empty()) sha.update(cert.data(), cert.size());
+
+        const auto digest = sha.finalizeBytes();
+        sig_bytes = signer->signDigest(digest.data());
+
+        // Now patch in the real signature length + offset for the
+        // on-disk header.
+        hdr.sig_len    = static_cast<uint32_t>(sig_bytes.size());
+        hdr.sig_offset = hdr.cert_offset + hdr.cert_len;
+    }
+
+    // Emit the .ddp file in section order.
     const fs::path out_path = joinOutput(output_dir, bundle.name);
     std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
     if (!out) {
@@ -192,26 +252,14 @@ PackResult packBundle(const BundleConfig& bundle,
             "packer: cannot open output file: " + out_path.string());
     }
 
-    const std::string manifest_json = manifestToJson(manifest);
-
-    format::Header hdr{};
-    hdr.magic            = format::MAGIC;
-    hdr.version          = format::VERSION_CURRENT;
-    hdr.flags            = use_zlib ? format::FLAG_COMPRESSED : 0u;
-    hdr.manifest_len     = static_cast<uint32_t>(manifest_json.size());
-    hdr.manifest_offset  = format::kHeaderSize;
-    hdr.data_len         = data_cursor;
-    hdr.data_offset      = format::kHeaderSize + hdr.manifest_len;
-    hdr.sig_len          = 0;
-    hdr.sig_offset       = 0;
-    hdr.cert_len         = 0;
-    hdr.cert_offset      = 0;
-
     writeAll(out, &hdr, sizeof(hdr));
     writeAll(out, manifest_json.data(), manifest_json.size());
     for (const auto& blob : blobs) {
         if (!blob.empty()) writeAll(out, blob.data(), blob.size());
     }
+    if (!cert.empty())     writeAll(out, cert.data(),     cert.size());
+    if (!sig_bytes.empty()) writeAll(out, sig_bytes.data(), sig_bytes.size());
+
     out.flush();
     if (!out) {
         throw std::runtime_error(
@@ -233,7 +281,8 @@ std::vector<PackResult> packAll(const Config& config,
     results.reserve(config.bundles.size());
     for (const auto& b : config.bundles) {
         results.push_back(
-            packBundle(b, config.output_dir, progress, config.pack_mode));
+            packBundle(b, config.output_dir, progress,
+                       config.pack_mode, config.signing));
     }
     return results;
 }

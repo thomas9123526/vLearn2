@@ -28,6 +28,9 @@ public:
     // invalid arguments that our wrapper prevents).
     void update(const void* data, size_t len);
 
+    // 32-byte digest as raw bytes. Hasher is consumed.
+    std::array<uint8_t, 32> finalizeBytes();
+
     // 32-byte digest as lowercase hex (64 chars). Hasher is consumed.
     std::string finalizeHex();
 

@@ -49,14 +49,18 @@ void Sha256::update(const void* data, size_t len) {
           "mbedtls_sha256_update");
 }
 
-std::string Sha256::finalizeHex() {
-    unsigned char bytes[32]{};
-    check(mbedtls_sha256_finish(ctxFrom(ctx_buf_.data()), bytes),
+std::array<uint8_t, 32> Sha256::finalizeBytes() {
+    std::array<uint8_t, 32> bytes{};
+    check(mbedtls_sha256_finish(ctxFrom(ctx_buf_.data()), bytes.data()),
           "mbedtls_sha256_finish");
+    return bytes;
+}
 
+std::string Sha256::finalizeHex() {
+    const auto bytes = finalizeBytes();
     std::ostringstream o;
     o << std::hex << std::setfill('0');
-    for (unsigned char b : bytes) {
+    for (uint8_t b : bytes) {
         o << std::setw(2) << static_cast<int>(b);
     }
     return o.str();
