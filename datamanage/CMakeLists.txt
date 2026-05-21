@@ -1,46 +1,70 @@
 cmake_minimum_required(VERSION 3.20)
-project(DataManage VERSION 0.1.0 LANGUAGES CXX)
+project(DataManage VERSION 0.1.0 LANGUAGES CXX RC)
 
-# C++20 — needed for std::filesystem path::u8string, ranges, designated
-# initializers, and source_location. MSVC 19.30+ (VS 2022 17.0+) is fine.
+# C++20 — std::filesystem, ranges, designated initializers. MSVC 19.30+
+# (VS 2022 17.0+) is fine. Both x64 and x86 (Win32) targets supported.
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Force a real release build by default when CMake is invoked without
-# --config (i.e. via the Ninja generator or VS Open Folder).
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
 
 if(MSVC)
     # /utf-8 makes string literals UTF-8 regardless of source encoding —
-    # important for any non-ASCII paths we'll see during packing.
-    # /permissive- enforces standard C++, no MSVC quirks.
+    # important because manifest entries and pack paths may be non-ASCII.
+    # /permissive- enforces standard C++.
     add_compile_options(/W4 /utf-8 /permissive- /Zc:__cplusplus)
-    add_compile_definitions(_CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
+    add_compile_definitions(
+        _CRT_SECURE_NO_WARNINGS
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        UNICODE
+        _UNICODE
+    )
 endif()
 
-# Vendored third-party libraries get pulled in here in later stages.
-# Each lands under vendor/<name>/ and is committed to the repo so the
-# project builds offline on a fresh Windows 10 machine.
-#
-#   add_subdirectory(vendor/mbedtls)           # Stage 4, 6, 7
-#   add_subdirectory(vendor/zstd/build/cmake)  # Stage 4
-#   add_subdirectory(vendor/nlohmann_json)     # Stage 2
+# Future vendored libraries (each lands offline in its own stage):
+#   add_subdirectory(vendor/mbedtls)            # Stage 4, 6, 7
+#   add_subdirectory(vendor/zstd/build/cmake)   # Stage 4
+#   add_subdirectory(vendor/nlohmann_json)      # Stage 2
 
-add_executable(DataManage
+# WIN32 subsystem: no console window pops on launch. The exe falls back
+# to AttachConsole(ATTACH_PARENT_PROCESS) when invoked from a shell with
+# positional args (CLI mode). See src/main.cpp.
+add_executable(DataManage WIN32
     src/main.cpp
+    src/app.cpp
     src/cli.cpp
+    resources/app.rc
 )
 
 target_include_directories(DataManage PRIVATE src)
 
-# Where the .exe lands. Keeps the output predictable for the README and
-# for any scripts the admin builds around it.
+# rc.exe needs to find app.manifest as a sibling of app.rc. CMake invokes
+# rc from the build dir, so point it at the source dir explicitly.
+set_source_files_properties(resources/app.rc PROPERTIES
+    COMPILE_FLAGS "/I\"${CMAKE_CURRENT_SOURCE_DIR}/resources\"")
+
+target_link_libraries(DataManage PRIVATE
+    comctl32   # themed Common Controls v6 (status bar, etc.)
+    user32     # CreateWindowEx, MessageBox, ...
+    gdi32      # DrawText, SetTextColor, ...
+    shell32    # CommandLineToArgvW
+)
+
+# MSVC auto-injects its own RT_MANIFEST resource. We supply ours via
+# resources/app.rc (Common Controls v6 + PerMonitorV2 DPI + UTF-8 active
+# code page), so disable the auto-generated one to avoid CVT1100
+# "duplicate resource. type:MANIFEST" at link time.
+if(MSVC)
+    target_link_options(DataManage PRIVATE /MANIFEST:NO)
+endif()
+
 set_target_properties(DataManage PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY            "${CMAKE_BINARY_DIR}/bin"
-    RUNTIME_OUTPUT_DIRECTORY_DEBUG      "${CMAKE_BINARY_DIR}/bin"
-    RUNTIME_OUTPUT_DIRECTORY_RELEASE    "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY                "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG          "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE        "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin"
 )

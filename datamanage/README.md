@@ -1,21 +1,26 @@
 # DataManage
 
-Windows 10 / VS 2022 C++ command-line tool that packs directories of
+Windows 10 GUI tool (with optional CLI mode) that packs directories of
 files into signed, optionally encrypted, optionally compressed bundles
-(`.ddp`) that the Flutter app verifies and unpacks at runtime.
+(`.ddp`) consumed by the Flutter app at first-run.
+
+Built with raw Win32 + Common Controls v6. No external UI framework —
+the project builds offline on a fresh Windows 10 box with just
+**Visual Studio 2022 + Desktop C++ workload** installed.
 
 ## Status
 
 **Stage 1 of 9: project scaffold.**
-Subcommands parse but don't do anything useful yet.
+The window opens, the menu works, About dialog displays. No real
+packing yet.
 
 | # | Stage | Lands |
-|---|---|---|
-| 1 | Project scaffold (CMake + CLI skeleton) | **done** |
+| --- | --- | --- |
+| 1 | Project scaffold (Win32 GUI + CLI fallback) | **done** |
 | 2 | `.ddp` file format definition (header + manifest) | next |
 | 3 | Packer MVP — walk dirs, build manifest, write uncompressed .ddp | |
 | 4 | Compression — vendor zstd, compress data blocks | |
-| 5 | CA setup — PowerShell scripts: root CA, admin sub-CAs | |
+| 5 | CA setup — PowerShell scripts: root CA + admin sub-CAs | |
 | 6 | Signing — ECDSA P-256 over (header ‖ manifest ‖ data) | |
 | 7 | Encryption — AES-256-GCM + ECDH-wrapped session key | |
 | 8 | Flutter `DataUnpackFactory` — verify → decompress → write | |
@@ -26,53 +31,97 @@ Subcommands parse but don't do anything useful yet.
 Requirements:
 
 - Windows 10 or 11
-- Visual Studio 2022 with the **Desktop development with C++** workload
+- Visual Studio 2022 with **Desktop development with C++** workload
 - CMake 3.20+ (ships with VS 2022)
 
-Open in VS 2022:
-
-> File → Open → CMake... → select `datamanage/CMakeLists.txt`
-
-Or from a `Developer PowerShell for VS 2022`:
+### x64
 
 ```powershell
 cd datamanage
-cmake -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
+cmake -B build-x64 -G "Visual Studio 17 2022" -A x64
+cmake --build build-x64 --config Release
 ```
 
-Result: `build/bin/Release/DataManage.exe`.
+Output: `build-x64/bin/Release/DataManage.exe`.
 
-## Usage (Stage 1)
+### x86 (Win32)
 
 ```powershell
-DataManage --help
-DataManage pack --config config.json   # echoes args, packing not implemented yet
-DataManage info <pack.ddp>             # not implemented yet
-DataManage verify <pack.ddp>           # not implemented yet
+cd datamanage
+cmake -B build-x86 -G "Visual Studio 17 2022" -A Win32
+cmake --build build-x86 --config Release
 ```
+
+Output: `build-x86/bin/Release/DataManage.exe`.
+
+Both directories live side-by-side in the same source tree.
+
+### Open in Visual Studio 2022
+
+> File → Open → CMake... → `datamanage/CMakeLists.txt`
+
+VS will create build folders under `out/`. Switch between
+`x64-Release` and `x86-Release` from the configuration dropdown.
+
+## Usage
+
+GUI mode — no positional args:
+
+```powershell
+.\DataManage.exe
+```
+
+CLI mode — any positional arg (or the explicit `--no-gui` flag):
+
+```powershell
+.\DataManage.exe pack --config config.json
+.\DataManage.exe info <pack.ddp>
+.\DataManage.exe verify <pack.ddp>
+.\DataManage.exe --help
+```
+
+CLI output goes to the parent shell's console via
+`AttachConsole(ATTACH_PARENT_PROCESS)`. Launching with no parent
+console (e.g. double-click) and CLI args is silently ignored — there's
+no popup window.
+
+**Known Win32-subsystem caveat:** PowerShell and `cmd.exe` start
+WIN32-subsystem processes asynchronously, so they don't pipe stdout
+back into the shell the way they do for CONSOLE-subsystem processes.
+To see CLI output:
+
+```powershell
+# PowerShell — synchronous + visible
+Start-Process -FilePath .\DataManage.exe -ArgumentList 'pack', '--config', 'config.json' -NoNewWindow -Wait
+```
+
+```bat
+:: cmd.exe — start /wait pins to the parent console
+start /wait "" DataManage.exe pack --config config.json
+```
+
+Exit codes propagate correctly in both shells regardless. If CLI use
+becomes common, a separate CONSOLE-subsystem `DataManage_cli.exe`
+target can be added.
 
 ## Offline build
 
-All third-party code is vendored under `vendor/` as plain source —
-nothing is downloaded at build time. After Stages 4 / 7 land, the
-project will build on any fresh Windows 10 machine with VS 2022
-installed, with no internet access.
-
-Vendored libraries (added in their respective stages):
+After Stages 2–7 land, all third-party source lives under `vendor/`:
 
 | Lib | License | Purpose | Lands at |
-|---|---|---|---|
+| --- | --- | --- | --- |
+| `nlohmann_json` | MIT | single-header JSON for the manifest | Stage 2 |
 | `mbedtls` | Apache 2.0 | AES-256-GCM, ECDSA P-256, ECDH P-256, X.509 | Stage 4 / 6 / 7 |
 | `zstd` | BSD 3-clause | block compression | Stage 4 |
-| `nlohmann_json` | MIT | single-header JSON for the manifest | Stage 2 |
 
-Stage 1 itself has **zero external dependencies** — standard library
-only.
+Stage 1 itself has **zero external dependencies** — Win32 API + C++
+standard library only. Clone the repo, install VS 2022 with the
+desktop C++ workload, run the cmake commands above. No internet
+required.
 
 ## Pack format (preview — finalised in Stage 2)
 
-```
+```text
 +----------------------+
 | MAGIC "DDDP" (4)     |  file fingerprint
 | version u32          |
@@ -97,7 +146,6 @@ only.
 +----------------------+
 ```
 
-The `out_folder` per-file in the manifest is what makes the bundle
-self-contained: the Flutter unpacker calls `unpack(packPath)` and every
-file lands where the admin specified, under the app's private storage
-root. No extra arguments needed.
+Self-contained: the Flutter unpacker just calls
+`DataUnpackFactory.unpack(packPath)` — names, folder structure, and
+`out_folder` for every file all travel inside the manifest.
