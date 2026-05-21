@@ -87,7 +87,6 @@ class SherpaOnnxSttService extends SpeechToTextService {
                 joiner: joiner,
               ),
               tokens: tokens,
-              modelType: 'zipformer2',
             ),
           ),
         );
