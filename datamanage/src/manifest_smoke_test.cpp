@@ -35,6 +35,12 @@ void test_round_trip() {
     m.created_at       = "2026-05-21T10:00:00Z";
     m.compression      = "zlib";
     m.encryption       = "aes-256-gcm";
+    // Encrypted packs must carry the ephemeral pubkey too. 66 hex
+    // chars = a 33-byte compressed P-256 point.
+    m.ephemeral_pub_hex =
+        "03000000000000000000000000000000"
+        "00000000000000000000000000000000"
+        "00";
 
     ManifestFile f;
     f.rel_path    = "editorial/Lora.ttf";
@@ -53,6 +59,8 @@ void test_round_trip() {
     CHECK(m2.created_at == m.created_at,             "created_at round-trip");
     CHECK(m2.compression == m.compression,           "compression round-trip");
     CHECK(m2.encryption == m.encryption,             "encryption round-trip");
+    CHECK(m2.ephemeral_pub_hex == m.ephemeral_pub_hex,
+          "ephemeral_pub_hex round-trip");
     CHECK(m2.files.size() == 1,                      "files size");
     if (m2.files.size() == 1) {
         const auto& g = m2.files[0];
@@ -155,12 +163,31 @@ void test_reject_unknown_algo() {
 
 }  // namespace
 
+void test_reject_encrypted_without_eph() {
+    using namespace datamanage;
+    // encryption != none but ephemeral_pub_hex missing → must reject.
+    const std::string bad_json = R"({
+        "bundle_name":"x","manifest_version":1,
+        "created_at":"2026-05-21T00:00:00Z",
+        "compression":"zlib","encryption":"aes-256-gcm",
+        "files":[]
+    })";
+    bool threw = false;
+    try {
+        manifestFromJson(bad_json);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    CHECK(threw, "rejects encrypted manifest without ephemeral_pub_hex");
+}
+
 int main() {
     test_round_trip();
     test_reject_dotdot();
     test_reject_absolute();
     test_reject_bad_hash();
     test_reject_unknown_algo();
+    test_reject_encrypted_without_eph();
 
     if (fails == 0) {
         std::printf("manifest smoke test: PASS\n");

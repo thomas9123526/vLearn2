@@ -81,6 +81,14 @@ struct Manifest {
     // "none" or "aes-256-gcm".
     std::string encryption = "none";
 
+    // Compressed-point hex of the per-pack ephemeral ECDH P-256
+    // public key. Only set when `encryption != "none"`. The unpacker
+    // re-derives the AES session key as
+    //   shared = admin_priv · ephemeral_pub
+    //   key    = HKDF-SHA-256(shared, salt, info, 32)
+    // matching the pack-time derivation in encrypt.cpp.
+    std::string ephemeral_pub_hex;
+
     // The files in this bundle, in the order they appear in the data
     // section.
     std::vector<ManifestFile> files;

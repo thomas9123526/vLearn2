@@ -67,6 +67,7 @@ add_executable(DataManage WIN32
     src/cli.cpp
     src/compress.cpp
     src/config.cpp
+    src/encrypt.cpp
     src/manifest.cpp
     src/packer.cpp
     src/sha256.cpp
@@ -132,6 +133,7 @@ add_executable(packer_smoke_test
     src/packer_smoke_test.cpp
     src/compress.cpp
     src/config.cpp
+    src/encrypt.cpp
     src/manifest.cpp
     src/packer.cpp
     src/sha256.cpp

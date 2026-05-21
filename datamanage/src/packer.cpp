@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "compress.h"
+#include "encrypt.h"
 #include "format.h"
 #include "manifest.h"
 #include "sha256.h"
@@ -125,13 +126,11 @@ PackResult packBundle(const BundleConfig& bundle,
     const fs::path source_root = fs::absolute(bundle.source_dir);
     const std::vector<fs::path> files = walkRegularFiles(source_root);
 
-    const bool use_zlib = (mode.compress == "zlib");
-    // Encryption arrives in Stage 7; for Stage 4 we accept only
-    // mode.encrypt == "none".
-    if (mode.encrypt != "none") {
+    const bool use_zlib   = (mode.compress == "zlib");
+    const bool use_aesgcm = (mode.encrypt  == "aes-256-gcm");
+    if (mode.encrypt != "none" && !use_aesgcm) {
         throw std::runtime_error(
-            "packer: encryption '" + mode.encrypt +
-            "' is not implemented yet (Stage 7)");
+            "packer: unsupported encryption algorithm '" + mode.encrypt + "'");
     }
 
     // Signing is opt-in: when both cert_path and key_path are present
@@ -146,6 +145,21 @@ PackResult packBundle(const BundleConfig& bundle,
                                           signing.key_path);
     }
 
+    // Encryption needs the admin's pubkey to ECDH against. We always
+    // get it from the same cert used for signing — both halves of
+    // the admin's keypair (sign with priv, decrypt against pub) live
+    // on the device, so reusing the cert here is intentional and
+    // doesn't widen the attack surface.
+    if (use_aesgcm && !sign_pack) {
+        throw std::runtime_error(
+            "packer: encryption requires signing block — the admin's "
+            "cert is the encryption recipient too");
+    }
+    std::unique_ptr<Encryptor> encryptor;
+    if (use_aesgcm) {
+        encryptor = std::make_unique<Encryptor>(signer->certDer());
+    }
+
     // First pass: hash plaintext, then optionally compress. The
     // SHA-256 in the manifest is *always* of the plaintext — that way
     // the unpacker can verify the decoded blob without needing to
@@ -155,7 +169,10 @@ PackResult packBundle(const BundleConfig& bundle,
     manifest.manifest_version = 1;
     manifest.created_at       = nowIso8601Utc();
     manifest.compression      = use_zlib ? "zlib" : "none";
-    manifest.encryption       = "none";
+    manifest.encryption       = use_aesgcm ? "aes-256-gcm" : "none";
+    if (use_aesgcm) {
+        manifest.ephemeral_pub_hex = encryptor->ephemeralPubHex();
+    }
     manifest.files.reserve(files.size());
 
     std::vector<std::vector<uint8_t>> blobs;
@@ -180,6 +197,11 @@ PackResult packBundle(const BundleConfig& bundle,
         std::vector<uint8_t> stored =
             use_zlib ? deflateZlib(bytes.data(), bytes.size())
                      : std::move(bytes);
+        if (use_aesgcm) {
+            // After this call, `stored` has 28 extra bytes:
+            //   [12-byte IV][ciphertext same length as input][16-byte tag]
+            stored = encryptor->encrypt(stored.data(), stored.size());
+        }
         const uint64_t stored_sz = static_cast<uint64_t>(stored.size());
 
         ManifestFile mf;
@@ -209,7 +231,8 @@ PackResult packBundle(const BundleConfig& bundle,
     format::Header hdr{};
     hdr.magic           = format::MAGIC;
     hdr.version         = format::VERSION_CURRENT;
-    hdr.flags           = use_zlib ? format::FLAG_COMPRESSED : 0u;
+    hdr.flags           = (use_zlib   ? format::FLAG_COMPRESSED : 0u) |
+                          (use_aesgcm ? format::FLAG_ENCRYPTED  : 0u);
     hdr.manifest_len    = static_cast<uint32_t>(manifest_json.size());
     hdr.manifest_offset = format::kHeaderSize;
     hdr.data_len        = data_cursor;

@@ -10,6 +10,10 @@
 // Exits 0 on PASS, non-zero on any assertion failure. Console-subsystem
 // so it pipes stdout normally to PowerShell / cmd.
 
+// Same trick as encrypt.cpp — we touch a few mbedTLS internals
+// directly (ECP point coords, EC keypair Q/d) for the ECDH math.
+#define MBEDTLS_ALLOW_PRIVATE_ACCESS
+
 #include "compress.h"
 #include "config.h"
 #include "format.h"
@@ -17,6 +21,12 @@
 #include "packer.h"
 #include "sha256.h"
 
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/ecp.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/gcm.h>
+#include <mbedtls/hkdf.h>
+#include <mbedtls/md.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/x509_crt.h>
 
@@ -338,6 +348,200 @@ void exerciseSigningRoundTrip(const std::string& cert_path,
     fs::remove_all(out_root, ec);
 }
 
+// Convert a hex string to a byte vector.
+std::vector<uint8_t> hexToBytes(const std::string& hex) {
+    if (hex.size() % 2) throw std::runtime_error("hex length is odd");
+    std::vector<uint8_t> out(hex.size() / 2);
+    for (size_t i = 0; i < out.size(); ++i) {
+        unsigned int b = 0;
+        std::sscanf(hex.c_str() + 2 * i, "%2x", &b);
+        out[i] = static_cast<uint8_t>(b);
+    }
+    return out;
+}
+
+// Stage-8 preview: decrypt an encrypted .ddp using the admin's
+// private key + the ephemeral pubkey from the manifest. Returns the
+// 32-byte AES session key the unpacker derived. We use this to drive
+// the per-blob AES-GCM decrypt.
+std::array<uint8_t, 32> deriveDecryptKey(
+    const std::string& admin_key_path,
+    const std::string& ephemeral_pub_hex)
+{
+    // 1. Load admin's private key.
+    mbedtls_pk_context admin_pk;
+    mbedtls_pk_init(&admin_pk);
+    mbedtls_entropy_context entropy;  mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_context drbg;    mbedtls_ctr_drbg_init(&drbg);
+    if (mbedtls_ctr_drbg_seed(&drbg, mbedtls_entropy_func, &entropy,
+                              nullptr, 0) != 0) {
+        throw std::runtime_error("ctr_drbg_seed");
+    }
+    if (mbedtls_pk_parse_keyfile(&admin_pk, admin_key_path.c_str(),
+                                 nullptr,
+                                 mbedtls_ctr_drbg_random, &drbg) != 0) {
+        throw std::runtime_error("pk_parse_keyfile");
+    }
+    const mbedtls_ecp_keypair* admin_ec = mbedtls_pk_ec(admin_pk);
+
+    // 2. Parse + decompress the ephemeral pubkey.
+    mbedtls_ecp_group grp;
+    mbedtls_ecp_group_init(&grp);
+    if (mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1) != 0) {
+        throw std::runtime_error("ecp_group_load");
+    }
+    mbedtls_ecp_point eph_Q;
+    mbedtls_ecp_point_init(&eph_Q);
+    const auto eph_bytes = hexToBytes(ephemeral_pub_hex);
+    if (mbedtls_ecp_point_read_binary(&grp, &eph_Q,
+                                      eph_bytes.data(),
+                                      eph_bytes.size()) != 0) {
+        throw std::runtime_error("ecp_point_read_binary");
+    }
+
+    // 3. ECDH: shared = admin_d · eph_Q.
+    mbedtls_ecp_point shared_pt;
+    mbedtls_ecp_point_init(&shared_pt);
+    if (mbedtls_ecp_mul(&grp, &shared_pt, &admin_ec->d, &eph_Q,
+                        mbedtls_ctr_drbg_random, &drbg) != 0) {
+        throw std::runtime_error("ecp_mul(ECDH)");
+    }
+    unsigned char z[32];
+    mbedtls_mpi_write_binary(&shared_pt.X, z, sizeof(z));
+
+    // 4. HKDF-SHA-256 with the same salt+info encrypt.cpp uses.
+    std::array<uint8_t, 32> key{};
+    const char kSalt[] = "DataManage v1 ECIES salt";
+    const char kInfo[] = "DataManage v1 ECIES aes-256-gcm";
+    mbedtls_hkdf(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256),
+                 reinterpret_cast<const unsigned char*>(kSalt),
+                 sizeof(kSalt) - 1,
+                 z, sizeof(z),
+                 reinterpret_cast<const unsigned char*>(kInfo),
+                 sizeof(kInfo) - 1,
+                 key.data(), key.size());
+
+    mbedtls_ecp_point_free(&shared_pt);
+    mbedtls_ecp_point_free(&eph_Q);
+    mbedtls_ecp_group_free(&grp);
+    mbedtls_pk_free(&admin_pk);
+    mbedtls_ctr_drbg_free(&drbg);
+    mbedtls_entropy_free(&entropy);
+
+    return key;
+}
+
+void exerciseEncryptionRoundTrip(const std::string& cert_path,
+                                 const std::string& key_path) {
+    using namespace datamanage;
+
+    if (!std::filesystem::exists(cert_path) ||
+        !std::filesystem::exists(key_path)) {
+        std::printf("[encrypt] SKIP — cert/key not at %s / %s\n",
+                    cert_path.c_str(), key_path.c_str());
+        return;
+    }
+
+    fs::path src_root = makeTempDir();
+    fs::path out_root = makeTempDir();
+
+    try {
+        const TestInputs ti = materialise(src_root);
+
+        BundleConfig bundle;
+        bundle.name       = "enc_bundle";
+        bundle.source_dir = src_root.string();
+        bundle.out_folder = "enc";
+
+        PackMode mode;
+        mode.compress = "zlib";
+        mode.encrypt  = "aes-256-gcm";
+
+        SigningConfig signing;
+        signing.cert_path = cert_path;
+        signing.key_path  = key_path;
+
+        const auto result =
+            packBundle(bundle, out_root.string(), {}, mode, signing);
+
+        const auto pack_bytes = readAll(result.output_path);
+
+        format::Header hdr{};
+        std::memcpy(&hdr, pack_bytes.data(), sizeof(hdr));
+        CHECK((hdr.flags & format::FLAG_ENCRYPTED) != 0,
+              "encrypt: FLAG_ENCRYPTED set");
+        CHECK((hdr.flags & format::FLAG_COMPRESSED) != 0,
+              "encrypt: FLAG_COMPRESSED set (zlib was on)");
+        CHECK(hdr.sig_len > 0,
+              "encrypt: pack is signed (required when encrypting)");
+
+        // Parse manifest, get ephemeral pubkey.
+        const std::string manifest_json(
+            reinterpret_cast<const char*>(pack_bytes.data() +
+                                          hdr.manifest_offset),
+            hdr.manifest_len);
+        const Manifest m = manifestFromJson(manifest_json);
+        CHECK(m.encryption == "aes-256-gcm",
+              "encrypt: manifest encryption field");
+        CHECK(m.ephemeral_pub_hex.size() == 66,
+              "encrypt: ephemeral_pub_hex is 66 hex chars "
+              "(33-byte compressed P-256 point)");
+
+        // Stage-8 preview: derive the AES key with admin_priv + eph_pub.
+        const auto aes_key = deriveDecryptKey(key_path, m.ephemeral_pub_hex);
+
+        // Set up GCM for decryption.
+        mbedtls_gcm_context gcm;
+        mbedtls_gcm_init(&gcm);
+        CHECK(mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES,
+                                 aes_key.data(), 256) == 0,
+              "encrypt: gcm_setkey");
+
+        // Per-file: split [IV][CT][tag], decrypt, decompress, re-hash.
+        for (const auto& mf : m.files) {
+            CHECK(mf.stored_size >= 12 + 16,
+                  ("encrypt: blob big enough for IV+tag: " +
+                   mf.rel_path).c_str());
+
+            const auto* blob = pack_bytes.data() + hdr.data_offset +
+                               mf.offset;
+            const size_t ct_len = mf.stored_size - 12 - 16;
+
+            std::vector<uint8_t> plaintext_compressed(ct_len);
+            const int dec_rc = mbedtls_gcm_auth_decrypt(
+                &gcm, ct_len,
+                blob,                12,           // IV
+                nullptr, 0,                         // AAD
+                blob + 12 + ct_len, 16,             // tag
+                blob + 12,                          // ciphertext
+                plaintext_compressed.data());       // plaintext output
+            CHECK(dec_rc == 0,
+                  ("encrypt: AES-GCM decrypt + auth for " +
+                   mf.rel_path).c_str());
+
+            // Decompress.
+            const auto plaintext = inflateZlib(plaintext_compressed.data(),
+                                               plaintext_compressed.size(),
+                                               mf.size);
+
+            // Verify plaintext hash matches the manifest.
+            const std::string re_hash =
+                Sha256::hashHex(plaintext.data(), plaintext.size());
+            CHECK(re_hash == mf.sha256_hex,
+                  ("encrypt: plaintext hash for " + mf.rel_path).c_str());
+        }
+
+        mbedtls_gcm_free(&gcm);
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "EXCEPTION (encrypt): %s\n", e.what());
+        ++fails;
+    }
+
+    std::error_code ec;
+    fs::remove_all(src_root, ec);
+    fs::remove_all(out_root, ec);
+}
+
 int main() {
     exerciseRoundTrip("uncompressed", "none");
     exerciseRoundTrip("zlib",         "zlib");
@@ -349,6 +553,10 @@ int main() {
     const fs::path src_dir = fs::path(__FILE__).parent_path();
     const fs::path ca_root = src_dir / ".." / "ca" / "issued" / "admins" / "alice";
     exerciseSigningRoundTrip(
+        (ca_root / "admin.crt").string(),
+        (ca_root / "admin.key").string());
+
+    exerciseEncryptionRoundTrip(
         (ca_root / "admin.crt").string(),
         (ca_root / "admin.key").string());
 

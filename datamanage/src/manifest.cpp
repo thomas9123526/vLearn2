@@ -96,6 +96,9 @@ std::string manifestToJson(const Manifest& m) {
     j["created_at"]       = m.created_at;
     j["compression"]      = m.compression;
     j["encryption"]       = m.encryption;
+    if (!m.ephemeral_pub_hex.empty()) {
+        j["ephemeral_pub_hex"] = m.ephemeral_pub_hex;
+    }
 
     json files = json::array();
     files.get_ref<json::array_t&>().reserve(m.files.size());
@@ -135,6 +138,15 @@ Manifest manifestFromJson(const std::string& json_text) {
 
     validateAlgoName(m.compression, {"none", "zlib"}, "compression");
     validateAlgoName(m.encryption, {"none", "aes-256-gcm"}, "encryption");
+
+    if (j.contains("ephemeral_pub_hex")) {
+        m.ephemeral_pub_hex = j.at("ephemeral_pub_hex").get<std::string>();
+    }
+    // Encrypted packs must carry an ephemeral pubkey; reject if missing.
+    if (m.encryption != "none" && m.ephemeral_pub_hex.empty()) {
+        throw std::runtime_error(
+            "manifest: encryption != 'none' but ephemeral_pub_hex is empty");
+    }
 
     if (!j.contains("files") || !j["files"].is_array()) {
         throw std::runtime_error("manifest: 'files' must be an array");
