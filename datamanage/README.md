@@ -10,14 +10,14 @@ the project builds offline on a fresh Windows 10 box with just
 
 ## Status
 
-**Stage 6 of 9: signing.**
-When `config.json.signing.{cert_path,key_path}` are present, the
-packer loads the admin's ECDSA P-256 sub-CA cert + key (PEM), embeds
-the cert (DER) as section [4], computes SHA-256 over
-`header‖manifest‖data‖cert`, signs that digest with the admin's key,
-and appends the signature (DER ECDSA) as section [5]. The pack-time
-header has `sig_len`/`sig_offset` set; the **hashable** view of the
-header zeroes them so the unpacker can reconstruct identical bytes.
+**Stage 7 of 9: encryption.**
+With `pack_mode.encrypt = "aes-256-gcm"`, the packer generates a
+fresh ephemeral ECDH P-256 keypair, derives a shared secret against
+the admin's pubkey (from the signing cert), runs it through
+HKDF-SHA-256 → 32-byte AES-256 key. Each blob then encrypts as
+`[12-byte IV][ciphertext][16-byte GCM tag]`, with a fresh random
+IV per blob. The ephemeral pubkey ships in the manifest as
+`ephemeral_pub_hex` so the unpacker can re-derive the same key.
 
 | # | Stage | Lands |
 | --- | --- | --- |
@@ -27,8 +27,8 @@ header zeroes them so the unpacker can reconstruct identical bytes.
 | 4 | Compression — vendor zlib, DEFLATE per blob | **done** |
 | 5 | CA setup — PowerShell scripts: root CA + admin sub-CAs | **done** |
 | 6 | Signing — ECDSA P-256 over (header ‖ manifest ‖ data ‖ cert) | **done** |
-| 7 | Encryption — AES-256-GCM + ECDH-wrapped session key | next |
-| 8 | Flutter `DataUnpackFactory` — verify → decompress → write | |
+| 7 | Encryption — AES-256-GCM + ECDH-wrapped session key | **done** |
+| 8 | Flutter `DataUnpackFactory` — verify → decrypt → decompress → write | next |
 | 9 | App reads `.ddp` from external storage and unpacks | |
 
 ## Build
