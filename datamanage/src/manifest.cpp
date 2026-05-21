@@ -133,7 +133,7 @@ Manifest manifestFromJson(const std::string& json_text) {
     m.compression      = pluck<std::string>(j, "compression");
     m.encryption       = pluck<std::string>(j, "encryption");
 
-    validateAlgoName(m.compression, {"none", "zstd"}, "compression");
+    validateAlgoName(m.compression, {"none", "zlib"}, "compression");
     validateAlgoName(m.encryption, {"none", "aes-256-gcm"}, "encryption");
 
     if (!j.contains("files") || !j["files"].is_array()) {

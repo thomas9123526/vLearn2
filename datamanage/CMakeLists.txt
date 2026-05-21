@@ -33,9 +33,18 @@ target_include_directories(nlohmann_json INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/nlohmann_json
 )
 
+# Vendored zlib v1.3.1 — DEFLATE compression for the .ddp data blobs.
+# Suppress install rules and exclude from ALL so its own example
+# binaries don't build unless something depends on them.
+set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(vendor/zlib EXCLUDE_FROM_ALL)
+# zlib's CMakeLists builds `zlib` (shared) and `zlibstatic` (static).
+# We link the static one — keeps DataManage.exe single-file and
+# avoids the dance of shipping zlib1.dll alongside the binary.
+
 # Future vendored libraries (each lands offline in its own stage):
-#   add_subdirectory(vendor/mbedtls)            # Stage 4, 6, 7
-#   add_subdirectory(vendor/zstd/build/cmake)   # Stage 4
+#   add_subdirectory(vendor/mbedtls)            # Stage 6, 7
 
 # WIN32 subsystem: no console window pops on launch. The exe falls back
 # to AttachConsole(ATTACH_PARENT_PROCESS) when invoked from a shell with
@@ -44,6 +53,7 @@ add_executable(DataManage WIN32
     src/main.cpp
     src/app.cpp
     src/cli.cpp
+    src/compress.cpp
     src/config.cpp
     src/manifest.cpp
     src/packer.cpp
@@ -52,7 +62,12 @@ add_executable(DataManage WIN32
 )
 
 target_include_directories(DataManage PRIVATE src)
-target_link_libraries(DataManage PRIVATE nlohmann_json)
+target_link_libraries(DataManage PRIVATE nlohmann_json zlibstatic)
+# zlib's own include dirs need to reach our compress.cpp — zlibstatic
+# carries them transitively, but EXCLUDE_FROM_ALL strips transitive
+# usage requirements from the install side. The library targets
+# themselves still export INTERFACE_INCLUDE_DIRECTORIES, so the link
+# alone is enough; this comment is just a marker for future readers.
 
 # rc.exe needs to find app.manifest as a sibling of app.rc. CMake invokes
 # rc from the build dir, so point it at the source dir explicitly.
@@ -101,6 +116,7 @@ set_target_properties(manifest_smoke_test PROPERTIES
 
 add_executable(packer_smoke_test
     src/packer_smoke_test.cpp
+    src/compress.cpp
     src/config.cpp
     src/manifest.cpp
     src/packer.cpp
@@ -109,6 +125,7 @@ add_executable(packer_smoke_test
 target_include_directories(packer_smoke_test PRIVATE src)
 target_link_libraries(packer_smoke_test PRIVATE
     nlohmann_json
+    zlibstatic
     bcrypt
 )
 set_target_properties(packer_smoke_test PROPERTIES

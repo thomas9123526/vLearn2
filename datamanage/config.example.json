@@ -1,7 +1,7 @@
 {
   "version": 1,
   "pack_mode": {
-    "compress": "zstd",
+    "compress": "zlib",
     "encrypt": "aes-256-gcm"
   },
   "encrypt_options": {

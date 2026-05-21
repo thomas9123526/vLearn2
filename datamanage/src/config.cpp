@@ -87,7 +87,7 @@ Config loadConfig(const std::string& path) {
         c.pack_mode.compress = optional<std::string>(pm, "compress", "none");
         c.pack_mode.encrypt  = optional<std::string>(pm, "encrypt",  "none");
     }
-    validateAlgo(c.pack_mode.compress, {"none", "zstd"},        "pack_mode.compress");
+    validateAlgo(c.pack_mode.compress, {"none", "zlib"},        "pack_mode.compress");
     validateAlgo(c.pack_mode.encrypt,  {"none", "aes-256-gcm"}, "pack_mode.encrypt");
 
     // signing block — optional in Stage 3, required in Stage 6.

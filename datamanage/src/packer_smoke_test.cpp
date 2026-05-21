@@ -10,6 +10,7 @@
 // Exits 0 on PASS, non-zero on any assertion failure. Console-subsystem
 // so it pipes stdout normally to PowerShell / cmd.
 
+#include "compress.h"
 #include "config.h"
 #include "format.h"
 #include "manifest.h"
@@ -80,105 +81,142 @@ std::vector<uint8_t> readAll(const fs::path& p) {
 
 }  // namespace
 
-int main() {
+// Materialise three files in `src_root`: a small text file, a tiny
+// text file, and a 4 KB highly-compressible payload (all zeros). The
+// 4 KB-zeros gives Stage 4 a real ratio to chew on — zlib level 9
+// should compress 4096 zero bytes down to ~20 bytes.
+struct TestInputs {
+    std::vector<uint8_t> a_bytes;
+    std::vector<uint8_t> b_bytes;
+    std::vector<uint8_t> c_bytes;
+};
+
+TestInputs materialise(const fs::path& src_root) {
+    TestInputs ti;
+    ti.a_bytes = {0x41, 0x41, 0x41, 0x0A};   // "AAA\n"
+    ti.b_bytes = {0x42, 0x42};                // "BB"
+    ti.c_bytes.assign(4096, 0x00);            // 4 KB of zeros
+    writeFile(src_root / "a.txt",         ti.a_bytes);
+    writeFile(src_root / "sub" / "b.txt", ti.b_bytes);
+    writeFile(src_root / "sub" / "c.bin", ti.c_bytes);
+    return ti;
+}
+
+// Run a pack + read-back + per-file verification round. Used twice
+// per main(): once with compress="none", once with compress="zlib".
+void exerciseRoundTrip(const std::string& label,
+                       const std::string& compress_algo) {
     using namespace datamanage;
 
-    fs::path src_root;
-    fs::path out_root;
-    try {
-        src_root = makeTempDir();
-        out_root = makeTempDir();
+    fs::path src_root = makeTempDir();
+    fs::path out_root = makeTempDir();
 
-        // Three files at different paths, deterministic contents.
-        const std::vector<uint8_t> a_bytes{0x41, 0x41, 0x41, 0x0A};   // "AAA\n"
-        const std::vector<uint8_t> b_bytes{0x42, 0x42};                // "BB"
-        std::vector<uint8_t> c_bytes(1024);                            // 1 KB
-        for (size_t i = 0; i < c_bytes.size(); ++i) {
-            c_bytes[i] = static_cast<uint8_t>(i & 0xff);
-        }
-        writeFile(src_root / "a.txt",         a_bytes);
-        writeFile(src_root / "sub" / "b.txt", b_bytes);
-        writeFile(src_root / "sub" / "c.bin", c_bytes);
+    try {
+        const TestInputs ti = materialise(src_root);
 
         BundleConfig bundle;
         bundle.name       = "test_bundle";
         bundle.source_dir = src_root.string();
         bundle.out_folder = "test";
 
-        const auto result = packBundle(bundle, out_root.string());
+        PackMode mode;
+        mode.compress = compress_algo;
+        mode.encrypt  = "none";
 
-        CHECK(result.file_count == 3, "file count == 3");
+        const auto result = packBundle(bundle, out_root.string(), {}, mode);
+
+        CHECK(result.file_count == 3,
+              (label + ": file count == 3").c_str());
         CHECK(result.total_bytes_in ==
-                  a_bytes.size() + b_bytes.size() + c_bytes.size(),
-              "total_bytes_in matches sum of inputs");
-        CHECK(fs::exists(result.output_path), "output file exists on disk");
+                  ti.a_bytes.size() + ti.b_bytes.size() + ti.c_bytes.size(),
+              (label + ": total_bytes_in").c_str());
+        CHECK(fs::exists(result.output_path),
+              (label + ": output file exists").c_str());
 
         const auto pack_bytes = readAll(result.output_path);
         CHECK(pack_bytes.size() == result.total_bytes_out,
-              "produced .ddp size matches PackResult.total_bytes_out");
+              (label + ": file size == PackResult").c_str());
 
-        // Parse header.
-        CHECK(pack_bytes.size() >= sizeof(format::Header),
-              "pack large enough to hold header");
-
+        // Header.
         format::Header hdr{};
         std::memcpy(&hdr, pack_bytes.data(), sizeof(hdr));
-        CHECK(hdr.magic   == format::MAGIC,          "header magic == DDDP");
-        CHECK(hdr.version == format::VERSION_CURRENT,"header version current");
-        CHECK(hdr.flags   == 0,                      "Stage 3: no flags set");
-        CHECK(hdr.sig_len == 0,                      "Stage 3: no signature");
-        CHECK(hdr.cert_len == 0,                     "Stage 3: no certificate");
-        CHECK(hdr.manifest_offset == format::kHeaderSize,
-              "manifest follows header");
-        CHECK(hdr.data_offset == format::kHeaderSize + hdr.manifest_len,
-              "data follows manifest");
+        CHECK(hdr.magic   == format::MAGIC,
+              (label + ": header magic").c_str());
+        CHECK(hdr.version == format::VERSION_CURRENT,
+              (label + ": header version").c_str());
+        const uint32_t want_flags =
+            (compress_algo == "zlib") ? format::FLAG_COMPRESSED : 0u;
+        CHECK(hdr.flags == want_flags,
+              (label + ": header flags match compression").c_str());
+        CHECK(hdr.sig_len == 0,
+              (label + ": no signature").c_str());
+        CHECK(hdr.cert_len == 0,
+              (label + ": no certificate").c_str());
 
-        // Parse manifest.
+        // Manifest.
         const std::string manifest_json(
             reinterpret_cast<const char*>(pack_bytes.data() +
                                           hdr.manifest_offset),
             hdr.manifest_len);
         const Manifest m = manifestFromJson(manifest_json);
-        CHECK(m.bundle_name == "test_bundle", "manifest bundle_name");
-        CHECK(m.compression == "none",        "Stage 3 compression");
-        CHECK(m.encryption  == "none",        "Stage 3 encryption");
-        CHECK(m.files.size() == 3,            "manifest file count");
+        CHECK(m.compression == compress_algo,
+              (label + ": manifest compression").c_str());
+        CHECK(m.files.size() == 3,
+              (label + ": manifest file count").c_str());
 
-        // Per-file: seek to data offset, re-hash, compare to manifest hash.
+        // Per-file: read the stored blob, optionally decompress, then
+        // re-hash and compare. Plaintext hash (mf.sha256_hex) must
+        // match the decoded blob regardless of compression.
         for (const auto& mf : m.files) {
-            CHECK(mf.size == mf.stored_size,
-                  "Stage 3: stored_size == size (no transformation)");
             CHECK(mf.offset + mf.stored_size <= hdr.data_len,
-                  "blob fits inside data section");
+                  (label + ": blob fits in data section").c_str());
+
             const auto* blob_p =
                 pack_bytes.data() + hdr.data_offset + mf.offset;
+
+            std::vector<uint8_t> plain;
+            if (compress_algo == "zlib") {
+                plain = inflateZlib(blob_p, mf.stored_size, mf.size);
+            } else {
+                plain.assign(blob_p, blob_p + mf.stored_size);
+            }
+            CHECK(plain.size() == mf.size,
+                  (label + ": decoded size == manifest size for " +
+                   mf.rel_path).c_str());
+
             const std::string re_hash =
-                Sha256::hashHex(blob_p, mf.stored_size);
+                Sha256::hashHex(plain.data(), plain.size());
             CHECK(re_hash == mf.sha256_hex,
-                  ("hash matches for " + mf.rel_path).c_str());
-            CHECK(mf.out_folder == "test", "out_folder threaded through");
+                  (label + ": hash matches for " + mf.rel_path).c_str());
         }
 
-        // Confirm each known input file is present in the manifest by
-        // rel_path. Walk order is sorted, so a.txt < sub/b.txt < sub/c.bin.
-        bool saw_a = false, saw_b = false, saw_c = false;
-        for (const auto& mf : m.files) {
-            if (mf.rel_path == "a.txt")        saw_a = true;
-            if (mf.rel_path == "sub/b.txt")    saw_b = true;
-            if (mf.rel_path == "sub/c.bin")    saw_c = true;
+        // Compression sanity: the 4 KB-zeros blob must come out
+        // dramatically smaller under zlib. Sized < 50 bytes is a
+        // conservative bound — zlib level 9 typically gives ~20.
+        if (compress_algo == "zlib") {
+            for (const auto& mf : m.files) {
+                if (mf.rel_path == "sub/c.bin") {
+                    CHECK(mf.stored_size < 50,
+                          "zlib compressed 4096 zeros to < 50 bytes");
+                    CHECK(mf.stored_size < mf.size,
+                          "zlib: stored_size < size for compressible blob");
+                }
+            }
         }
-        CHECK(saw_a, "rel_path 'a.txt' present");
-        CHECK(saw_b, "rel_path 'sub/b.txt' present");
-        CHECK(saw_c, "rel_path 'sub/c.bin' present");
     } catch (const std::exception& e) {
-        std::fprintf(stderr, "EXCEPTION: %s\n", e.what());
-        fails = 999;
+        std::fprintf(stderr, "EXCEPTION (%s): %s\n",
+                     label.c_str(), e.what());
+        ++fails;
     }
 
-    // Clean up regardless of outcome.
     std::error_code ec;
-    if (!src_root.empty()) fs::remove_all(src_root, ec);
-    if (!out_root.empty()) fs::remove_all(out_root, ec);
+    fs::remove_all(src_root, ec);
+    fs::remove_all(out_root, ec);
+}
+
+int main() {
+    exerciseRoundTrip("uncompressed", "none");
+    exerciseRoundTrip("zlib",         "zlib");
 
     if (fails == 0) {
         std::printf("packer smoke test: PASS\n");

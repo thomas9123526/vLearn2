@@ -33,7 +33,7 @@ void test_round_trip() {
     m.bundle_name      = "out_font";
     m.manifest_version = 1;
     m.created_at       = "2026-05-21T10:00:00Z";
-    m.compression      = "zstd";
+    m.compression      = "zlib";
     m.encryption       = "aes-256-gcm";
 
     ManifestFile f;

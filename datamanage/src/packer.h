@@ -40,11 +40,16 @@ using PackProgress =
 
 // Pack a single bundle. Walks `bundle.source_dir` recursively (any
 // regular file is included; symlinks and directory entries are
-// skipped silently). Throws std::runtime_error on any I/O failure,
-// path-traversal attempt, or hash mismatch. Returns stats on success.
+// skipped silently). The `mode` argument controls per-blob
+// transformations: `mode.compress == "zlib"` runs each file through
+// DEFLATE before write; `mode.encrypt` lands in Stage 7 and currently
+// must be "none". Throws std::runtime_error on any I/O failure,
+// path-traversal attempt, or unsupported algorithm. Returns stats on
+// success.
 PackResult packBundle(const BundleConfig& bundle,
                       const std::string& output_dir,
-                      const PackProgress& progress = {});
+                      const PackProgress& progress = {},
+                      const PackMode& mode = {});
 
 // Convenience: pack every bundle in the config. Stops on first error
 // and rethrows. Returns one PackResult per bundle in config.bundles

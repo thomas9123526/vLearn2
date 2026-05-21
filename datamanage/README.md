@@ -10,23 +10,25 @@ the project builds offline on a fresh Windows 10 box with just
 
 ## Status
 
-**Stage 3 of 9: packer MVP.**
-GUI loads a config.json, packs each bundle to a real `.ddp` file with
-valid manifest + SHA-256 hashes. No compression or encryption yet —
-flags = 0, sig_len = 0, cert_len = 0. The Flutter unpacker (Stage 8)
-will refuse these debug packs once signing arrives in Stage 6.
+**Stage 4 of 9: compression.**
+Each blob now optionally passes through zlib DEFLATE before write.
+`pack_mode.compress = "zlib"` in config.json flips `FLAG_COMPRESSED`
+in the header and sets `compression: "zlib"` in the manifest. The
+SHA-256 in the manifest is always of the **plaintext**, so the
+Flutter unpacker (Stage 8) verifies the decompressed bytes
+independent of the algorithm used.
 
 | # | Stage | Lands |
 | --- | --- | --- |
 | 1 | Project scaffold (Win32 GUI + CLI fallback) | **done** |
 | 2 | `.ddp` file format definition (header + manifest) | **done** |
 | 3 | Packer MVP — walk dirs, build manifest, write uncompressed .ddp | **done** |
-| 4 | Compression — vendor zstd, compress data blocks | next |
-| 5 | CA setup — PowerShell scripts: root CA + admin sub-CAs | |
+| 4 | Compression — vendor zlib, DEFLATE per blob | **done** |
+| 5 | CA setup — PowerShell scripts: root CA + admin sub-CAs | next |
 | 6 | Signing — ECDSA P-256 over (header ‖ manifest ‖ data) | |
 | 7 | Encryption — AES-256-GCM + ECDH-wrapped session key | |
 | 8 | Flutter `DataUnpackFactory` — verify → decompress → write | |
-| 9 | App startup wiring — first-run unpack into private storage | |
+| 9 | App reads `.ddp` from external storage and unpacks | |
 
 ## Build
 
@@ -141,12 +143,12 @@ are offline-capable on a fresh Windows 10 box):
 | Lib | License | Purpose | Status |
 | --- | --- | --- | --- |
 | `nlohmann_json` v3.11.3 | MIT | single-header JSON for the manifest | **vendored** |
-| `mbedtls` | Apache 2.0 | AES-256-GCM, ECDSA P-256, ECDH P-256, X.509 | Stage 4 / 6 / 7 |
-| `zstd` | BSD 3-clause | block compression | Stage 4 |
+| `zlib` v1.3.1 | zlib | DEFLATE compression for the data blobs | **vendored** |
+| `mbedtls` | Apache 2.0 | AES-256-GCM, ECDSA P-256, ECDH P-256, X.509 | Stage 6 / 7 |
 
-Stages 1 + 2 build on a fresh Windows 10 + VS 2022 machine with no
-internet access — `nlohmann/json` is the only external dependency so
-far and it's a single `.hpp` file already checked in.
+Stages 1–4 build on a fresh Windows 10 + VS 2022 machine with **no
+internet access**. Clone the repo, run `cmake -B build-x64 -A x64` +
+`cmake --build build-x64 --config Release`, done.
 
 ## Pack format (preview — finalised in Stage 2)
 

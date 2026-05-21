@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "compress.h"
 #include "format.h"
 #include "manifest.h"
 #include "sha256.h"
@@ -117,21 +118,30 @@ fs::path joinOutput(const std::string& output_dir,
 
 PackResult packBundle(const BundleConfig& bundle,
                       const std::string& output_dir,
-                      const PackProgress& progress) {
+                      const PackProgress& progress,
+                      const PackMode& mode) {
     const fs::path source_root = fs::absolute(bundle.source_dir);
     const std::vector<fs::path> files = walkRegularFiles(source_root);
 
-    // First pass: hash + measure every file, building the manifest.
-    // We also keep each file's bytes in memory in `blobs` so the
-    // second pass can write them out in the same order. For typical
-    // model/font bundles this is fine; if a single bundle ever
-    // exceeds available RAM we'll switch to a streaming layout.
+    const bool use_zlib = (mode.compress == "zlib");
+    // Encryption arrives in Stage 7; for Stage 4 we accept only
+    // mode.encrypt == "none".
+    if (mode.encrypt != "none") {
+        throw std::runtime_error(
+            "packer: encryption '" + mode.encrypt +
+            "' is not implemented yet (Stage 7)");
+    }
+
+    // First pass: hash plaintext, then optionally compress. The
+    // SHA-256 in the manifest is *always* of the plaintext — that way
+    // the unpacker can verify the decoded blob without needing to
+    // know which compression algorithm was used.
     Manifest manifest;
     manifest.bundle_name      = bundle.name;
     manifest.manifest_version = 1;
     manifest.created_at       = nowIso8601Utc();
-    manifest.compression      = "none";   // Stage 4 will change this
-    manifest.encryption       = "none";   // Stage 7 will change this
+    manifest.compression      = use_zlib ? "zlib" : "none";
+    manifest.encryption       = "none";
     manifest.files.reserve(files.size());
 
     std::vector<std::vector<uint8_t>> blobs;
@@ -153,17 +163,22 @@ PackResult packBundle(const BundleConfig& bundle,
         h.update(bytes.data(), bytes.size());
         const std::string hex = h.finalizeHex();
 
+        std::vector<uint8_t> stored =
+            use_zlib ? deflateZlib(bytes.data(), bytes.size())
+                     : std::move(bytes);
+        const uint64_t stored_sz = static_cast<uint64_t>(stored.size());
+
         ManifestFile mf;
         mf.rel_path    = rel_fwd;
         mf.out_folder  = bundle.out_folder;
-        mf.size        = sz;
-        mf.sha256_hex  = hex;
+        mf.size        = sz;            // plaintext size
+        mf.sha256_hex  = hex;            // hash of plaintext
         mf.offset      = data_cursor;
-        mf.stored_size = sz;  // Stage 3: no compression, no encryption
+        mf.stored_size = stored_sz;      // post-compression size
         manifest.files.push_back(std::move(mf));
 
-        blobs.push_back(std::move(bytes));
-        data_cursor += sz;
+        blobs.push_back(std::move(stored));
+        data_cursor += stored_sz;
         total_in    += sz;
         ++completed;
     }
@@ -182,7 +197,7 @@ PackResult packBundle(const BundleConfig& bundle,
     format::Header hdr{};
     hdr.magic            = format::MAGIC;
     hdr.version          = format::VERSION_CURRENT;
-    hdr.flags            = 0;
+    hdr.flags            = use_zlib ? format::FLAG_COMPRESSED : 0u;
     hdr.manifest_len     = static_cast<uint32_t>(manifest_json.size());
     hdr.manifest_offset  = format::kHeaderSize;
     hdr.data_len         = data_cursor;
@@ -217,7 +232,8 @@ std::vector<PackResult> packAll(const Config& config,
     std::vector<PackResult> results;
     results.reserve(config.bundles.size());
     for (const auto& b : config.bundles) {
-        results.push_back(packBundle(b, config.output_dir, progress));
+        results.push_back(
+            packBundle(b, config.output_dir, progress, config.pack_mode));
     }
     return results;
 }

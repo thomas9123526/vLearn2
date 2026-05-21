@@ -43,7 +43,7 @@ inline constexpr uint32_t VERSION_CURRENT = 1u;
 // Flag bits in Header::flags. The lower 16 bits are reserved for
 // transformations that operate on the data section (compression,
 // encryption). The upper 16 bits are reserved for future use.
-inline constexpr uint32_t FLAG_COMPRESSED = 1u << 0;  // data is zstd-compressed
+inline constexpr uint32_t FLAG_COMPRESSED = 1u << 0;  // data is zlib/DEFLATE
 inline constexpr uint32_t FLAG_ENCRYPTED  = 1u << 1;  // data is AES-256-GCM
 // FLAG_SIGNED is implied — every shipping .ddp must carry a signature
 // and the unpacker rejects unsigned packs. We don't burn a flag bit
@@ -55,7 +55,7 @@ inline constexpr uint32_t FLAG_ENCRYPTED  = 1u << 1;  // data is AES-256-GCM
 // enums here so the C++ side can route through a switch.
 enum class Compression : uint8_t {
     None = 0,
-    Zstd = 1,
+    Zlib = 1,  // DEFLATE inside the zlib stream wrapper (RFC 1950)
 };
 
 enum class Encryption : uint8_t {
