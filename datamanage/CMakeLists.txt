@@ -44,7 +44,10 @@ add_executable(DataManage WIN32
     src/main.cpp
     src/app.cpp
     src/cli.cpp
+    src/config.cpp
     src/manifest.cpp
+    src/packer.cpp
+    src/sha256.cpp
     resources/app.rc
 )
 
@@ -61,6 +64,8 @@ target_link_libraries(DataManage PRIVATE
     user32     # CreateWindowEx, MessageBox, ...
     gdi32      # DrawText, SetTextColor, ...
     shell32    # CommandLineToArgvW
+    comdlg32   # GetOpenFileName
+    bcrypt     # SHA-256 (Stage 3); AES/ECDSA/ECDH later via mbedTLS
 )
 
 # MSVC auto-injects its own RT_MANIFEST resource. We supply ours via
@@ -78,10 +83,9 @@ set_target_properties(DataManage PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin"
 )
 
-# Console-subsystem smoke test for the manifest round-trip. Built
-# alongside the main GUI target; pipes stdout/stderr normally so CI
-# (and humans running it from PowerShell) get clean output. Exits 0
-# on success, non-zero on any assertion failure.
+# Console-subsystem smoke tests. Each builds alongside the main GUI
+# target; both pipe stdout/stderr normally so PowerShell / CI gets
+# clean output. Exit 0 on success, non-zero on any assertion failure.
 add_executable(manifest_smoke_test
     src/manifest_smoke_test.cpp
     src/manifest.cpp
@@ -89,6 +93,25 @@ add_executable(manifest_smoke_test
 target_include_directories(manifest_smoke_test PRIVATE src)
 target_link_libraries(manifest_smoke_test PRIVATE nlohmann_json)
 set_target_properties(manifest_smoke_test PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY                "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG          "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE        "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin"
+)
+
+add_executable(packer_smoke_test
+    src/packer_smoke_test.cpp
+    src/config.cpp
+    src/manifest.cpp
+    src/packer.cpp
+    src/sha256.cpp
+)
+target_include_directories(packer_smoke_test PRIVATE src)
+target_link_libraries(packer_smoke_test PRIVATE
+    nlohmann_json
+    bcrypt
+)
+set_target_properties(packer_smoke_test PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY                "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_DEBUG          "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE        "${CMAKE_BINARY_DIR}/bin"

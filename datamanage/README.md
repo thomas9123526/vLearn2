@@ -10,16 +10,18 @@ the project builds offline on a fresh Windows 10 box with just
 
 ## Status
 
-**Stage 2 of 9: file format + manifest types.**
-GUI window opens, manifest round-trips through JSON, smoke test
-passes. Still no real packing — that's Stage 3.
+**Stage 3 of 9: packer MVP.**
+GUI loads a config.json, packs each bundle to a real `.ddp` file with
+valid manifest + SHA-256 hashes. No compression or encryption yet —
+flags = 0, sig_len = 0, cert_len = 0. The Flutter unpacker (Stage 8)
+will refuse these debug packs once signing arrives in Stage 6.
 
 | # | Stage | Lands |
 | --- | --- | --- |
 | 1 | Project scaffold (Win32 GUI + CLI fallback) | **done** |
 | 2 | `.ddp` file format definition (header + manifest) | **done** |
-| 3 | Packer MVP — walk dirs, build manifest, write uncompressed .ddp | next |
-| 4 | Compression — vendor zstd, compress data blocks | |
+| 3 | Packer MVP — walk dirs, build manifest, write uncompressed .ddp | **done** |
+| 4 | Compression — vendor zstd, compress data blocks | next |
 | 5 | CA setup — PowerShell scripts: root CA + admin sub-CAs | |
 | 6 | Signing — ECDSA P-256 over (header ‖ manifest ‖ data) | |
 | 7 | Encryption — AES-256-GCM + ECDH-wrapped session key | |
@@ -104,17 +106,32 @@ Exit codes propagate correctly in both shells regardless. If CLI use
 becomes common, a separate CONSOLE-subsystem `DataManage_cli.exe`
 target can be added.
 
-## Smoke test
+## Smoke tests
 
-A separate `manifest_smoke_test.exe` exercises the JSON round-trip
-and the manifest validation rules (rejects `..`, absolute paths,
-malformed hashes, unknown algorithms). Builds alongside the main GUI
-target.
+Two console-subsystem test binaries build alongside the main GUI:
+
+| Binary | What it does |
+| --- | --- |
+| `manifest_smoke_test.exe` | JSON round-trip + validation rules (rejects `..`, absolute paths, malformed hashes, unknown algorithms) |
+| `packer_smoke_test.exe` | End-to-end: materialise a temp source dir, run `packBundle`, parse the produced `.ddp`, re-hash every blob and compare to the manifest |
 
 ```powershell
 .\build-x64\bin\manifest_smoke_test.exe
 # manifest smoke test: PASS
+
+.\build-x64\bin\packer_smoke_test.exe
+# packer smoke test: PASS
 ```
+
+## End-to-end CLI example
+
+```powershell
+Start-Process -FilePath .\build-x64\bin\DataManage.exe `
+              -ArgumentList 'pack', '--config', 'config.json' `
+              -NoNewWindow -Wait
+```
+
+Or from the GUI: **File → Open Config…**, then **Pack → Run Pack…**.
 
 ## Offline build
 

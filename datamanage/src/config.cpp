@@ -1,0 +1,121 @@
+#include "config.h"
+
+#include <nlohmann/json.hpp>
+
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
+
+namespace datamanage {
+
+namespace {
+
+using nlohmann::json;
+
+template <typename T>
+T require(const json& j, const char* key) {
+    if (!j.contains(key)) {
+        throw std::runtime_error(
+            std::string("config: missing required field '") + key + "'");
+    }
+    try {
+        return j.at(key).get<T>();
+    } catch (const json::type_error& e) {
+        throw std::runtime_error(
+            std::string("config: wrong type for '") + key + "': " +
+            e.what());
+    }
+}
+
+template <typename T>
+T optional(const json& j, const char* key, const T& fallback) {
+    if (!j.contains(key)) return fallback;
+    try {
+        return j.at(key).get<T>();
+    } catch (const json::type_error& e) {
+        throw std::runtime_error(
+            std::string("config: wrong type for '") + key + "': " +
+            e.what());
+    }
+}
+
+std::string slurp(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) {
+        throw std::runtime_error("config: cannot open '" + path + "'");
+    }
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+void validateAlgo(const std::string& s,
+                  std::initializer_list<const char*> allowed,
+                  const char* field) {
+    for (const char* a : allowed) {
+        if (s == a) return;
+    }
+    throw std::runtime_error(
+        std::string("config: ") + field + " must be one of {…}, got '" +
+        s + "'");
+}
+
+}  // namespace
+
+Config loadConfig(const std::string& path) {
+    const std::string text = slurp(path);
+
+    json root;
+    try {
+        root = json::parse(text);
+    } catch (const json::parse_error& e) {
+        throw std::runtime_error(
+            std::string("config: JSON parse failed: ") + e.what());
+    }
+
+    Config c;
+    c.version = require<uint32_t>(root, "version");
+    if (c.version != 1) {
+        throw std::runtime_error(
+            "config: unsupported version " + std::to_string(c.version) +
+            " (expected 1)");
+    }
+
+    // pack_mode block
+    if (root.contains("pack_mode")) {
+        const auto& pm = root["pack_mode"];
+        c.pack_mode.compress = optional<std::string>(pm, "compress", "none");
+        c.pack_mode.encrypt  = optional<std::string>(pm, "encrypt",  "none");
+    }
+    validateAlgo(c.pack_mode.compress, {"none", "zstd"},        "pack_mode.compress");
+    validateAlgo(c.pack_mode.encrypt,  {"none", "aes-256-gcm"}, "pack_mode.encrypt");
+
+    // signing block — optional in Stage 3, required in Stage 6.
+    if (root.contains("signing")) {
+        const auto& s = root["signing"];
+        c.signing.cert_path = optional<std::string>(s, "cert_path", "");
+        c.signing.key_path  = optional<std::string>(s, "key_path",  "");
+    }
+
+    // bundles[] — at least one required.
+    if (!root.contains("bundles") || !root["bundles"].is_array() ||
+        root["bundles"].empty()) {
+        throw std::runtime_error(
+            "config: 'bundles' must be a non-empty array");
+    }
+    for (const auto& b : root["bundles"]) {
+        BundleConfig bc;
+        bc.name       = require<std::string>(b, "name");
+        bc.source_dir = require<std::string>(b, "source_dir");
+        bc.out_folder = require<std::string>(b, "out_folder");
+        if (bc.name.empty()) {
+            throw std::runtime_error("config: bundle.name must not be empty");
+        }
+        c.bundles.push_back(std::move(bc));
+    }
+
+    c.output_dir = optional<std::string>(root, "output_dir", "./output");
+    return c;
+}
+
+}  // namespace datamanage

@@ -5,6 +5,9 @@
 #include <string>
 #include <string_view>
 
+#include "config.h"
+#include "packer.h"
+
 namespace datamanage {
 
 namespace {
@@ -19,8 +22,8 @@ void printUsage() {
         "  DataManage info <pack.ddp>                 print manifest\n"
         "  DataManage --help                          show this help\n"
         "\n"
-        "Stage 1 build: CLI skeleton only. Packing / signing / encryption\n"
-        "land in subsequent stages. See README.md for the project plan.\n"
+        "Stage 3 build: `pack` works against config.json. `info` and `verify`\n"
+        "land in later stages. See README.md for the project plan.\n"
     );
 }
 
@@ -28,11 +31,43 @@ bool isFlag(std::string_view a, std::string_view name) {
     return a == name;
 }
 
+int runPack(const CliCommand& cmd) {
+    const Config cfg = loadConfig(cmd.configPath);
+    std::printf("[pack] config=%s\n", cmd.configPath.c_str());
+    std::printf("[pack] bundles=%zu output_dir=%s\n",
+                cfg.bundles.size(), cfg.output_dir.c_str());
+
+    const auto results = packAll(cfg, [](const std::string& rel,
+                                          uint64_t done,
+                                          uint64_t total) {
+        if (rel.empty()) {
+            std::printf("[pack]   (%llu / %llu) done\n",
+                        static_cast<unsigned long long>(done),
+                        static_cast<unsigned long long>(total));
+        } else {
+            std::printf("[pack]   (%llu / %llu) %s\n",
+                        static_cast<unsigned long long>(done + 1),
+                        static_cast<unsigned long long>(total),
+                        rel.c_str());
+        }
+    });
+
+    for (const auto& r : results) {
+        std::printf("[pack] wrote %s — %llu files, %llu bytes in → "
+                    "%llu bytes out\n",
+                    r.output_path.c_str(),
+                    static_cast<unsigned long long>(r.file_count),
+                    static_cast<unsigned long long>(r.total_bytes_in),
+                    static_cast<unsigned long long>(r.total_bytes_out));
+    }
+    return 0;
+}
+
 }  // namespace
 
 CliCommand parseCli(int argc, char** argv) {
     CliCommand cmd;
-    if (argc < 2) return cmd;  // defaults to Help
+    if (argc < 2) return cmd;
 
     const std::string sub = argv[1];
 
@@ -42,7 +77,7 @@ CliCommand parseCli(int argc, char** argv) {
 
     if (sub == "pack") {
         cmd.command = Command::Pack;
-        cmd.configPath = "config.json";  // default
+        cmd.configPath = "config.json";
         for (int i = 2; i < argc; ++i) {
             const std::string a = argv[i];
             if (a == "--config" && i + 1 < argc) {
@@ -77,16 +112,14 @@ int run(const CliCommand& cmd) {
             printUsage();
             return 0;
         case Command::Pack:
-            std::printf("[pack]   config=%s\n", cmd.configPath.c_str());
-            std::puts("[pack]   not implemented yet — arriving in Stage 3");
-            return 0;
+            return runPack(cmd);
         case Command::Verify:
             std::printf("[verify] pack=%s\n", cmd.packPath.c_str());
             std::puts("[verify] not implemented yet — arriving in Stage 6");
             return 0;
         case Command::Info:
             std::printf("[info]   pack=%s\n", cmd.packPath.c_str());
-            std::puts("[info]   not implemented yet — arriving in Stage 3");
+            std::puts("[info]   not implemented yet — arriving in Stage 4");
             return 0;
     }
     return 0;
