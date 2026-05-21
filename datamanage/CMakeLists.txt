@@ -43,8 +43,20 @@ add_subdirectory(vendor/zlib EXCLUDE_FROM_ALL)
 # We link the static one — keeps DataManage.exe single-file and
 # avoids the dance of shipping zlib1.dll alongside the binary.
 
-# Future vendored libraries (each lands offline in its own stage):
-#   add_subdirectory(vendor/mbedtls)            # Stage 6, 7
+# Vendored mbedTLS v3.6.2 — SHA-256 (Stage 5+), ECDSA P-256 signing
+# (Stage 6), AES-256-GCM + ECDH (Stage 7), X.509 chain validation
+# (Stage 6/8). Replaces the Windows CNG path so the crypto stack is
+# fully readable source — portable to non-Windows later if we want.
+set(ENABLE_PROGRAMS               OFF CACHE BOOL "" FORCE)
+set(ENABLE_TESTING                OFF CACHE BOOL "" FORCE)
+set(USE_SHARED_MBEDTLS_LIBRARY    OFF CACHE BOOL "" FORCE)
+set(USE_STATIC_MBEDTLS_LIBRARY    ON  CACHE BOOL "" FORCE)
+set(MBEDTLS_FATAL_WARNINGS        OFF CACHE BOOL "" FORCE)
+set(DISABLE_PACKAGE_CONFIG_AND_INSTALL ON CACHE BOOL "" FORCE)
+add_subdirectory(vendor/mbedtls EXCLUDE_FROM_ALL)
+# mbedTLS creates three targets: mbedcrypto (primitives), mbedx509
+# (cert parsing), mbedtls (SSL/TLS). We link the first two; we have
+# no TLS connections to make so mbedtls proper is unused.
 
 # WIN32 subsystem: no console window pops on launch. The exe falls back
 # to AttachConsole(ATTACH_PARENT_PROCESS) when invoked from a shell with
@@ -75,12 +87,13 @@ set_source_files_properties(resources/app.rc PROPERTIES
     COMPILE_FLAGS "/I\"${CMAKE_CURRENT_SOURCE_DIR}/resources\"")
 
 target_link_libraries(DataManage PRIVATE
-    comctl32   # themed Common Controls v6 (status bar, etc.)
-    user32     # CreateWindowEx, MessageBox, ...
-    gdi32      # DrawText, SetTextColor, ...
-    shell32    # CommandLineToArgvW
-    comdlg32   # GetOpenFileName
-    bcrypt     # SHA-256 (Stage 3); AES/ECDSA/ECDH later via mbedTLS
+    comctl32      # themed Common Controls v6 (status bar, etc.)
+    user32        # CreateWindowEx, MessageBox, ...
+    gdi32         # DrawText, SetTextColor, ...
+    shell32       # CommandLineToArgvW
+    comdlg32      # GetOpenFileName
+    mbedcrypto    # SHA-256 today; ECDSA/AES-GCM/ECDH in Stage 6/7
+    mbedx509      # X.509 cert parsing + chain validation (Stage 6+)
 )
 
 # MSVC auto-injects its own RT_MANIFEST resource. We supply ours via
@@ -126,7 +139,8 @@ target_include_directories(packer_smoke_test PRIVATE src)
 target_link_libraries(packer_smoke_test PRIVATE
     nlohmann_json
     zlibstatic
-    bcrypt
+    mbedcrypto
+    mbedx509
 )
 set_target_properties(packer_smoke_test PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY                "${CMAKE_BINARY_DIR}/bin"

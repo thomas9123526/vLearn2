@@ -143,11 +143,14 @@ are offline-capable on a fresh Windows 10 box):
 | --- | --- | --- | --- |
 | `nlohmann_json` v3.11.3 | MIT | single-header JSON for the manifest | **vendored** |
 | `zlib` v1.3.1 | zlib | DEFLATE compression for the data blobs | **vendored** |
-| `mbedtls` | Apache 2.0 | AES-256-GCM, ECDSA P-256, ECDH P-256, X.509 | Stage 6 / 7 |
+| `mbedtls` v3.6.2 | Apache 2.0 | SHA-256 (now), ECDSA P-256 (Stage 6), AES-256-GCM + ECDH + X.509 (Stage 7) | **vendored** |
 
-Stages 1–4 build on a fresh Windows 10 + VS 2022 machine with **no
+Stages 1–5 build on a fresh Windows 10 + VS 2022 machine with **no
 internet access**. Clone the repo, run `cmake -B build-x64 -A x64` +
-`cmake --build build-x64 --config Release`, done.
+`cmake --build build-x64 --config Release`, done. The entire crypto
+stack (SHA-256 today; ECDSA P-256, AES-256-GCM, ECDH P-256, X.509
+chain validation in later stages) compiles from readable C source
+under `vendor/mbedtls/`.
 
 ## Pack format (preview — finalised in Stage 2)
 
