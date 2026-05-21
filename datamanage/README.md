@@ -28,8 +28,8 @@ IV per blob. The ephemeral pubkey ships in the manifest as
 | 5 | CA setup — PowerShell scripts: root CA + admin sub-CAs | **done** |
 | 6 | Signing — ECDSA P-256 over (header ‖ manifest ‖ data ‖ cert) | **done** |
 | 7 | Encryption — AES-256-GCM + ECDH-wrapped session key | **done** |
-| 8 | Flutter `DataUnpackFactory` — verify → decrypt → decompress → write | next |
-| 9 | App reads `.ddp` from external storage and unpacks | |
+| 8 | Flutter `DataUnpackFactory` — verify → decrypt → decompress → write | **done** |
+| 9 | App reads `.ddp` from external storage and unpacks | next |
 
 ## Build
 

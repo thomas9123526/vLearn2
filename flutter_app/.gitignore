@@ -1,3 +1,9 @@
+# DataManage admin private key — bundled per build, never committed.
+# The matching root_ca.crt IS committed (it's a public certificate
+# that pins the trusted CA in the app).
+assets/datamanage/*.key
+assets/datamanage/*.pem
+
 # Miscellaneous
 *.class
 *.log
