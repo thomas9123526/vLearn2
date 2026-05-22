@@ -53,11 +53,19 @@ void main() {
     final outDir    = Directory('${tmp.path}/pack_out')..createSync();
     final unpackDir = Directory('${tmp.path}/unpacked')..createSync();
 
-    // Two files with deterministic content.
-    final helloBytes = utf8.encode('hello world\n');
-    final zerosBytes = Uint8List(4096); // all zeros — compresses dramatically
+    // Files with deterministic content, including TWO inside nested
+    // subdirectories so we verify the unpacker preserves the source
+    // folder structure rather than flattening everything.
+    final helloBytes  = utf8.encode('hello world\n');
+    final zerosBytes  = Uint8List(4096); // all zeros — compresses dramatically
+    final nestedBytes = utf8.encode('nested one level\n');
+    final deepBytes   = utf8.encode('nested two levels deep\n');
     await File('${srcDir.path}/hello.txt').writeAsBytes(helloBytes);
     await File('${srcDir.path}/zeros.bin').writeAsBytes(zerosBytes);
+    await (File('${srcDir.path}/sub/nested.txt')..createSync(recursive: true))
+        .writeAsBytes(nestedBytes);
+    await (File('${srcDir.path}/sub/deep/deep.txt')..createSync(recursive: true))
+        .writeAsBytes(deepBytes);
 
     final config = {
       'version': 1,
@@ -97,14 +105,34 @@ void main() {
     );
 
     expect(result.bundleName, 'roundtrip');
-    expect(result.files.length, 2);
+    expect(result.files.length, 4);
 
-    final helloOut = File('${unpackDir.path}/rt/hello.txt');
-    final zerosOut = File('${unpackDir.path}/rt/zeros.bin');
-    expect(helloOut.existsSync(), isTrue);
-    expect(zerosOut.existsSync(), isTrue);
-    expect(await helloOut.readAsBytes(), helloBytes);
-    expect(await zerosOut.readAsBytes(), zerosBytes);
+    final helloOut  = File('${unpackDir.path}/rt/hello.txt');
+    final zerosOut  = File('${unpackDir.path}/rt/zeros.bin');
+    // Nested files must land under <root>/<out_folder>/<rel_path> with
+    // the source subdirectory structure intact — NOT flattened into
+    // the out_folder root.
+    final nestedOut = File('${unpackDir.path}/rt/sub/nested.txt');
+    final deepOut   = File('${unpackDir.path}/rt/sub/deep/deep.txt');
+
+    expect(helloOut.existsSync(),  isTrue, reason: 'top-level file');
+    expect(zerosOut.existsSync(),  isTrue, reason: 'top-level file');
+    expect(nestedOut.existsSync(), isTrue,
+        reason: 'sub/nested.txt must keep its "sub/" folder');
+    expect(deepOut.existsSync(),   isTrue,
+        reason: 'sub/deep/deep.txt must keep its "sub/deep/" folders');
+
+    expect(await helloOut.readAsBytes(),  helloBytes);
+    expect(await zerosOut.readAsBytes(),  zerosBytes);
+    expect(await nestedOut.readAsBytes(), nestedBytes);
+    expect(await deepOut.readAsBytes(),   deepBytes);
+
+    // And the flattened-bug regression guard: a file named just
+    // "nested.txt" must NOT exist directly under rt/.
+    expect(File('${unpackDir.path}/rt/nested.txt').existsSync(), isFalse,
+        reason: 'nested file must not be flattened into out_folder root');
+    expect(File('${unpackDir.path}/rt/deep.txt').existsSync(), isFalse,
+        reason: 'deep file must not be flattened into out_folder root');
   });
 
   test('tamper detection: byte-flip in manifest must fail signature check',

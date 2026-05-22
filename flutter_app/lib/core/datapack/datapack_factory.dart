@@ -221,15 +221,21 @@ String _toHex(Uint8List bytes) {
 }
 
 String _safeJoin(String root, String outFolder, String relPath) {
-  // Manifest parsing already rejected absolute paths + `..` segments.
-  // Defence in depth: normalise + check the joined path actually
-  // stays under root.
-  final baseName = relPath.split(RegExp(r'[/\\]')).last;
-  final folderParts = outFolder.split(RegExp(r'[/\\]'));
+  // Final location is  <root>/<outFolder>/<relPath>  with the FULL
+  // directory structure of relPath preserved — relPath carries the
+  // path the file had inside the packed source dir (e.g.
+  // "encoder/model.onnx"), so we keep every segment, not just the
+  // basename. Manifest parsing already rejected absolute paths and
+  // `..` segments in both fields; splitting on separators here is a
+  // belt-and-braces normalisation before the under-root check.
+  final folderParts =
+      outFolder.split(RegExp(r'[/\\]')).where((s) => s.isNotEmpty);
+  final relParts =
+      relPath.split(RegExp(r'[/\\]')).where((s) => s.isNotEmpty);
   final joined = [
     root,
-    ...folderParts.where((s) => s.isNotEmpty),
-    baseName,
+    ...folderParts,
+    ...relParts,
   ].join(Platform.pathSeparator);
   // Reject if the resulting path doesn't start with root (after
   // canonicalisation). Symlinks aside, this catches any escape.
