@@ -64,6 +64,15 @@ class DataPackInstallOutcome {
 /// - `failed`    — could not be read or unpacked; see `error`.
 enum DataPackInstallStatus { installed, cached, deferred, failed }
 
+/// A `.dat` discovered during a scan: the file, its peeked manifest,
+/// and its SHA-256 fingerprint. Internal to `installGroup`.
+class _ScannedPack {
+  _ScannedPack(this.file, this.manifest, this.sha);
+  final File file;
+  final DataPackManifest manifest;
+  final String sha;
+}
+
 class DataPackInstaller {
   DataPackInstaller({
     required this.factory,
@@ -202,6 +211,140 @@ class DataPackInstaller {
     dpLog('installer: done — $installed installed, $cached cached, '
         '$deferred deferred, $failed failed. '
         'State saved to ${paths.stateFile.path}');
+    return outcomes;
+  }
+
+  /// Unpack every `.dat` whose manifest `group` matches [group] and
+  /// that isn't already installed — the on-demand counterpart to
+  /// [installPending]. A feature calls this the first time it needs
+  /// its data (e.g. the conversation screen for the "speech" group).
+  ///
+  /// [onProgress] fires with an overall fraction (0.0–1.0) across all
+  /// of the group's not-yet-installed packs, plus a human-readable
+  /// status — enough to drive a 0–100% progress bar. Already-cached
+  /// packs are reported `cached` and counted as instantly complete.
+  ///
+  /// The state file is checkpointed after every pack, so a group
+  /// unpack interrupted partway resumes cleanly on the next call.
+  Future<List<DataPackInstallOutcome>> installGroup(
+    String group, {
+    void Function(double fraction, String status)? onProgress,
+  }) async {
+    final outcomes = <DataPackInstallOutcome>[];
+    dpLog('installer: group "$group" — scanning ${paths.packsDir.path}');
+
+    if (!paths.packsDir.existsSync()) {
+      dpLog('installer: packs dir missing — nothing for group "$group"');
+      onProgress?.call(1.0, 'No data packs found');
+      return outcomes;
+    }
+
+    final state = await _loadState();
+    final candidates = paths.packsDir
+        .listSync(followLinks: false)
+        .whereType<File>()
+        .where((f) => f.path.toLowerCase().endsWith('.dat'))
+        .toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+
+    // Peek each manifest; keep this group's packs.
+    final inGroup = <_ScannedPack>[];
+    for (final pack in candidates) {
+      DataPackManifest manifest;
+      try {
+        manifest = await readPackManifest(pack.path);
+      } catch (e) {
+        dpLog('installer: FAILED  ${pack.uri.pathSegments.last} — '
+            'cannot read manifest: $e');
+        outcomes.add(DataPackInstallOutcome(
+          packPath:          pack.path,
+          bundleName:        '',
+          status:            DataPackInstallStatus.failed,
+          unpackedFileCount: 0,
+          error:             e.toString(),
+        ));
+        continue;
+      }
+      if (manifest.group != group) continue;
+      inGroup.add(_ScannedPack(pack, manifest, await _hashFile(pack)));
+    }
+    dpLog('installer: group "$group" — ${inGroup.length} pack(s) matched');
+
+    // Split: already-cached vs needs-unpack.
+    final toUnpack = <_ScannedPack>[];
+    for (final sp in inGroup) {
+      final fileName = sp.file.uri.pathSegments.last;
+      final prior = state['installed']?[fileName];
+      if (prior is Map && prior['sha256'] == sp.sha) {
+        dpLog('installer: CACHED  $fileName (group "$group")');
+        outcomes.add(DataPackInstallOutcome(
+          packPath:          sp.file.path,
+          bundleName:        sp.manifest.bundleName,
+          status:            DataPackInstallStatus.cached,
+          unpackedFileCount: 0,
+        ));
+      } else {
+        toUnpack.add(sp);
+      }
+    }
+
+    final totalFiles =
+        toUnpack.fold<int>(0, (s, e) => s + e.manifest.files.length);
+    if (totalFiles == 0) {
+      onProgress?.call(1.0, 'Already set up');
+      dpLog('installer: group "$group" — all packs already installed');
+      return outcomes;
+    }
+
+    var filesDoneBefore = 0;
+    for (final sp in toUnpack) {
+      final fileName  = sp.file.uri.pathSegments.last;
+      final packFiles = sp.manifest.files.length;
+      dpLog('installer: INSTALL $fileName '
+          '(group "$group", $packFiles file(s))');
+      try {
+        final result = await factory.unpack(
+          packPath: sp.file.path,
+          outRoot:  paths.unpackedRoot.path,
+          onFileProgress: (done, total) {
+            final overall = (filesDoneBefore + done) / totalFiles;
+            onProgress?.call(
+              overall.clamp(0.0, 1.0),
+              'Unpacking ${sp.manifest.bundleName} — $done/$total files',
+            );
+          },
+        );
+        state['installed'] ??= <String, dynamic>{};
+        state['installed'][fileName] = {
+          'sha256':      sp.sha,
+          'bundle_name': result.bundleName,
+          'unpacked_at': DateTime.now().toUtc().toIso8601String(),
+          'files':       result.files.map((f) => f.path).toList(),
+        };
+        await _saveState(state);  // checkpoint after each pack
+        outcomes.add(DataPackInstallOutcome(
+          packPath:          sp.file.path,
+          bundleName:        result.bundleName,
+          status:            DataPackInstallStatus.installed,
+          unpackedFileCount: result.files.length,
+        ));
+        dpLog('installer: OK      $fileName → "${result.bundleName}", '
+            '${result.files.length} file(s)');
+      } catch (e) {
+        dpLog('installer: FAILED  $fileName — $e');
+        outcomes.add(DataPackInstallOutcome(
+          packPath:          sp.file.path,
+          bundleName:        sp.manifest.bundleName,
+          status:            DataPackInstallStatus.failed,
+          unpackedFileCount: 0,
+          error:             e.toString(),
+        ));
+      }
+      filesDoneBefore += packFiles;
+    }
+
+    onProgress?.call(1.0, 'Done');
+    dpLog('installer: group "$group" — done');
     return outcomes;
   }
 

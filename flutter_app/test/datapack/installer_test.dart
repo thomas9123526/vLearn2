@@ -198,6 +198,66 @@ void main() {
     expect(speechNow.status, DataPackInstallStatus.installed,
         reason: 'on-demand phase: speech pack installs');
   });
+
+  test('installer: installGroup unpacks only the named group + reports '
+      'progress to 100%', () async {
+    if (!precondsOk) return;
+
+    final tmp = await Directory.systemTemp.createTemp('dm_install_group_');
+    addTearDown(() async {
+      try { await tmp.delete(recursive: true); } catch (_) {}
+    });
+
+    final packsDir   = Directory('${tmp.path}/packs')..createSync();
+    final unpackRoot = Directory('${tmp.path}/unpacked')..createSync();
+    final stateFile  = File('${tmp.path}/state.json');
+
+    // A "core" pack and a 2-file "speech" pack.
+    await _pack(
+      dmExe: dmExe, tmp: tmp.path, name: 'core_pack',
+      sourceFiles: {'c.txt': 'C'},
+      aliceCrt: aliceCrt, aliceKey: aliceKey, outDir: packsDir.path,
+      group: 'core', unpackPhase: 'splash',
+    );
+    await _pack(
+      dmExe: dmExe, tmp: tmp.path, name: 'speech_pack',
+      sourceFiles: {'s1.txt': 'S1', 's2.txt': 'S2'},
+      aliceCrt: aliceCrt, aliceKey: aliceKey, outDir: packsDir.path,
+      group: 'speech', unpackPhase: 'on-demand',
+    );
+
+    final paths = DataPackPaths(
+      packsDir: packsDir, unpackedRoot: unpackRoot, stateFile: stateFile,
+    );
+    final factory = DataUnpackFactory(
+      adminKeyPem: await File(aliceKey).readAsString(),
+      rootCaPem:   await File(rootCrt).readAsString(),
+    );
+    final installer = DataPackInstaller(factory: factory, paths: paths);
+
+    final fractions = <double>[];
+    final outcomes = await installer.installGroup(
+      'speech',
+      onProgress: (frac, status) => fractions.add(frac),
+    );
+
+    // Only the speech pack — core_pack is a different group, untouched.
+    expect(outcomes.length, 1,
+        reason: 'installGroup returns only the named group\'s packs');
+    expect(outcomes.single.bundleName, 'speech_pack');
+    expect(outcomes.single.status, DataPackInstallStatus.installed);
+    expect(outcomes.single.unpackedFileCount, 2);
+
+    // Progress was reported and reached 100%.
+    expect(fractions, isNotEmpty, reason: 'onProgress fired');
+    expect(fractions.last, closeTo(1.0, 0.0001),
+        reason: 'progress ends at 100%');
+
+    // Second call — the pack is now cached.
+    final again = await installer.installGroup('speech');
+    expect(again.single.status, DataPackInstallStatus.cached,
+        reason: 'group already installed → cached on the next call');
+  });
 }
 
 Future<void> _pack({

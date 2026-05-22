@@ -80,9 +80,13 @@ class DataUnpackFactory {
   /// `outRoot/<file.outFolder>/<basename(file.relPath)>`. Throws on
   /// any verification failure (bad magic, bad chain, bad signature,
   /// bad hash) or I/O error.
+  /// [onFileProgress] (optional) fires once per file as the data
+  /// section is decoded — `(filesDone, filesTotal)`. Used by the
+  /// on-demand group unpack to drive a 0–100% progress bar.
   Future<UnpackResult> unpack({
     required String packPath,
     required String outRoot,
+    void Function(int filesDone, int filesTotal)? onFileProgress,
   }) async {
     dpLog('unpack: START $packPath');
     dpLog('unpack:   → output root $outRoot');
@@ -208,6 +212,7 @@ class DataUnpackFactory {
       results.add(UnpackedFile(outPath, bytes.length));
       dpLog('unpack:   [$index/$total] ${mf.relPath}  '
           '(${steps.join(" → ")})  →  $outPath');
+      onFileProgress?.call(index, total);
     }
     dpLog('unpack: DONE "${manifest.bundleName}" — $total file(s) written '
         'under $outRoot');
