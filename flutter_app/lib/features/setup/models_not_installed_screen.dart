@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -172,6 +173,13 @@ class _NotFoundBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // The real unpack location is internal app storage — showing it
+    // would leak the package name + folder layout. Surface it on the
+    // console in debug builds only; the box below shows a friendly
+    // placeholder instead.
+    if (kDebugMode) {
+      debugPrint('[speech-setup] models would unpack to: $modelRoot');
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -207,9 +215,11 @@ class _NotFoundBody extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 4),
-              SelectableText(
-                modelRoot,
-                style: const TextStyle(
+              // Friendly placeholder — never the real internal path.
+              // The actual path is logged to the console in debug mode.
+              const Text(
+                'App data › Speech models',
+                style: TextStyle(
                   fontFamily: 'EditorialMono',
                   fontSize: 13,
                 ),
