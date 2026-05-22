@@ -73,6 +73,32 @@ class _ScannedPack {
   final String sha;
 }
 
+/// Where the [group]'s pack(s) were unpacked to, read straight from
+/// the install state file — the absolute model-root directory
+/// (`<unpackedRoot>/<out_folder>`). Returns null if the group isn't
+/// installed yet. Lets a feature (e.g. ModelRegistry → "speech")
+/// locate its data without re-reading any `.dat`.
+Future<String?> unpackedRootForGroup(
+    DataPackPaths paths, String group) async {
+  if (!paths.stateFile.existsSync()) return null;
+  try {
+    final raw = jsonDecode(await paths.stateFile.readAsString());
+    if (raw is! Map) return null;
+    final installed = raw['installed'];
+    if (installed is! Map) return null;
+    for (final entry in installed.values) {
+      if (entry is Map &&
+          entry['group'] == group &&
+          entry['unpacked_subroot'] is String) {
+        return entry['unpacked_subroot'] as String;
+      }
+    }
+  } catch (_) {
+    // Corrupt state file — treat the group as not installed.
+  }
+  return null;
+}
+
 class DataPackInstaller {
   DataPackInstaller({
     required this.factory,
@@ -180,10 +206,12 @@ class DataPackInstaller {
         );
         state['installed'] ??= <String, dynamic>{};
         state['installed'][fileName] = {
-          'sha256':      fingerprint,
-          'bundle_name': result.bundleName,
-          'unpacked_at': DateTime.now().toUtc().toIso8601String(),
-          'files':       result.files.map((f) => f.path).toList(),
+          'sha256':           fingerprint,
+          'bundle_name':      result.bundleName,
+          'group':            manifest.group,
+          'unpacked_subroot': _subrootFor(manifest),
+          'unpacked_at':      DateTime.now().toUtc().toIso8601String(),
+          'files':            result.files.map((f) => f.path).toList(),
         };
         ++installed;
         dpLog('installer: OK      $fileName → bundle "${result.bundleName}", '
@@ -316,10 +344,12 @@ class DataPackInstaller {
         );
         state['installed'] ??= <String, dynamic>{};
         state['installed'][fileName] = {
-          'sha256':      sp.sha,
-          'bundle_name': result.bundleName,
-          'unpacked_at': DateTime.now().toUtc().toIso8601String(),
-          'files':       result.files.map((f) => f.path).toList(),
+          'sha256':           sp.sha,
+          'bundle_name':      result.bundleName,
+          'group':            sp.manifest.group,
+          'unpacked_subroot': _subrootFor(sp.manifest),
+          'unpacked_at':      DateTime.now().toUtc().toIso8601String(),
+          'files':            result.files.map((f) => f.path).toList(),
         };
         await _saveState(state);  // checkpoint after each pack
         outcomes.add(DataPackInstallOutcome(
@@ -346,6 +376,21 @@ class DataPackInstaller {
     onProgress?.call(1.0, 'Done');
     dpLog('installer: group "$group" — done');
     return outcomes;
+  }
+
+  /// Absolute directory the bundle's files land in:
+  /// `<unpackedRoot>/<out_folder>`. Every file in a bundle shares the
+  /// same `out_folder` (the packer sets it bundle-wide), so the first
+  /// file's is representative. Recorded in the state file so
+  /// [unpackedRootForGroup] can answer "where is group X?" without
+  /// re-reading the .dat.
+  String _subrootFor(DataPackManifest manifest) {
+    if (manifest.files.isEmpty) return paths.unpackedRoot.path;
+    final outFolder = manifest.files.first.outFolder
+        .replaceAll('/', Platform.pathSeparator);
+    return outFolder.isEmpty
+        ? paths.unpackedRoot.path
+        : '${paths.unpackedRoot.path}${Platform.pathSeparator}$outFolder';
   }
 
   Future<Map<String, dynamic>> _loadState() async {

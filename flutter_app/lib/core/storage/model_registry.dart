@@ -5,7 +5,9 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+
+import '../datapack/datapack_installer.dart' show unpackedRootForGroup;
+import '../datapack/datapack_paths.dart';
 
 /// Per-file entry from manifest.json.
 class ModelFile {
@@ -98,32 +100,36 @@ class ModelRegistry {
 
   final Directory? _overrideRoot;
 
-  /// Resolves the on-disk root where models are expected to live.
+  /// Resolves the on-disk root where the sherpa-onnx models live.
   ///
-  /// Android: app-scoped external storage (`getExternalStorageDirectory()`)
-  /// — survives uninstalls if the user moves to `/sdcard/Android/data/...`.
-  /// Windows: hardcoded `%APPDATA%\VLearn2\models` so the path is stable
-  /// across rebuilds and doesn't depend on Flutter's `package_info_plus` →
-  /// `path_provider_windows` resolution (which varies with VERSIONINFO
-  /// fields and was making the expected location hard to communicate).
+  /// Models now arrive via the **datapack** pipeline: the admin packs
+  /// them into a `.dat` tagged `group: "speech"`, and the app unpacks
+  /// that group (on-demand) into the unpacked tree under the admin's
+  /// chosen `out_folder`. We read that exact location back from the
+  /// install state file via [unpackedRootForGroup] — so the model
+  /// root is wherever `out_folder` put it, no guessing.
+  ///
+  /// Before the speech group is installed there's no root, so we
+  /// return a placeholder dir that won't contain `manifest.json` —
+  /// `snapshot()` then reports `manifestMissing`, which routes the
+  /// user to the speech-setup screen.
+  ///
+  /// A test `overrideRoot` still wins, resolving to `<override>/models`.
   Future<Directory> resolveModelRoot() async {
-    Directory? root;
+    Directory root;
     if (_overrideRoot != null) {
-      root = _overrideRoot;
-    } else if (Platform.isAndroid) {
-      root = await getExternalStorageDirectory();
-    } else if (Platform.isWindows) {
-      final appData = Platform.environment['APPDATA'];
-      if (appData != null && appData.isNotEmpty) {
-        root = Directory(p.join(appData, 'VLearn2'));
-      }
+      root = Directory(p.join(_overrideRoot.path, 'models'));
+    } else {
+      final paths = await DataPackPaths.resolve();
+      final subroot = await unpackedRootForGroup(paths, 'speech');
+      root = subroot != null
+          ? Directory(subroot)
+          : Directory(p.join(paths.unpackedRoot.path, '_speech_not_installed'));
     }
-    root ??= await getApplicationSupportDirectory();
-    final modelsDir = Directory(p.join(root.path, 'models'));
-    if (!modelsDir.existsSync()) {
-      modelsDir.createSync(recursive: true);
+    if (!root.existsSync()) {
+      root.createSync(recursive: true);
     }
-    return modelsDir;
+    return root;
   }
 
   Future<File> _manifestFile() async {

@@ -258,6 +258,56 @@ void main() {
     expect(again.single.status, DataPackInstallStatus.cached,
         reason: 'group already installed → cached on the next call');
   });
+
+  test('installer: unpackedRootForGroup resolves the group model root',
+      () async {
+    if (!precondsOk) return;
+
+    final tmp = await Directory.systemTemp.createTemp('dm_group_root_');
+    addTearDown(() async {
+      try { await tmp.delete(recursive: true); } catch (_) {}
+    });
+
+    final packsDir   = Directory('${tmp.path}/packs')..createSync();
+    final unpackRoot = Directory('${tmp.path}/unpacked')..createSync();
+    final stateFile  = File('${tmp.path}/state.json');
+
+    await _pack(
+      dmExe: dmExe, tmp: tmp.path, name: 'sherpa_models',
+      sourceFiles: {'encoder.onnx': 'E', 'tokens.txt': 'T'},
+      aliceCrt: aliceCrt, aliceKey: aliceKey, outDir: packsDir.path,
+      group: 'speech', unpackPhase: 'on-demand',
+    );
+
+    final paths = DataPackPaths(
+      packsDir: packsDir, unpackedRoot: unpackRoot, stateFile: stateFile,
+    );
+
+    // Before install — the group has no recorded root.
+    expect(await unpackedRootForGroup(paths, 'speech'), isNull,
+        reason: 'group not installed yet → null');
+
+    final factory = DataUnpackFactory(
+      adminKeyPem: await File(aliceKey).readAsString(),
+      rootCaPem:   await File(rootCrt).readAsString(),
+    );
+    final installer = DataPackInstaller(factory: factory, paths: paths);
+    await installer.installGroup('speech');
+
+    // After install — resolves to <unpackedRoot>/<out_folder>. The
+    // _pack helper uses out_folder == bundle name ("sherpa_models").
+    final root = await unpackedRootForGroup(paths, 'speech');
+    expect(root, isNotNull);
+    expect(root, endsWith('sherpa_models'),
+        reason: 'model root is <unpackedRoot>/<out_folder>');
+    expect(Directory(root!).existsSync(), isTrue,
+        reason: 'the resolved root actually exists on disk');
+    expect(File('$root/encoder.onnx').existsSync(), isTrue,
+        reason: 'the unpacked model files are under the resolved root');
+
+    // An unknown group resolves to null.
+    expect(await unpackedRootForGroup(paths, 'no-such-group'), isNull);
+  });
 }
 
 Future<void> _pack({
