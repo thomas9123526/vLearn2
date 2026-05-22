@@ -15,6 +15,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'datapack_log.dart';
+
 class DataPackPaths {
   const DataPackPaths({
     required this.packsDir,
@@ -58,13 +60,20 @@ class DataPackPaths {
             await Permission.storage.isGranted;
 
     final packs = hasPermission ? publicPacks : fallbackPacks;
+    dpLog('paths: platform=Android, '
+        'MANAGE_EXTERNAL_STORAGE granted=$hasPermission');
+    dpLog('paths: ${hasPermission ? "using PUBLIC path" : "using FALLBACK "
+        "path (permission not granted — public /storage/emulated/0/룡마/... "
+        "is not reachable)"}');
     if (!packs.existsSync()) {
       try {
         packs.createSync(recursive: true);
-      } catch (_) {
+        dpLog('paths: created packs dir (did not exist)');
+      } catch (e) {
         // Public dir creation can fail before permission is granted;
         // fall back silently. The installer will see "no packs to
         // process" and exit clean.
+        dpLog('paths: WARNING could not create packs dir: $e');
       }
     }
 
@@ -73,6 +82,11 @@ class DataPackPaths {
     unpacked.createSync(recursive: true);
 
     final state = File(p.join(support.path, 'datapack_state.json'));
+
+    dpLog('paths: .ddp folder (drop files here) = ${packs.path}');
+    dpLog('paths: decoded files go to          = ${unpacked.path}');
+    dpLog('paths: install state file           = ${state.path}');
+
     return DataPackPaths(
       packsDir:     packs,
       unpackedRoot: unpacked,
@@ -93,6 +107,12 @@ class DataPackPaths {
     unpacked.createSync(recursive: true);
 
     final state = File(p.join(support.path, 'datapack_state.json'));
+
+    dpLog('paths: platform=Windows');
+    dpLog('paths: .ddp folder (drop files here) = ${packs.path}');
+    dpLog('paths: decoded files go to          = ${unpacked.path}');
+    dpLog('paths: install state file           = ${state.path}');
+
     return DataPackPaths(
       packsDir:     packs,
       unpackedRoot: unpacked,

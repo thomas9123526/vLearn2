@@ -26,6 +26,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
 
+import 'datapack_log.dart';
 import 'datapack_factory.dart';
 import 'datapack_paths.dart';
 
@@ -72,7 +73,9 @@ class DataPackInstaller {
   Future<List<DataPackInstallOutcome>> installPending() async {
     final outcomes = <DataPackInstallOutcome>[];
 
+    dpLog('installer: scanning ${paths.packsDir.path}');
     if (!paths.packsDir.existsSync()) {
+      dpLog('installer: packs dir does not exist — nothing to install');
       return outcomes;  // nothing to do — admin hasn't dropped any packs yet
     }
 
@@ -85,12 +88,22 @@ class DataPackInstaller {
         .toList()
       ..sort((a, b) => a.path.compareTo(b.path));
 
+    dpLog('installer: found ${candidates.length} .ddp file(s)');
+    if (candidates.isEmpty) {
+      dpLog('installer: drop .ddp files into ${paths.packsDir.path} '
+          'and relaunch');
+    }
+
+    var installed = 0, cached = 0, failed = 0;
     for (final pack in candidates) {
       final fileName = pack.uri.pathSegments.last;
       final fingerprint = await _hashFile(pack);
       final prior = state['installed']?[fileName];
       if (prior is Map &&
           prior['sha256'] == fingerprint) {
+        dpLog('installer: CACHED  $fileName '
+            '(sha256 ${fingerprint.substring(0, 12)}… already installed)');
+        ++cached;
         outcomes.add(DataPackInstallOutcome(
           packPath:          pack.path,
           bundleName:        (prior['bundle_name'] as String?) ?? '',
@@ -100,6 +113,8 @@ class DataPackInstaller {
         continue;
       }
 
+      dpLog('installer: INSTALL $fileName '
+          '(sha256 ${fingerprint.substring(0, 12)}… — new or changed)');
       try {
         final result = await factory.unpack(
           packPath: pack.path,
@@ -112,6 +127,9 @@ class DataPackInstaller {
           'unpacked_at': DateTime.now().toUtc().toIso8601String(),
           'files':       result.files.map((f) => f.path).toList(),
         };
+        ++installed;
+        dpLog('installer: OK      $fileName → bundle "${result.bundleName}", '
+            '${result.files.length} file(s)');
         outcomes.add(DataPackInstallOutcome(
           packPath:          pack.path,
           bundleName:        result.bundleName,
@@ -119,6 +137,8 @@ class DataPackInstaller {
           unpackedFileCount: result.files.length,
         ));
       } catch (e) {
+        ++failed;
+        dpLog('installer: FAILED  $fileName — $e');
         outcomes.add(DataPackInstallOutcome(
           packPath:          pack.path,
           bundleName:        '',
@@ -130,6 +150,8 @@ class DataPackInstaller {
     }
 
     await _saveState(state);
+    dpLog('installer: done — $installed installed, $cached cached, '
+        '$failed failed. State saved to ${paths.stateFile.path}');
     return outcomes;
   }
 

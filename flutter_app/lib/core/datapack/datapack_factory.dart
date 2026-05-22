@@ -22,6 +22,7 @@ import 'package:archive/archive.dart';
 import 'datapack_cert.dart';
 import 'datapack_crypto.dart';
 import 'datapack_format.dart';
+import 'datapack_log.dart';
 import 'datapack_manifest.dart';
 
 class UnpackedFile {
@@ -54,16 +55,26 @@ class DataUnpackFactory {
     required String packPath,
     required String outRoot,
   }) async {
+    dpLog('unpack: START $packPath');
+    dpLog('unpack:   → output root $outRoot');
     final pack = Uint8List.fromList(await File(packPath).readAsBytes());
+    dpLog('unpack:   read ${pack.length} bytes from disk');
 
     // 1) Header.
     final hdr = DataPackHeader.parse(pack);
+    dpLog('unpack:   [1/6] header OK — version ${hdr.version}, '
+        'compressed=${hdr.isCompressed}, encrypted=${hdr.isEncrypted}, '
+        'signed=${hdr.isSigned}');
 
     // 2) Manifest.
     final manifestJson = String.fromCharCodes(Uint8List.sublistView(
       pack, hdr.manifestOffset, hdr.manifestOffset + hdr.manifestLen,
     ));
     final manifest = DataPackManifest.parse(manifestJson);
+    dpLog('unpack:   [2/6] manifest OK — bundle "${manifest.bundleName}", '
+        '${manifest.files.length} file(s), '
+        'compression=${manifest.compression}, '
+        'encryption=${manifest.encryption}');
 
     // 3) Cert + chain validation. Anything without a cert + sig is
     //    refused — debug Stage-3 packs only work in dev tools.
@@ -77,6 +88,7 @@ class DataUnpackFactory {
       throw const FormatException(
           '.ddp admin cert does not chain to the pinned root CA');
     }
+    dpLog('unpack:   [3/6] cert chain OK — admin cert chains to pinned root');
 
     // 4) Verify the pack signature. Mirror of the trick in
     //    packer.cpp: re-zero sig_len/sig_offset before hashing.
@@ -93,6 +105,7 @@ class DataUnpackFactory {
       throw const FormatException(
           '.ddp signature does not verify against admin cert pubkey');
     }
+    dpLog('unpack:   [4/6] signature OK — ECDSA verifies against admin cert');
 
     // 5) Derive AES key if the pack is encrypted.
     Uint8List? aesKey;
@@ -109,46 +122,66 @@ class DataUnpackFactory {
         salt: Uint8List.fromList(kHkdfSalt.codeUnits),
         info: Uint8List.fromList(kHkdfInfo.codeUnits),
       );
+      dpLog('unpack:   [5/6] AES-256 key derived via ECDH + HKDF');
+    } else {
+      dpLog('unpack:   [5/6] pack not encrypted — no key derivation');
     }
 
     // 6) Walk the manifest, decode + write each file.
+    dpLog('unpack:   [6/6] decoding ${manifest.files.length} file(s)…');
     final outDir = Directory(outRoot);
     if (!await outDir.exists()) await outDir.create(recursive: true);
 
     final results = <UnpackedFile>[];
+    final total = manifest.files.length;
+    var index = 0;
     for (final mf in manifest.files) {
-      final stored = Uint8List.sublistView(
+      ++index;
+      final steps = <String>[];
+
+      Uint8List bytes = Uint8List.sublistView(
         pack, hdr.dataOffset + mf.offset,
               hdr.dataOffset + mf.offset + mf.storedSize,
       );
+      steps.add('read ${mf.storedSize}B');
 
-      Uint8List bytes = stored;
       if (aesKey != null) {
         bytes = aesGcmDecrypt(key: aesKey, blob: bytes);
+        steps.add('decrypt');
       }
       if (hdr.isCompressed) {
         // archive's ZLibDecoder handles RFC 1950 zlib streams
         // (which is what encrypt.cpp::deflateZlib produces).
         bytes = Uint8List.fromList(const ZLibDecoder().decodeBytes(bytes));
+        steps.add('inflate→${bytes.length}B');
       }
 
       if (bytes.length != mf.size) {
+        dpLog('unpack:   [$index/$total] FAIL ${mf.relPath} — '
+            'decoded ${bytes.length}B != manifest ${mf.size}B');
         throw FormatException(
             'decoded size ${bytes.length} != manifest size ${mf.size} '
             'for ${mf.relPath}');
       }
       final actualHash = _toHex(sha256Bytes(bytes));
       if (actualHash != mf.sha256Hex) {
+        dpLog('unpack:   [$index/$total] FAIL ${mf.relPath} — '
+            'SHA-256 mismatch');
         throw FormatException(
             'SHA-256 mismatch for ${mf.relPath}: '
             'expected ${mf.sha256Hex}, got $actualHash');
       }
+      steps.add('sha256 OK');
 
       final outPath = _safeJoin(outRoot, mf.outFolder, mf.relPath);
       await Directory(_dirOf(outPath)).create(recursive: true);
       await File(outPath).writeAsBytes(bytes, flush: true);
       results.add(UnpackedFile(outPath, bytes.length));
+      dpLog('unpack:   [$index/$total] ${mf.relPath}  '
+          '(${steps.join(" → ")})  →  $outPath');
     }
+    dpLog('unpack: DONE "${manifest.bundleName}" — $total file(s) written '
+        'under $outRoot');
     return UnpackResult(manifest.bundleName, results);
   }
 
