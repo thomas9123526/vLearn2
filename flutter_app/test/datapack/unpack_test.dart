@@ -91,9 +91,9 @@ void main() {
         reason: 'DataManage.exe failed.\nstderr:\n${pack.stderr}\n'
                 'stdout:\n${pack.stdout}');
 
-    final packPath = '${outDir.path}/roundtrip.ddp';
+    final packPath = '${outDir.path}/roundtrip.dat';
     expect(File(packPath).existsSync(), isTrue,
-        reason: 'expected .ddp at $packPath');
+        reason: 'expected .dat pack at $packPath');
 
     final factory = DataUnpackFactory(
       adminKeyPem: await File(aliceKey).readAsString(),
@@ -168,14 +168,14 @@ void main() {
     final pack = await Process.run(dmExe, ['pack', '--config', configPath]);
     expect(pack.exitCode, 0);
 
-    final packPath = '${outDir.path}/tamper.ddp';
+    final packPath = '${outDir.path}/tamper.dat';
     final pristine = Uint8List.fromList(await File(packPath).readAsBytes());
     // Flip one byte inside the manifest region (offset 64 = start of
     // manifest section in standard packs — bump 10 bytes in to land
     // somewhere inside a key/value pair).
     final mutated = Uint8List.fromList(pristine);
     mutated[74] ^= 0xFF;
-    final mutatedPath = '${tmp.path}/mutated.ddp';
+    final mutatedPath = '${tmp.path}/mutated.dat';
     await File(mutatedPath).writeAsBytes(mutated);
 
     final factory = DataUnpackFactory(
@@ -185,7 +185,7 @@ void main() {
     await expectLater(
       factory.unpack(packPath: mutatedPath, outRoot: unpackDir.path),
       throwsA(isA<Exception>()),
-      reason: 'tampered .ddp must be rejected',
+      reason: 'tampered .dat pack must be rejected',
     );
   });
 }

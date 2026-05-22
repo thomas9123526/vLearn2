@@ -84,13 +84,13 @@ class DataPackInstaller {
     final candidates = paths.packsDir
         .listSync(followLinks: false)
         .whereType<File>()
-        .where((f) => f.path.toLowerCase().endsWith('.ddp'))
+        .where((f) => f.path.toLowerCase().endsWith('.dat'))
         .toList()
       ..sort((a, b) => a.path.compareTo(b.path));
 
-    dpLog('installer: found ${candidates.length} .ddp file(s)');
+    dpLog('installer: found ${candidates.length} .dat pack file(s)');
     if (candidates.isEmpty) {
-      dpLog('installer: drop .ddp files into ${paths.packsDir.path} '
+      dpLog('installer: drop .dat pack files into ${paths.packsDir.path} '
           'and relaunch');
     }
 

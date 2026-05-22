@@ -30,4 +30,5 @@ config.json
 
 # Bundles produced by `DataManage pack` — output, not source.
 output/
+*.dat
 *.ddp

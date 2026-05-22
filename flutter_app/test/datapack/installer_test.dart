@@ -92,8 +92,8 @@ void main() {
       reason: 'second run hits cache for both packs',
     );
 
-    // Updated .ddp: rewrite pack_a with different content, same name.
-    await File('${packsDir.path}/pack_a.ddp').delete();
+    // Updated pack: rewrite pack_a with different content, same name.
+    await File('${packsDir.path}/pack_a.dat').delete();
     await _pack(
       dmExe: dmExe, tmp: tmp.path, name: 'pack_a',
       sourceFiles: {'a.txt': 'AAA_v2'},
@@ -103,11 +103,11 @@ void main() {
 
     final third = await installer.installPending();
     final updated = third.firstWhere((o) =>
-        o.packPath.endsWith('pack_a.ddp'));
+        o.packPath.endsWith('pack_a.dat'));
     expect(updated.status, DataPackInstallStatus.installed,
-        reason: 'updated .ddp triggers re-install');
+        reason: 'updated pack triggers re-install');
     final stillCached = third.firstWhere((o) =>
-        o.packPath.endsWith('pack_b.ddp'));
+        o.packPath.endsWith('pack_b.dat'));
     expect(stillCached.status, DataPackInstallStatus.cached);
   });
 
@@ -123,8 +123,8 @@ void main() {
     final unpackRoot = Directory('${tmp.path}/unpacked')..createSync();
     final stateFile  = File('${tmp.path}/state.json');
 
-    // Write a bogus .ddp — wrong magic.
-    await File('${packsDir.path}/bogus.ddp').writeAsBytes(
+    // Write a bogus .dat pack — wrong magic.
+    await File('${packsDir.path}/bogus.dat').writeAsBytes(
         List.filled(128, 0));
 
     final paths = DataPackPaths(

@@ -113,7 +113,9 @@ fs::path joinOutput(const std::string& output_dir,
                     const std::string& bundle_name) {
     fs::path dir(output_dir);
     fs::create_directories(dir);
-    return dir / (bundle_name + ".ddp");
+    // Output extension is ".dat". The internal format magic stays
+    // "DDDP" — only the on-disk file extension changed.
+    return dir / (bundle_name + ".dat");
 }
 
 }  // namespace
@@ -267,7 +269,7 @@ PackResult packBundle(const BundleConfig& bundle,
         hdr.sig_offset = hdr.cert_offset + hdr.cert_len;
     }
 
-    // Emit the .ddp file in section order.
+    // Emit the .dat pack file in section order.
     const fs::path out_path = joinOutput(output_dir, bundle.name);
     std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
     if (!out) {
