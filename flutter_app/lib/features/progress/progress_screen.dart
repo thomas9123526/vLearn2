@@ -1,88 +1,106 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/app_apis.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/cached_providers.dart';
 import '../../shared/widgets/layout_visibility.dart';
-
-/// Aggregated `/progress` payload. Backend shape (see ProgressService):
-/// `{ ...UserProgressEntity, latestSnapshot: SkillSnapshotEntity | null }`.
-final _progressProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  return ref.read(progressApiProvider).myProgress();
-});
-
-final _snapshotsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  return ref.read(progressApiProvider).snapshots();
-});
-
-final _completionsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  return ref.read(progressApiProvider).completions();
-});
+import '../../shared/widgets/refreshing_dot.dart';
 
 class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authProvider).user;
-    final progress = ref.watch(_progressProvider);
-    final snapshots = ref.watch(_snapshotsProvider);
-    final completions = ref.watch(_completionsProvider);
+    final currentLevel = ref.watch(authProvider).user?.currentLevel ?? 1;
+    final progress = ref.watch(progressSummaryProvider);
+    final snapshots = ref.watch(progressSnapshotsProvider);
+    final completions = ref.watch(progressCompletionsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Progress')),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(_progressProvider);
-          ref.invalidate(_snapshotsProvider);
-          ref.invalidate(_completionsProvider);
+          await Future.wait<void>([
+            ref.read(progressSummaryProvider.notifier).refresh(),
+            ref.read(progressSnapshotsProvider.notifier).refresh(),
+            ref.read(progressCompletionsProvider.notifier).refresh(),
+          ]);
         },
-        child: progress.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, st) {
-            logRawError('progress_screen.load', e, st);
-            return PoliteErrorCenter(
-              error: e,
-              context: ErrorContext.loadDetail,
-              onRetry: () => ref.invalidate(_progressProvider),
-            );
-          },
-          data: (p) {
-            final latest = p['latestSnapshot'] as Map<String, dynamic>?;
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-              children: [
-                LayoutVisibility(
-                  configKey: 'progress.level_badge',
-                  child: _CefrCard(currentLevel: user?.currentLevel ?? 1),
-                ),
-                const SizedBox(height: 16),
-                LayoutVisibility(
-                  configKey: 'progress.weekly_chart',
-                  child: _ActivityCard(
-                    minutesTotal: (p['minutes_spoken_total'] as num? ?? 0).toInt(),
-                    minutesWeek: (p['minutes_spoken_this_week'] as num? ?? 0).toInt(),
-                    sessionsTotal: (p['sessions_total'] as num? ?? 0).toInt(),
-                    sessionsWeek: (p['sessions_this_week'] as num? ?? 0).toInt(),
-                    snapshotsAsync: snapshots,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                LayoutVisibility(
-                  configKey: 'progress.skill_radar',
-                  child: _SkillBreakdown(latest: latest),
-                ),
-                const SizedBox(height: 16),
-                LayoutVisibility(
-                  configKey: 'progress.achievements',
-                  child: _CompletionsCard(async: completions),
-                ),
-              ],
-            );
-          },
-        ),
+        child:
+            _body(context, ref, currentLevel, progress, snapshots, completions),
       ),
+    );
+  }
+
+  /// Cache-first body: the cards render the instant a cached `/progress`
+  /// copy exists; a cold first launch shows a spinner; a first-ever fetch
+  /// failure (nothing cached) shows a polite error.
+  Widget _body(
+    BuildContext context,
+    WidgetRef ref,
+    int currentLevel,
+    Cached<Map<String, dynamic>> progress,
+    Cached<List<Map<String, dynamic>>> snapshots,
+    Cached<List<Map<String, dynamic>>> completions,
+  ) {
+    final p = progress.value;
+    if (p == null) {
+      if (progress.error != null) {
+        logRawError('progress_screen.load', progress.error!,
+            progress.stackTrace ?? StackTrace.current);
+        return PoliteErrorCenter(
+          error: progress.error!,
+          context: ErrorContext.loadDetail,
+          onRetry: () => ref.read(progressSummaryProvider.notifier).refresh(),
+        );
+      }
+      // Cold first launch — spinner kept inside a scrollable so
+      // pull-to-refresh still works.
+      return ListView(
+        children: const [
+          SizedBox(height: 240),
+          Center(child: CircularProgressIndicator()),
+        ],
+      );
+    }
+    final latest = p['latestSnapshot'] as Map<String, dynamic>?;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      children: [
+        LayoutVisibility(
+          configKey: 'progress.level_badge',
+          child: _CefrCard(currentLevel: currentLevel),
+        ),
+        const SizedBox(height: 16),
+        LayoutVisibility(
+          configKey: 'progress.weekly_chart',
+          child: _ActivityCard(
+            minutesTotal: (p['minutes_spoken_total'] as num? ?? 0).toInt(),
+            minutesWeek: (p['minutes_spoken_this_week'] as num? ?? 0).toInt(),
+            sessionsTotal: (p['sessions_total'] as num? ?? 0).toInt(),
+            sessionsWeek: (p['sessions_this_week'] as num? ?? 0).toInt(),
+            snapshots: snapshots,
+            refreshing: progress.refreshing || snapshots.refreshing,
+          ),
+        ),
+        const SizedBox(height: 16),
+        LayoutVisibility(
+          configKey: 'progress.skill_radar',
+          child: _SkillBreakdown(
+            latest: latest,
+            refreshing: progress.refreshing,
+          ),
+        ),
+        const SizedBox(height: 16),
+        LayoutVisibility(
+          configKey: 'progress.achievements',
+          child: _CompletionsCard(
+            completions: completions,
+            refreshing: completions.refreshing,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -214,14 +232,16 @@ class _ActivityCard extends StatelessWidget {
     required this.minutesWeek,
     required this.sessionsTotal,
     required this.sessionsWeek,
-    required this.snapshotsAsync,
+    required this.snapshots,
+    required this.refreshing,
   });
 
   final int minutesTotal;
   final int minutesWeek;
   final int sessionsTotal;
   final int sessionsWeek;
-  final AsyncValue<List<Map<String, dynamic>>> snapshotsAsync;
+  final Cached<List<Map<String, dynamic>>> snapshots;
+  final bool refreshing;
 
   @override
   Widget build(BuildContext context) {
@@ -236,15 +256,7 @@ class _ActivityCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'MINUTES SPOKEN',
-            style: TextStyle(
-              fontFamily: 'EditorialMono',
-              fontSize: 11,
-              letterSpacing: 1.4,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
+          _SectionLabel('MINUTES SPOKEN', refreshing: refreshing),
           const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -287,17 +299,17 @@ class _ActivityCard extends StatelessWidget {
           const SizedBox(height: 16),
           SizedBox(
             height: 100,
-            child: snapshotsAsync.when(
-              loading: () => const Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-              error: (_, _) => const SizedBox.shrink(),
-              data: (list) => _MiniBars(snapshots: list),
-            ),
+            child: snapshots.hasValue
+                ? _MiniBars(snapshots: snapshots.value!)
+                : snapshots.error != null
+                    ? const SizedBox.shrink()
+                    : const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -414,8 +426,9 @@ class _MiniStat extends StatelessWidget {
 }
 
 class _SkillBreakdown extends StatelessWidget {
-  const _SkillBreakdown({required this.latest});
+  const _SkillBreakdown({required this.latest, required this.refreshing});
   final Map<String, dynamic>? latest;
+  final bool refreshing;
 
   @override
   Widget build(BuildContext context) {
@@ -436,15 +449,7 @@ class _SkillBreakdown extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'SKILL BREAKDOWN',
-            style: TextStyle(
-              fontFamily: 'EditorialMono',
-              fontSize: 11,
-              letterSpacing: 1.4,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
+          _SectionLabel('SKILL BREAKDOWN', refreshing: refreshing),
           const SizedBox(height: 12),
           for (final entry in skills.entries)
             Padding(
@@ -528,8 +533,9 @@ class _SkillRow extends StatelessWidget {
 }
 
 class _CompletionsCard extends StatelessWidget {
-  const _CompletionsCard({required this.async});
-  final AsyncValue<List<Map<String, dynamic>>> async;
+  const _CompletionsCard({required this.completions, required this.refreshing});
+  final Cached<List<Map<String, dynamic>>> completions;
+  final bool refreshing;
 
   @override
   Widget build(BuildContext context) {
@@ -544,72 +550,101 @@ class _CompletionsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'SCENARIOS COMPLETED',
-            style: TextStyle(
-              fontFamily: 'EditorialMono',
-              fontSize: 11,
-              letterSpacing: 1.4,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
+          _SectionLabel('SCENARIOS COMPLETED', refreshing: refreshing),
           const SizedBox(height: 12),
-          async.when(
-            loading: () => const SizedBox(
-              height: 60,
-              child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
-            error: (_, _) => const SizedBox.shrink(),
-            data: (list) => list.isEmpty
-                ? Text(
-                    'No completed scenarios yet — pick one and start talking.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                  )
-                : Column(
-                    children: [
-                      for (final c in list.take(6))
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.check_circle_outline,
-                                size: 16,
-                                color: scheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  c['scenario_id'] as String? ?? 'Scenario',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
-                              Text(
-                                '×${(c['completion_count'] as num? ?? 1).toInt()}',
-                                style: TextStyle(
-                                  fontFamily: 'EditorialMono',
-                                  fontSize: 12,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-          ),
+          _completionsBody(context, scheme),
         ],
       ),
+    );
+  }
+
+  Widget _completionsBody(BuildContext context, ColorScheme scheme) {
+    final list = completions.value;
+    if (list == null) {
+      // Cold launch — or a first fetch that failed with no cache.
+      if (completions.error != null) return const SizedBox.shrink();
+      return const SizedBox(
+        height: 60,
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (list.isEmpty) {
+      return Text(
+        'No completed scenarios yet — pick one and start talking.',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+      );
+    }
+    return Column(
+      children: [
+        for (final c in list.take(6))
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 16,
+                  color: scheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    c['scenario_id'] as String? ?? 'Scenario',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                Text(
+                  '×${(c['completion_count'] as num? ?? 1).toInt()}',
+                  style: TextStyle(
+                    fontFamily: 'EditorialMono',
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// A card's small-caps heading with an optional inline [RefreshingDot]
+/// shown while that section is refreshing in the background.
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text, {this.refreshing = false});
+  final String text;
+  final bool refreshing;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Text(
+          text,
+          style: TextStyle(
+            fontFamily: 'EditorialMono',
+            fontSize: 11,
+            letterSpacing: 1.4,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+        if (refreshing) ...[
+          const SizedBox(width: 8),
+          const RefreshingDot(size: 12),
+        ],
+      ],
     );
   }
 }

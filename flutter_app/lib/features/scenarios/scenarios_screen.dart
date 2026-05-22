@@ -1,32 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/api/app_apis.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
+import '../../core/providers/cached_providers.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/router/app_router.dart';
-
-final _scenariosListProvider = FutureProvider.family<List<Scenario>, _Filters>((ref, f) async {
-  final raw = await ref.read(scenariosApiProvider).list(
-        category: f.category,
-        difficulty: f.difficulty,
-        q: f.query,
-      );
-  return raw.map(Scenario.fromJson).toList();
-});
-
-class _Filters {
-  const _Filters({this.category, this.difficulty, this.query});
-  final String? category;
-  final int? difficulty;
-  final String? query;
-  @override
-  bool operator ==(Object o) =>
-      o is _Filters && o.category == category && o.difficulty == difficulty && o.query == query;
-  @override
-  int get hashCode => Object.hash(category, difficulty, query);
-}
+import '../../shared/widgets/refreshing_dot.dart';
 
 class ScenariosScreen extends ConsumerStatefulWidget {
   const ScenariosScreen({super.key});
@@ -45,16 +25,38 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filters = _Filters(
-      category: _category,
-      difficulty: _difficulty,
-      query: _query.isEmpty ? null : _query,
-    );
-    final scenarios = ref.watch(_scenariosListProvider(filters));
+    final cached = ref.watch(scenariosProvider);
     final locale = ref.watch(localeProvider).languageCode;
 
+    // The full scenario list is cached; filtering runs client-side, so
+    // typing a query or tapping a chip is instant — no network per filter.
+    final all = cached.value ?? const <Scenario>[];
+    final filtered = all.where((s) {
+      if (_category != null && s.category != _category) return false;
+      if (_difficulty != null && s.difficulty != _difficulty) return false;
+      if (_query.isNotEmpty) {
+        final q = _query.toLowerCase();
+        final inTitle = s.title.forLocale(locale).toLowerCase().contains(q);
+        final inDesc =
+            s.description.forLocale(locale).toLowerCase().contains(q);
+        if (!inTitle && !inDesc) return false;
+      }
+      return true;
+    }).toList();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Scenarios')),
+      appBar: AppBar(
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Scenarios'),
+            if (cached.refreshing && cached.hasValue) ...[
+              const SizedBox(width: 10),
+              const RefreshingDot(),
+            ],
+          ],
+        ),
+      ),
       body: Column(
         children: [
           Padding(
@@ -107,33 +109,55 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: scenarios.when(
-              data: (list) => list.isEmpty
-                  ? const Center(child: Text('No scenarios match your filters.'))
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: list.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (_, i) => _ScenarioTile(
-                        scenario: list[i],
-                        locale: locale,
-                        onStart: () => context.push(
-                          AppRoute.scenarioBrief(list[i].id),
-                        ),
-                      ),
-                    ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, st) {
-                logRawError('scenarios_screen', e, st);
-                return PoliteErrorCenter(
-                  error: e,
-                  context: ErrorContext.loadList,
-                  onRetry: () => ref.invalidate(_scenariosListProvider),
-                );
-              },
+            child: RefreshIndicator(
+              onRefresh: () => ref.read(scenariosProvider.notifier).refresh(),
+              child: _list(context, cached, filtered, locale),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// The list area: the filtered tiles, an empty state, a cold-launch
+  /// spinner, or a polite error if the very first fetch failed with no
+  /// cache to fall back on.
+  Widget _list(
+    BuildContext context,
+    Cached<List<Scenario>> cached,
+    List<Scenario> filtered,
+    String locale,
+  ) {
+    if (!cached.hasValue) {
+      // Cold first launch — nothing cached yet.
+      if (cached.error != null) {
+        logRawError('scenarios_screen', cached.error!,
+            cached.stackTrace ?? StackTrace.current);
+        return PoliteErrorCenter(
+          error: cached.error!,
+          context: ErrorContext.loadList,
+          onRetry: () => ref.read(scenariosProvider.notifier).refresh(),
+        );
+      }
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (filtered.isEmpty) {
+      // Kept scrollable so pull-to-refresh still works on the empty state.
+      return ListView(
+        children: const [
+          SizedBox(height: 120),
+          Center(child: Text('No scenarios match your filters.')),
+        ],
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: filtered.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (_, i) => _ScenarioTile(
+        scenario: filtered[i],
+        locale: locale,
+        onStart: () => context.push(AppRoute.scenarioBrief(filtered[i].id)),
       ),
     );
   }
