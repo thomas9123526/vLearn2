@@ -70,6 +70,7 @@ add_executable(DataManage WIN32
     src/encrypt.cpp
     src/manifest.cpp
     src/packer.cpp
+    src/session.cpp
     src/sha256.cpp
     src/signer.cpp
     resources/app.rc
@@ -147,6 +148,19 @@ target_link_libraries(packer_smoke_test PRIVATE
     mbedx509
 )
 set_target_properties(packer_smoke_test PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY                "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG          "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE        "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin"
+)
+
+add_executable(session_smoke_test
+    src/session_smoke_test.cpp
+    src/session.cpp
+)
+target_include_directories(session_smoke_test PRIVATE src)
+target_link_libraries(session_smoke_test PRIVATE nlohmann_json)
+set_target_properties(session_smoke_test PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY                "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_DEBUG          "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE        "${CMAKE_BINARY_DIR}/bin"
