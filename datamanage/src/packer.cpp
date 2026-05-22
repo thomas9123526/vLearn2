@@ -172,6 +172,8 @@ PackResult packBundle(const BundleConfig& bundle,
     manifest.created_at       = nowIso8601Utc();
     manifest.compression      = use_zlib ? "zlib" : "none";
     manifest.encryption       = use_aesgcm ? "aes-256-gcm" : "none";
+    manifest.group            = bundle.group;
+    manifest.unpack_phase     = bundle.unpack_phase;
     if (use_aesgcm) {
         manifest.ephemeral_pub_hex = encryptor->ephemeralPubHex();
     }

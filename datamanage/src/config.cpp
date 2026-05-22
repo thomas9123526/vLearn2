@@ -138,6 +138,14 @@ Config loadConfig(const std::string& path) {
         } else {
             bc.pack_mode = c.pack_mode;
         }
+        // Phased-unpack metadata. Both optional; omitting them keeps
+        // a bundle behaving exactly as before — group "core",
+        // unpacked at splash.
+        bc.group        = optional<std::string>(b, "group", "core");
+        bc.unpack_phase = optional<std::string>(b, "unpack_phase", "splash");
+        if (bc.group.empty()) bc.group = "core";
+        validateAlgo(bc.unpack_phase, {"splash", "on-demand"},
+                     ("bundles[\"" + bc.name + "\"].unpack_phase").c_str());
         c.bundles.push_back(std::move(bc));
     }
 

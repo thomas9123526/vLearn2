@@ -32,6 +32,16 @@ struct BundleConfig {
     // otherwise this is a copy of the top-level Config::pack_mode.
     // Always fully populated after loadConfig() returns.
     PackMode pack_mode;
+
+    // Phased-unpack metadata, written into the .dat manifest so the
+    // Flutter app knows when + with what to unpack each bundle.
+    //   group        — feature bucket, e.g. "core", "speech".
+    //   unpack_phase — "splash" (unpack at startup) or "on-demand"
+    //                  (unpack when the feature is first used).
+    // Both default such that a bundle which sets neither behaves
+    // exactly as before: core group, unpacked at splash.
+    std::string group        = "core";
+    std::string unpack_phase = "splash";
 };
 
 // signing block — admin's sub-CA cert + private key. Required when

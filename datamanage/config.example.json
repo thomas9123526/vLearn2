@@ -10,14 +10,18 @@
   },
   "bundles": [
     {
-      "name": "out_model",
-      "source_dir": "C:/data/models",
-      "out_folder": "models"
-    },
-    {
       "name": "out_font",
       "source_dir": "C:/data/fonts",
-      "out_folder": "fonts"
+      "out_folder": "fonts",
+      "group": "core",
+      "unpack_phase": "splash"
+    },
+    {
+      "name": "sherpa_2021",
+      "source_dir": "C:/data/models/sherpa",
+      "out_folder": "models/sherpa_2021",
+      "group": "speech",
+      "unpack_phase": "on-demand"
     },
     {
       "name": "out_secret",
