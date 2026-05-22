@@ -65,3 +65,6 @@ $env:PORT = 5101
 
 
 npx next dev -p 4101 -H 0.0.0.0
+
+flutter logs | Select-String "\[datapack\]"
+flutter run -d emulator-5554
