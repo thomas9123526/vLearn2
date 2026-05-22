@@ -1,0 +1,59 @@
+# Line-ending policy.
+#
+# autocrlf on Windows can fight with files that tools regenerate on
+# both platforms — they get written LF but git checks them out as
+# CRLF, then `flutter gen-l10n` / `dart format` / etc. rewrites them
+# LF again, and `git status` falsely flags them as modified for the
+# rest of time.
+#
+# Defaults: let git auto-detect text vs binary.
+* text=auto
+
+# Generated Dart/Flutter sources — always LF, no autocrlf magic.
+flutter_app/lib/l10n/generated/** text eol=lf
+flutter_app/lib/**/*.g.dart       text eol=lf
+flutter_app/lib/**/*.freezed.dart text eol=lf
+flutter_app/lib/**/*.gr.dart      text eol=lf
+
+# Shell scripts — must stay LF on every platform or they break in WSL,
+# Docker, and CI runners.
+*.sh    text eol=lf
+
+# Windows scripts — keep CRLF.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Known binary types — don't try to diff or autocrlf these.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.icns  binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.tar   binary
+*.7z    binary
+*.exe   binary
+*.dll   binary
+*.so    binary
+*.dylib binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+
+# Crypto material — also binary-safe so git doesn't autocrlf PEM
+# bodies (the base64 content has no newline ambiguity, but the
+# headers count as text and autocrlf would corrupt the
+# already-committed root_ca.crt).
+*.crt   text eol=lf
+*.pem   text eol=lf
+*.key   text eol=lf
+
+# vendored mbedTLS / zlib / nlohmann_json source — leave their
+# upstream line endings alone. git auto-detect is fine.
+datamanage/vendor/** -text
