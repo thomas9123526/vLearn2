@@ -28,6 +28,7 @@ import 'package:crypto/crypto.dart' as crypto;
 
 import 'datapack_log.dart';
 import 'datapack_factory.dart';
+import 'datapack_manifest.dart';
 import 'datapack_paths.dart';
 
 /// One entry of `installer.installPending()`'s return value.
@@ -46,17 +47,22 @@ class DataPackInstallOutcome {
   /// `bundleName` from the manifest, or empty on early failure.
   final String bundleName;
 
-  /// One of `installed`, `cached`, `failed`.
+  /// One of `installed`, `cached`, `deferred`, `failed`.
   final DataPackInstallStatus status;
 
-  /// Number of files written. 0 on failure or cached (already installed).
+  /// Number of files written. 0 on failure / cached / deferred.
   final int unpackedFileCount;
 
   /// Set when `status == failed` — the exception message.
   final String? error;
 }
 
-enum DataPackInstallStatus { installed, cached, failed }
+/// - `installed` — unpacked this run.
+/// - `cached`    — already unpacked in a prior run (SHA-256 match).
+/// - `deferred`  — skipped: its `unpack_phase` isn't the phase being
+///                 installed (e.g. an "on-demand" pack at splash).
+/// - `failed`    — could not be read or unpacked; see `error`.
+enum DataPackInstallStatus { installed, cached, deferred, failed }
 
 class DataPackInstaller {
   DataPackInstaller({
@@ -67,13 +73,21 @@ class DataPackInstaller {
   final DataUnpackFactory factory;
   final DataPackPaths paths;
 
-  /// Walk `paths.packsDir` for `*.ddp`, unpack any whose SHA-256 isn't
-  /// already in the state file. Idempotent: callable on every
-  /// launch with no side effect once everything is up to date.
-  Future<List<DataPackInstallOutcome>> installPending() async {
+  /// Walk `paths.packsDir` for `*.dat`, and for every pack whose
+  /// `unpack_phase` matches [phase], unpack any whose SHA-256 isn't
+  /// already in the state file. Packs of a different phase are
+  /// reported `deferred` and left untouched. Idempotent: callable on
+  /// every launch with no side effect once everything is up to date.
+  ///
+  /// [phase] defaults to `"splash"` — the startup pass. The on-demand
+  /// pass (Stage C) calls it with `phase: "on-demand"` (plus a group
+  /// filter).
+  Future<List<DataPackInstallOutcome>> installPending({
+    String phase = 'splash',
+  }) async {
     final outcomes = <DataPackInstallOutcome>[];
 
-    dpLog('installer: scanning ${paths.packsDir.path}');
+    dpLog('installer: scanning ${paths.packsDir.path} (phase "$phase")');
     if (!paths.packsDir.existsSync()) {
       dpLog('installer: packs dir does not exist — nothing to install');
       return outcomes;  // nothing to do — admin hasn't dropped any packs yet
@@ -94,9 +108,44 @@ class DataPackInstaller {
           'and relaunch');
     }
 
-    var installed = 0, cached = 0, failed = 0;
+    var installed = 0, cached = 0, deferred = 0, failed = 0;
     for (final pack in candidates) {
       final fileName = pack.uri.pathSegments.last;
+
+      // Peek the manifest (header + manifest only — cheap, no decrypt,
+      // no whole-file read) to learn this pack's phase before deciding
+      // whether to touch it this run.
+      DataPackManifest manifest;
+      try {
+        manifest = await readPackManifest(pack.path);
+      } catch (e) {
+        ++failed;
+        dpLog('installer: FAILED  $fileName — cannot read manifest: $e');
+        outcomes.add(DataPackInstallOutcome(
+          packPath:          pack.path,
+          bundleName:        '',
+          status:            DataPackInstallStatus.failed,
+          unpackedFileCount: 0,
+          error:             e.toString(),
+        ));
+        continue;
+      }
+
+      // Wrong phase — leave it for whoever installs that phase.
+      if (manifest.unpackPhase != phase) {
+        ++deferred;
+        dpLog('installer: DEFER   $fileName '
+            '(phase "${manifest.unpackPhase}", group "${manifest.group}" '
+            '— not this run\'s phase "$phase")');
+        outcomes.add(DataPackInstallOutcome(
+          packPath:          pack.path,
+          bundleName:        manifest.bundleName,
+          status:            DataPackInstallStatus.deferred,
+          unpackedFileCount: 0,
+        ));
+        continue;
+      }
+
       final fingerprint = await _hashFile(pack);
       final prior = state['installed']?[fileName];
       if (prior is Map &&
@@ -151,7 +200,8 @@ class DataPackInstaller {
 
     await _saveState(state);
     dpLog('installer: done — $installed installed, $cached cached, '
-        '$failed failed. State saved to ${paths.stateFile.path}');
+        '$deferred deferred, $failed failed. '
+        'State saved to ${paths.stateFile.path}');
     return outcomes;
   }
 

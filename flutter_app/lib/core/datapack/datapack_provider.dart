@@ -88,6 +88,10 @@ Future<List<DataPackInstallOutcome>> _installOnIsolate(
     stateFile:    File(inputs.stateFilePath),
   );
   final installer = DataPackInstaller(factory: factory, paths: paths);
+  // Splash pass: installPending defaults to phase "splash", so only
+  // packs tagged unpack_phase == "splash" are unpacked here. Packs
+  // tagged "on-demand" come back `deferred` and are unpacked later by
+  // the feature that needs them (Stage C).
   return installer.installPending();
 }
 

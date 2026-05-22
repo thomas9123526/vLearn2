@@ -31,6 +31,35 @@ class UnpackedFile {
   final int sizeBytes;
 }
 
+/// Read just the header + manifest of a `.dat` — no signature
+/// verification, no decrypt, no file writes. Cheap: reads only the
+/// 64-byte header plus the (plaintext) manifest section, never the
+/// multi-MB data section.
+///
+/// Used by the installer to learn a pack's `group` / `unpackPhase`
+/// *before* deciding whether to unpack it this phase. The manifest is
+/// routing metadata only — the real security gate (cert chain +
+/// signature) still runs inside [DataUnpackFactory.unpack].
+Future<DataPackManifest> readPackManifest(String packPath) async {
+  final raf = await File(packPath).open();
+  try {
+    final headerBytes = await raf.read(64);
+    if (headerBytes.length < 64) {
+      throw const FormatException('.dat too small to hold header');
+    }
+    final hdr = DataPackHeader.parse(Uint8List.fromList(headerBytes));
+    await raf.setPosition(hdr.manifestOffset);
+    final manifestBytes = await raf.read(hdr.manifestLen);
+    if (manifestBytes.length < hdr.manifestLen) {
+      throw const FormatException('.dat truncated — manifest section short');
+    }
+    return DataPackManifest.parse(
+        String.fromCharCodes(manifestBytes));
+  } finally {
+    await raf.close();
+  }
+}
+
 class UnpackResult {
   UnpackResult(this.bundleName, this.files);
   final String bundleName;

@@ -141,6 +141,63 @@ void main() {
     expect(outcomes.single.status, DataPackInstallStatus.failed);
     expect(outcomes.single.error, isNotNull);
   });
+
+  test('installer: phase filter — splash installs, on-demand deferred',
+      () async {
+    if (!precondsOk) return;
+
+    final tmp = await Directory.systemTemp.createTemp('dm_install_phase_');
+    addTearDown(() async {
+      try { await tmp.delete(recursive: true); } catch (_) {}
+    });
+
+    final packsDir   = Directory('${tmp.path}/packs')..createSync();
+    final unpackRoot = Directory('${tmp.path}/unpacked')..createSync();
+    final stateFile  = File('${tmp.path}/state.json');
+
+    // Two packs: one tagged splash, one tagged on-demand.
+    await _pack(
+      dmExe: dmExe, tmp: tmp.path, name: 'core_fonts',
+      sourceFiles: {'a.txt': 'AAA'},
+      aliceCrt: aliceCrt, aliceKey: aliceKey, outDir: packsDir.path,
+      group: 'core', unpackPhase: 'splash',
+    );
+    await _pack(
+      dmExe: dmExe, tmp: tmp.path, name: 'speech_models',
+      sourceFiles: {'m.txt': 'MMM'},
+      aliceCrt: aliceCrt, aliceKey: aliceKey, outDir: packsDir.path,
+      group: 'speech', unpackPhase: 'on-demand',
+    );
+
+    final paths = DataPackPaths(
+      packsDir: packsDir, unpackedRoot: unpackRoot, stateFile: stateFile,
+    );
+    final factory = DataUnpackFactory(
+      adminKeyPem: await File(aliceKey).readAsString(),
+      rootCaPem:   await File(rootCrt).readAsString(),
+    );
+    final installer = DataPackInstaller(factory: factory, paths: paths);
+
+    // Splash pass — core_fonts installs, speech_models is deferred.
+    final splash = await installer.installPending();  // default phase
+    final coreOutcome = splash.firstWhere(
+        (o) => o.packPath.endsWith('core_fonts.dat'));
+    final speechOutcome = splash.firstWhere(
+        (o) => o.packPath.endsWith('speech_models.dat'));
+    expect(coreOutcome.status, DataPackInstallStatus.installed,
+        reason: 'splash phase: core pack installs');
+    expect(speechOutcome.status, DataPackInstallStatus.deferred,
+        reason: 'splash phase: on-demand pack is deferred, not installed');
+
+    // On-demand pass — now speech_models installs, core_fonts is the
+    // one deferred (already done, but also wrong phase for this pass).
+    final onDemand =
+        await installer.installPending(phase: 'on-demand');
+    final speechNow = onDemand.firstWhere(
+        (o) => o.packPath.endsWith('speech_models.dat'));
+    expect(speechNow.status, DataPackInstallStatus.installed,
+        reason: 'on-demand phase: speech pack installs');
+  });
 }
 
 Future<void> _pack({
@@ -151,6 +208,8 @@ Future<void> _pack({
   required String aliceCrt,
   required String aliceKey,
   required String outDir,
+  String? group,
+  String? unpackPhase,
 }) async {
   final srcDir = Directory('$tmp/src_$name');
   if (srcDir.existsSync()) srcDir.deleteSync(recursive: true);
@@ -161,6 +220,14 @@ Future<void> _pack({
     await f.writeAsString(entry.value);
   }
 
+  final bundle = <String, Object?>{
+    'name': name,
+    'source_dir': srcDir.absolute.path.replaceAll(r'\', '/'),
+    'out_folder': name,
+  };
+  if (group != null) bundle['group'] = group;
+  if (unpackPhase != null) bundle['unpack_phase'] = unpackPhase;
+
   final config = {
     'version': 1,
     'pack_mode': {'compress': 'zlib', 'encrypt': 'aes-256-gcm'},
@@ -168,13 +235,7 @@ Future<void> _pack({
       'cert_path': File(aliceCrt).absolute.path.replaceAll(r'\', '/'),
       'key_path':  File(aliceKey).absolute.path.replaceAll(r'\', '/'),
     },
-    'bundles': [
-      {
-        'name': name,
-        'source_dir': srcDir.absolute.path.replaceAll(r'\', '/'),
-        'out_folder': name,
-      },
-    ],
+    'bundles': [bundle],
     'output_dir': Directory(outDir).absolute.path.replaceAll(r'\', '/'),
   };
   final configPath = '$tmp/config_$name.json';

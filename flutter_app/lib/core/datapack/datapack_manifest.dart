@@ -53,6 +53,8 @@ class DataPackManifest {
     required this.compression,
     required this.encryption,
     required this.ephemeralPubHex,
+    required this.group,
+    required this.unpackPhase,
     required this.files,
   });
 
@@ -70,6 +72,15 @@ class DataPackManifest {
   /// ephemeral ECDH pubkey. Required when [encryption] != "none";
   /// empty when "none".
   final String ephemeralPubHex;
+
+  /// Feature bucket this pack belongs to, e.g. "core", "speech".
+  /// Defaults to "core" for packs that don't declare one.
+  final String group;
+
+  /// When the app unpacks this pack: "splash" (at startup) or
+  /// "on-demand" (when the feature is first used). Defaults to
+  /// "splash" — packs that don't declare one behave as before.
+  final String unpackPhase;
 
   final List<DataPackFile> files;
 
@@ -92,6 +103,16 @@ class DataPackManifest {
     if (encryption != 'none' && ephHex.isEmpty) {
       throw const FormatException(
           "manifest: encryption != 'none' but ephemeral_pub_hex is empty");
+    }
+
+    // Phased-unpack metadata. Both optional — a manifest from an
+    // older pack omits them and reads back as core / splash, i.e.
+    // unchanged behaviour.
+    final group = (raw['group'] as String?)?.trim();
+    final unpackPhase = (raw['unpack_phase'] as String?) ?? 'splash';
+    if (unpackPhase != 'splash' && unpackPhase != 'on-demand') {
+      throw FormatException(
+          "manifest: unknown unpack_phase '$unpackPhase'");
     }
 
     final filesRaw = raw['files'];
@@ -131,6 +152,8 @@ class DataPackManifest {
       compression:      compression,
       encryption:       encryption,
       ephemeralPubHex:  ephHex,
+      group:            (group == null || group.isEmpty) ? 'core' : group,
+      unpackPhase:      unpackPhase,
       files:            files,
     );
   }
