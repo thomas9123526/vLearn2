@@ -20,7 +20,12 @@ import '../../shared/widgets/datapack_progress_view.dart';
 /// guidance (place the pack, then Retry) plus a text-only opt-out so
 /// the user isn't blocked from the rest of the app.
 class ModelsNotInstalledScreen extends ConsumerStatefulWidget {
-  const ModelsNotInstalledScreen({super.key});
+  const ModelsNotInstalledScreen({super.key, this.redirectTo});
+
+  /// Where to send the user once setup is finished — the conversation
+  /// route they were trying to reach when the router bounced them here.
+  /// Null (screen opened some other way) → fall back to /home.
+  final String? redirectTo;
 
   @override
   ConsumerState<ModelsNotInstalledScreen> createState() =>
@@ -50,6 +55,10 @@ class _ModelsNotInstalledScreenState
     ctrl.reset();
     ctrl.ensureGroup('speech');
   }
+
+  /// Where Continue / text-only send the user: back to the conversation
+  /// they originally tapped, or /home if we weren't given a route.
+  String get _destination => widget.redirectTo ?? '/home';
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +110,7 @@ class _ModelsNotInstalledScreenState
           );
         },
         data: (s) => s.isReady
-            ? _ReadyBody(onContinue: () => context.go('/home'))
+            ? _ReadyBody(onContinue: () => context.go(_destination))
             : _NotFoundBody(
                 modelRoot: s.modelRoot,
                 onRetry: _retry,
@@ -109,7 +118,7 @@ class _ModelsNotInstalledScreenState
                   await ref
                       .read(appSettingsProvider.notifier)
                       .acknowledgeTextOnly();
-                  if (context.mounted) context.go('/home');
+                  if (context.mounted) context.go(_destination);
                 },
               ),
       ),

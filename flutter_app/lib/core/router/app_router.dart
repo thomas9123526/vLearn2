@@ -91,7 +91,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           // Only force the setup screen when the user is actively trying to
           // start a conversation; the rest of the app (home, scenarios,
           // settings, etc.) still works without speech models.
-          return '/setup/models';
+          //
+          // Carry the conversation route the user was headed to as a
+          // `redirect` query param, so the setup screen can return them
+          // there once speech is ready — instead of dropping them on /home.
+          final dest = Uri.encodeComponent(state.uri.toString());
+          return '/setup/models?redirect=$dest';
         }
       }
       return null;
@@ -121,7 +126,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: AppRoute.profileEdit, builder: (_, _) => const ProfileEditScreen()),
       GoRoute(
         path: '/setup/models',
-        builder: (_, _) => const ModelsNotInstalledScreen(),
+        builder: (_, s) => ModelsNotInstalledScreen(
+          redirectTo: s.uri.queryParameters['redirect'],
+        ),
       ),
       GoRoute(
         path: '/scenarios/:idOrSlug/brief',
