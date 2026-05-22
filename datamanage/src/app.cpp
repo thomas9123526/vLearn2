@@ -4,6 +4,8 @@
 #include <Windows.h>
 #include <commdlg.h>  // GetOpenFileName — excluded by WIN32_LEAN_AND_MEAN
 
+#include <cstdint>
+#include <cwchar>
 #include <exception>
 #include <string>
 
@@ -57,6 +59,51 @@ void setStatus(HWND hwnd, const std::wstring& text) {
         SendMessageW(hStatus, SB_SETTEXTW, 0,
                      reinterpret_cast<LPARAM>(text.c_str()));
     }
+}
+
+// ─── byte-size formatting for the pack-complete dialog ────────────────────
+
+// "4631678" → "4,631,678" — thousands separators so big byte counts
+// stay readable in the MessageBox.
+std::wstring groupDigits(uint64_t n) {
+    std::wstring s = std::to_wstring(n);
+    for (int pos = static_cast<int>(s.size()) - 3; pos > 0; pos -= 3) {
+        s.insert(static_cast<size_t>(pos), L",");
+    }
+    return s;
+}
+
+// "4,631,678 bytes (4.42 MB)" — raw byte count + the MB figure, so the
+// admin sees both an exact number and a human-scale one. MB is binary
+// (1 MB = 1024×1024), matching what Windows Explorer shows.
+std::wstring formatSize(uint64_t bytes) {
+    const double mb = static_cast<double>(bytes) / (1024.0 * 1024.0);
+    wchar_t mbuf[32];
+    std::swprintf(mbuf, 32, L"%.2f", mb);
+    return groupDigits(bytes) + L" bytes (" + mbuf + L" MB)";
+}
+
+// One line describing the size delta between source and packed:
+//   "reduced: 2,359,701 bytes (2.25 MB)  —  50.9% smaller"
+// or, for incompressible/encrypted bundles that end up bigger:
+//   "grew: +12,345 bytes (0.01 MB)  (+0.3%)"
+std::wstring reductionLine(uint64_t in, uint64_t out) {
+    wchar_t pbuf[32];
+    if (out <= in) {
+        const uint64_t saved = in - out;
+        const double pct = in > 0
+            ? 100.0 * static_cast<double>(saved) / static_cast<double>(in)
+            : 0.0;
+        std::swprintf(pbuf, 32, L"%.1f", pct);
+        return L"reduced: " + formatSize(saved) +
+               L"  —  " + pbuf + L"% smaller";
+    }
+    const uint64_t grew = out - in;
+    const double pct = in > 0
+        ? 100.0 * static_cast<double>(grew) / static_cast<double>(in)
+        : 0.0;
+    std::swprintf(pbuf, 32, L"%.1f", pct);
+    return L"grew: +" + formatSize(grew) + L"  (+" + pbuf + L"%)";
 }
 
 void layoutStatusBar(HWND hwnd) {
@@ -150,18 +197,26 @@ void onRunPack(HWND hwnd) {
         const Config cfg = loadConfig(wideToUtf8(g_state.config_path));
         const auto results = packAll(cfg);  // no progress callback yet
 
+        uint64_t grandIn = 0, grandOut = 0;
         std::wstring msg = L"Packed " +
-            utf8ToWide(std::to_string(results.size())) +
-            L" bundle(s):\n\n";
+            std::to_wstring(results.size()) + L" bundle(s):\n\n";
         for (const auto& r : results) {
+            grandIn  += r.total_bytes_in;
+            grandOut += r.total_bytes_out;
             msg += utf8ToWide(r.output_path);
-            msg += L"\n  ";
-            msg += utf8ToWide(std::to_string(r.file_count));
-            msg += L" files, ";
-            msg += utf8ToWide(std::to_string(r.total_bytes_in));
-            msg += L" → ";
-            msg += utf8ToWide(std::to_string(r.total_bytes_out));
-            msg += L" bytes\n\n";
+            msg += L"\n  " + std::to_wstring(r.file_count) + L" files\n";
+            msg += L"  source : " + formatSize(r.total_bytes_in)  + L"\n";
+            msg += L"  packed : " + formatSize(r.total_bytes_out) + L"\n";
+            msg += L"  " + reductionLine(r.total_bytes_in,
+                                         r.total_bytes_out) + L"\n\n";
+        }
+        // Grand total across all bundles — only worth showing when
+        // there's more than one.
+        if (results.size() > 1) {
+            msg += L"───────────────────────────\n";
+            msg += L"Total source : " + formatSize(grandIn)  + L"\n";
+            msg += L"Total packed : " + formatSize(grandOut) + L"\n";
+            msg += L"Total " + reductionLine(grandIn, grandOut) + L"\n";
         }
         MessageBoxW(hwnd, msg.c_str(),
                     L"DataManage — pack complete",
