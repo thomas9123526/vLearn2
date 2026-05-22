@@ -1,9 +1,9 @@
-// Where the admin drops `.ddp` files on the device and where the
-// unpacker writes the decoded contents.
+// Where the admin drops `.dat` pack files on the device and where
+// the unpacker writes the decoded contents.
 //
 // Mirrors the path-resolution pattern from
 // `lib/core/config/app_config.dart`: prefer the public
-// `/storage/emulated/0/룡마/가상외국어회화/datapacks/` folder when
+// `/storage/emulated/0/룡마/가상외국어회화/data/` folder when
 // `MANAGE_EXTERNAL_STORAGE` is granted, otherwise fall back to the
 // app-scoped external dir under the same `룡마/가상외국어회화/`
 // hierarchy. The admin sees the same folder from a USB transfer
@@ -49,11 +49,11 @@ class DataPackPaths {
 
   static Future<DataPackPaths> _resolveAndroid() async {
     final publicPacks =
-        Directory('/storage/emulated/0/룡마/가상외국어회화/datapacks');
+        Directory('/storage/emulated/0/룡마/가상외국어회화/data');
     final extBase = await getExternalStorageDirectory() ??
         await getApplicationSupportDirectory();
     final fallbackPacks = Directory(
-        p.join(extBase.path, '룡마', '가상외국어회화', 'datapacks'));
+        p.join(extBase.path, '룡마', '가상외국어회화', 'data'));
 
     final hasPermission =
         await Permission.manageExternalStorage.isGranted ||
