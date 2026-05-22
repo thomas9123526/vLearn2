@@ -305,9 +305,11 @@ std::vector<PackResult> packAll(const Config& config,
     std::vector<PackResult> results;
     results.reserve(config.bundles.size());
     for (const auto& b : config.bundles) {
+        // Each bundle carries its own resolved pack_mode (its own
+        // override, or a copy of the global — loadConfig settled that).
         results.push_back(
             packBundle(b, config.output_dir, progress,
-                       config.pack_mode, config.signing));
+                       b.pack_mode, config.signing));
     }
     return results;
 }

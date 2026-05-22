@@ -10,26 +10,33 @@
 
 namespace datamanage {
 
-// One bundle = one .ddp output file. Multiple bundles per config are
-// supported (e.g. one for models, one for fonts) so the admin can pack
-// everything in a single run.
-struct BundleConfig {
-    std::string name;        // logical name → output file `name`.ddp
-    std::string source_dir;  // absolute path that gets walked
-    std::string out_folder;  // where each file lands on the device,
-                             // relative to the app's data root
-};
-
 // pack_mode block — chooses transformations applied to each blob.
-// Stage 3 only emits "none" / "none" packs (uncompressed, unencrypted).
-// Stages 4 and 7 fill in the others.
+// "none"/"none" emits a raw pack; "zlib"/"aes-256-gcm" turn on
+// compression / encryption.
 struct PackMode {
-    std::string compress = "none";  // "none" | "zstd"
+    std::string compress = "none";  // "none" | "zlib"
     std::string encrypt  = "none";  // "none" | "aes-256-gcm"
 };
 
-// signing block — admin's sub-CA cert + private key. Stage 6 starts
-// reading these. For Stage 3 we tolerate them being absent.
+// One bundle = one .dat output file. Multiple bundles per config are
+// supported (e.g. one for models, one for fonts) so the admin can pack
+// everything in a single run.
+struct BundleConfig {
+    std::string name;        // logical name → output file `name`.dat
+    std::string source_dir;  // absolute path that gets walked
+    std::string out_folder;  // where each file lands on the device,
+                             // relative to the app's data root
+
+    // Per-bundle transformation mode. Resolved at parse time: if the
+    // bundle's JSON has its own "pack_mode" block, that's used;
+    // otherwise this is a copy of the top-level Config::pack_mode.
+    // Always fully populated after loadConfig() returns.
+    PackMode pack_mode;
+};
+
+// signing block — admin's sub-CA cert + private key. Required when
+// any bundle's resolved pack_mode encrypts; otherwise optional (but
+// the Flutter unpacker refuses unsigned packs in production).
 struct SigningConfig {
     std::string cert_path;
     std::string key_path;
@@ -37,6 +44,9 @@ struct SigningConfig {
 
 struct Config {
     uint32_t              version = 1;
+    // Top-level default pack_mode. Each bundle either overrides it
+    // with its own "pack_mode" block or inherits this one — see
+    // BundleConfig::pack_mode.
     PackMode              pack_mode;
     SigningConfig         signing;
     std::vector<BundleConfig> bundles;

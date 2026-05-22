@@ -2,14 +2,11 @@
   "version": 1,
   "pack_mode": {
     "compress": "zlib",
-    "encrypt": "aes-256-gcm"
-  },
-  "encrypt_options": {
-    "mode": "full"
+    "encrypt": "none"
   },
   "signing": {
-    "cert_path": "ca/admin1.crt",
-    "key_path": "ca/admin1.key"
+    "cert_path": "ca/issued/admins/alice/admin.crt",
+    "key_path": "ca/issued/admins/alice/admin.key"
   },
   "bundles": [
     {
@@ -21,6 +18,15 @@
       "name": "out_font",
       "source_dir": "C:/data/fonts",
       "out_folder": "fonts"
+    },
+    {
+      "name": "out_secret",
+      "source_dir": "C:/data/secret",
+      "out_folder": "secret",
+      "pack_mode": {
+        "compress": "zlib",
+        "encrypt": "aes-256-gcm"
+      }
     }
   ],
   "output_dir": "./output"

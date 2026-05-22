@@ -60,6 +60,23 @@ void validateAlgo(const std::string& s,
         s + "'");
 }
 
+// Parse + validate a `pack_mode` JSON object. Any sub-field the JSON
+// omits inherits from `fallback` — so the top-level pack_mode parses
+// against built-in defaults, and a per-bundle pack_mode parses
+// against the resolved top-level one ("override what I name, inherit
+// the rest"). `field` is the JSON path used in error messages.
+PackMode parsePackMode(const json& pm, const PackMode& fallback,
+                       const std::string& field) {
+    PackMode m;
+    m.compress = optional<std::string>(pm, "compress", fallback.compress);
+    m.encrypt  = optional<std::string>(pm, "encrypt",  fallback.encrypt);
+    validateAlgo(m.compress, {"none", "zlib"},
+                 (field + ".compress").c_str());
+    validateAlgo(m.encrypt, {"none", "aes-256-gcm"},
+                 (field + ".encrypt").c_str());
+    return m;
+}
+
 }  // namespace
 
 Config loadConfig(const std::string& path) {
@@ -81,16 +98,16 @@ Config loadConfig(const std::string& path) {
             " (expected 1)");
     }
 
-    // pack_mode block
+    // Top-level pack_mode — the default every bundle inherits unless
+    // it carries its own override. Falls back to built-in defaults
+    // (PackMode{} = "none"/"none") when the block is absent.
     if (root.contains("pack_mode")) {
-        const auto& pm = root["pack_mode"];
-        c.pack_mode.compress = optional<std::string>(pm, "compress", "none");
-        c.pack_mode.encrypt  = optional<std::string>(pm, "encrypt",  "none");
+        c.pack_mode = parsePackMode(root["pack_mode"], PackMode{},
+                                    "pack_mode");
     }
-    validateAlgo(c.pack_mode.compress, {"none", "zlib"},        "pack_mode.compress");
-    validateAlgo(c.pack_mode.encrypt,  {"none", "aes-256-gcm"}, "pack_mode.encrypt");
 
-    // signing block — optional in Stage 3, required in Stage 6.
+    // signing block — required when any bundle's resolved pack_mode
+    // encrypts; the packer enforces that. Optional here.
     if (root.contains("signing")) {
         const auto& s = root["signing"];
         c.signing.cert_path = optional<std::string>(s, "cert_path", "");
@@ -110,6 +127,16 @@ Config loadConfig(const std::string& path) {
         bc.out_folder = require<std::string>(b, "out_folder");
         if (bc.name.empty()) {
             throw std::runtime_error("config: bundle.name must not be empty");
+        }
+        // Per-bundle pack_mode: a bundle with its own "pack_mode"
+        // block overrides (sub-fields it omits inherit the global);
+        // a bundle without one inherits the whole global pack_mode.
+        if (b.contains("pack_mode")) {
+            bc.pack_mode = parsePackMode(
+                b["pack_mode"], c.pack_mode,
+                "bundles[\"" + bc.name + "\"].pack_mode");
+        } else {
+            bc.pack_mode = c.pack_mode;
         }
         c.bundles.push_back(std::move(bc));
     }
