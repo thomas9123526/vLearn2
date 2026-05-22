@@ -107,6 +107,16 @@ class ConfigFileService {
 
   static const _fileName = 'app_config.json';
 
+  /// ─── Code-side toggle ────────────────────────────────────────────────
+  /// `false` → `write()` saves **minified** JSON — the smallest
+  ///           on-disk form (~80 B for the current config). Default.
+  /// `true`  → `write()` saves **indented**, human-readable JSON.
+  ///
+  /// Reads are whitespace-insensitive (`jsonDecode` accepts either),
+  /// so flipping this never breaks an existing config file — the next
+  /// write just re-saves it in the chosen form.
+  static const bool prettyPrint = false;
+
   /// Resolves the absolute config-file path. Creates any missing intermediate
   /// directories on the way down.
   ///
@@ -204,12 +214,14 @@ class ConfigFileService {
 
   Future<void> write(AppConfig config, {File? file}) async {
     final target = file ?? await resolveConfigFile();
-    // Minified plain JSON — the smallest on-disk form. No indentation
-    // (saves the newlines + spaces) and no base64 (base64 only
-    // inflates ~33%). Keeps app_config.json well under its 1 KB
-    // budget. Reads still tolerate a legacy base64 file — see
-    // _decodeContent.
-    final jsonStr = jsonEncode(config.toJson());
+    // `prettyPrint` picks the on-disk form: minified (smallest — the
+    // default) or indented (human-readable). No base64 either way —
+    // base64 only inflates ~33%. Reads still tolerate a legacy
+    // base64 file — see _decodeContent.
+    final json = config.toJson();
+    final jsonStr = prettyPrint
+        ? const JsonEncoder.withIndent('  ').convert(json)
+        : jsonEncode(json);
     await target.writeAsString(jsonStr);
   }
 
