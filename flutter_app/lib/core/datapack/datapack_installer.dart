@@ -336,9 +336,11 @@ class DataPackInstaller {
           outRoot:  paths.unpackedRoot.path,
           onFileProgress: (done, total) {
             final overall = (filesDoneBefore + done) / totalFiles;
+            // No bundle/model name in the user-facing status — it
+            // would leak the internal pack identity. Plain file count.
             onProgress?.call(
               overall.clamp(0.0, 1.0),
-              'Unpacking ${sp.manifest.bundleName} — $done/$total files',
+              'Unpacking $done of $total files',
             );
           },
         );
