@@ -22,6 +22,21 @@ Uint8List sha256Bytes(Uint8List bytes) {
   return d.process(bytes);
 }
 
+/// Streaming SHA-256: feed chunks via [add], call [finalize] once for
+/// the 32-byte digest. The unpacker uses this to hash a multi-hundred-MB
+/// `.dat` for signature verification without buffering the whole file —
+/// reading the previous full-pack buffer in one shot was the direct
+/// cause of "Out of Memory" failures on Android.
+class Sha256Streamer {
+  final SHA256Digest _d = SHA256Digest();
+  void add(Uint8List bytes) => _d.update(bytes, 0, bytes.length);
+  Uint8List finalize() {
+    final out = Uint8List(32);
+    _d.doFinal(out, 0);
+    return out;
+  }
+}
+
 /// ECDH P-256: shared = priv · pub. Returns the **X coordinate** of
 /// the result as a fixed 32-byte big-endian buffer (this is the
 /// SECG SEC1 standard ECDH output, matching `mbedtls_mpi_write_binary(
