@@ -224,10 +224,25 @@ class DataUnpackFactory {
         dpLog('unpack:   [5/6] pack not encrypted — no key derivation');
       }
 
-      // 6) Walk the manifest one blob at a time. Per-iteration peak
-      //    memory is bounded by ONE file's encrypted + decrypted +
-      //    decompressed bytes — the rest of the pack stays on disk.
-      dpLog('unpack:   [6/6] decoding ${manifest.files.length} file(s)…');
+      // 6) Walk the manifest one blob at a time.
+      //
+      //    Two paths:
+      //      a) PASSTHROUGH (compress=none AND encrypt=none): the blob
+      //         is the file verbatim, so stream-copy it from the .dat
+      //         straight to disk in 64 KB chunks, hashing as we go.
+      //         Peak RAM ≈ one chunk — a 1 GB file is fine.
+      //      b) Transformed: load the blob → decrypt → inflate → hash
+      //         → write. Peak RAM ≈ one file's encrypted + decrypted +
+      //         decompressed bytes (the existing path).
+      //
+      //    A pack made with `pack_mode: {compress:"none", encrypt:"none"}`
+      //    in DataManage's config.json hits path (a) and can therefore
+      //    contain arbitrarily large files without OOM-ing the device.
+      final passthrough = aesKey == null && !hdr.isCompressed;
+      dpLog('unpack:   [6/6] decoding ${manifest.files.length} file(s) '
+          '(${passthrough ? "passthrough: stream-copy" : "transformed: "
+              "${hdr.isEncrypted ? "decrypt+" : ""}"
+              "${hdr.isCompressed ? "inflate" : ""}"})…');
       final outDir = Directory(outRoot);
       if (!await outDir.exists()) await outDir.create(recursive: true);
 
@@ -236,8 +251,51 @@ class DataUnpackFactory {
       var index = 0;
       for (final mf in manifest.files) {
         ++index;
-        final steps = <String>[];
+        final outPath = _safeJoin(outRoot, mf.outFolder, mf.relPath);
+        await Directory(_dirOf(outPath)).create(recursive: true);
 
+        if (passthrough) {
+          // ── path (a): stream-copy + stream-hash, bounded memory ──
+          if (mf.storedSize != mf.size) {
+            throw FormatException(
+                'passthrough but storedSize ${mf.storedSize} != size '
+                '${mf.size} for ${mf.relPath} — pack/unpack disagree on '
+                'whether transforms are applied');
+          }
+          final hashSink = _DigestSink();
+          final hashInput = crypto.sha256.startChunkedConversion(hashSink);
+          final outFile = File(outPath);
+          final outSink = outFile.openWrite();
+          try {
+            await for (final chunk in file.openRead(
+                hdr.dataOffset + mf.offset,
+                hdr.dataOffset + mf.offset + mf.storedSize)) {
+              hashInput.add(chunk);
+              outSink.add(chunk);
+            }
+            hashInput.close();
+          } finally {
+            await outSink.flush();
+            await outSink.close();
+          }
+          final actualHash = _toHex(Uint8List.fromList(hashSink.digest!.bytes));
+          if (actualHash != mf.sha256Hex) {
+            try { await outFile.delete(); } catch (_) {/* ignore */}
+            dpLog('unpack:   [$index/$total] FAIL ${mf.relPath} — '
+                'SHA-256 mismatch (stream-copy)');
+            throw FormatException(
+                'SHA-256 mismatch for ${mf.relPath}: '
+                'expected ${mf.sha256Hex}, got $actualHash');
+          }
+          results.add(UnpackedFile(outPath, mf.size));
+          dpLog('unpack:   [$index/$total] ${mf.relPath}  '
+              '(stream-copy ${mf.size}B → sha256 OK)  →  $outPath');
+          onFileProgress?.call(index, total);
+          continue;
+        }
+
+        // ── path (b): whole-buffer decrypt / inflate ──
+        final steps = <String>[];
         await raf.setPosition(hdr.dataOffset + mf.offset);
         Uint8List bytes = await raf.read(mf.storedSize);
         if (bytes.length < mf.storedSize) {
@@ -275,8 +333,6 @@ class DataUnpackFactory {
         }
         steps.add('sha256 OK');
 
-        final outPath = _safeJoin(outRoot, mf.outFolder, mf.relPath);
-        await Directory(_dirOf(outPath)).create(recursive: true);
         await File(outPath).writeAsBytes(bytes, flush: true);
         results.add(UnpackedFile(outPath, bytes.length));
         dpLog('unpack:   [$index/$total] ${mf.relPath}  '
