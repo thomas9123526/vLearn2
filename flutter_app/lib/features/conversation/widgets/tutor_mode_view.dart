@@ -13,7 +13,7 @@ import '../../../core/storage/model_registry.dart';
 import 'tutor_avatar.dart';
 
 /// Fullscreen voice-only tutor mode. Flexible layout (no fixed % heights),
-/// large avatar, compact latest-speech cards, hold-to-talk mic dock.
+/// large avatar, compact latest-speech cards, tap-to-toggle mic dock.
 class TutorModeView extends ConsumerStatefulWidget {
   const TutorModeView({
     required this.sessionId,
@@ -176,12 +176,6 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     }
   }
 
-  Future<void> _cancelRecording() async {
-    await ref.read(audioRecorderProvider).cancel();
-    if (!mounted) return;
-    setState(() => _mood = TutorMood.idle);
-  }
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -232,10 +226,13 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
           _RecordDock(
             recording: recording,
             mood: _mood,
-            onPressStart: _startRecording,
-            onPressEnd: _stopRecording,
-            onCancel: _cancelRecording,
-            onOpenChat: widget.onSwitchToChat,
+            onToggle: () async {
+              if (recording) {
+                await _stopRecording();
+              } else {
+                await _startRecording();
+              }
+            },
           ),
         ],
       ),
@@ -324,14 +321,19 @@ class _AvatarStage extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final side = math.min(constraints.maxWidth, constraints.maxHeight);
-        final avatarSize = (side * 0.72).clamp(140.0, 280.0);
+        // Reserve room for the name + status pill + spacing below the avatar
+        // so the Column never overflows its slot on shorter screens.
+        const reservedBelow = 12.0 + 30.0 + 8.0 + 36.0;
+        final availableHeight =
+            (constraints.maxHeight - reservedBelow).clamp(0.0, double.infinity);
+        final side = math.min(constraints.maxWidth, availableHeight);
+        final avatarSize = (side * 0.72).clamp(96.0, 280.0);
 
         final statusLabel = switch (mood) {
           TutorMood.listening => 'Listening…',
           TutorMood.speaking => 'Speaking…',
           TutorMood.encouraging => 'Your turn',
-          _ => 'Hold the mic below to speak',
+          _ => 'Tap the mic below to speak',
         };
 
         return DecoratedBox(
@@ -589,72 +591,31 @@ class _SuggestionChip extends StatelessWidget {
   }
 }
 
-/// Voice-only dock — large hold-to-talk control.
+/// Voice-only dock — tap-to-toggle mic control.
 class _RecordDock extends StatelessWidget {
   const _RecordDock({
     required this.recording,
     required this.mood,
-    required this.onPressStart,
-    required this.onPressEnd,
-    required this.onCancel,
-    required this.onOpenChat,
+    required this.onToggle,
   });
 
   final bool recording;
   final TutorMood mood;
-  final Future<void> Function() onPressStart;
-  final Future<void> Function() onPressEnd;
-  final Future<void> Function() onCancel;
-  final VoidCallback onOpenChat;
+  final Future<void> Function() onToggle;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final hint = recording
-        ? 'Release to send'
-        : mood == TutorMood.speaking
-            ? 'Wait for tutor to finish…'
-            : 'Hold to speak';
-
     return Material(
       color: scheme.surfaceContainerLow,
-      elevation: 8,
       child: SafeArea(
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                hint,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: recording
-                          ? scheme.error
-                          : scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              _MicButton(
-                recording: recording,
-                enabled: mood != TutorMood.speaking,
-                onPressStart: onPressStart,
-                onPressEnd: onPressEnd,
-                onCancel: onCancel,
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: onOpenChat,
-                child: Text(
-                  'Need to type? Switch to chat',
-                  style: TextStyle(
-                    color: scheme.primary,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
+          child: _MicButton(
+            recording: recording,
+            enabled: mood != TutorMood.speaking,
+            onToggle: onToggle,
           ),
         ),
       ),
@@ -666,16 +627,12 @@ class _MicButton extends StatelessWidget {
   const _MicButton({
     required this.recording,
     required this.enabled,
-    required this.onPressStart,
-    required this.onPressEnd,
-    required this.onCancel,
+    required this.onToggle,
   });
 
   final bool recording;
   final bool enabled;
-  final Future<void> Function() onPressStart;
-  final Future<void> Function() onPressEnd;
-  final Future<void> Function() onCancel;
+  final Future<void> Function() onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -685,9 +642,7 @@ class _MicButton extends StatelessWidget {
     return Opacity(
       opacity: active ? 1 : 0.45,
       child: GestureDetector(
-        onLongPressStart: active ? (_) => onPressStart() : null,
-        onLongPressEnd: active ? (_) => onPressEnd() : null,
-        onLongPressCancel: active ? onCancel : null,
+        onTap: active ? onToggle : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           width: recording ? 88 : 76,
