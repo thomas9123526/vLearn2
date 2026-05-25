@@ -98,11 +98,18 @@ class _TutorAvatarState extends State<TutorAvatar>
     return Color(v);
   }
 
-  Future<bool> _riveAssetExists(String path) async {
+  /// True only if the asset is bundled AND the `rive` runtime can actually
+  /// parse it. A `.riv` exported from a newer Rive editor than our pinned
+  /// `rive` package throws mid-parse (RangeError from the binary reader) —
+  /// checking that the bytes load is not enough, so we attempt a real import
+  /// and let the avatar fall back to [CartoonFace] when it fails.
+  Future<bool> _riveAssetUsable(String path) async {
     try {
-      await rootBundle.load(path);
+      final bytes = await rootBundle.load(path);
+      rive.RiveFile.import(bytes);
       return true;
-    } catch (_) {
+    } catch (e) {
+      AppConfig.logx('rive parse failed', '$path: $e');
       return false;
     }
   }
@@ -180,7 +187,7 @@ class _TutorAvatarState extends State<TutorAvatar>
                     child: asset != null
                         ? FutureBuilder<bool>(
                             key: ValueKey('rive-${widget.persona.id}-$asset'),
-                            future: _riveAssetExists('assets/animations/$asset'),
+                            future: _riveAssetUsable('assets/animations/$asset'),
                             builder: (context, snap) {
                               if (snap.data == true) {
                                 return rive.RiveAnimation.asset(

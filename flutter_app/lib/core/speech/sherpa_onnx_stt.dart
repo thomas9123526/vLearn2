@@ -53,7 +53,7 @@ class SherpaOnnxSttService extends SpeechToTextService {
   SttCapabilities get capabilities => const SttCapabilities(
         supportsStreaming: true,
         supportsLanguageDetection: false,
-        supportedLanguages: ['en', 'ko', 'zh'],
+        supportedLanguages: ['en'],
         onDevice: true,
       );
 
