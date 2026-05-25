@@ -18,6 +18,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:crypto/crypto.dart' as crypto;
 
 import 'datapack_cert.dart';
 import 'datapack_crypto.dart';
@@ -91,12 +92,20 @@ class DataUnpackFactory {
     dpLog('unpack: START $packPath');
     dpLog('unpack:   → output root $outRoot');
 
+    // Up-front file-size log: invaluable when the user reports "the
+    // app died on this .dat" — tells us whether we're dealing with a
+    // tiny pack or a multi-GB one.
+    final file = File(packPath);
+    final packSize = await file.length();
+    dpLog('unpack:   → pack file is $packSize bytes '
+        '(${(packSize / (1024 * 1024)).toStringAsFixed(1)} MB)');
+
     // Streamed: only the section / file blob currently being processed
     // is held in memory. The previous implementation read the WHOLE
     // pack into a Uint8List up-front, which OOM'd on Android for
     // multi-hundred-MB `.dat`s (the user-visible "Out of Memory" on
     // 2.dat).
-    final raf = await File(packPath).open();
+    final raf = await file.open();
     try {
       // 1) Header — first 64 bytes.
       final headerBytes = await raf.read(64);
@@ -107,6 +116,26 @@ class DataUnpackFactory {
       dpLog('unpack:   [1/6] header OK — version ${hdr.version}, '
           'compressed=${hdr.isCompressed}, encrypted=${hdr.isEncrypted}, '
           'signed=${hdr.isSigned}');
+      dpLog('unpack:        sections — '
+          'manifest @${hdr.manifestOffset}(${hdr.manifestLen}B), '
+          'data @${hdr.dataOffset}(${hdr.dataLen}B), '
+          'cert @${hdr.certOffset}(${hdr.certLen}B), '
+          'sig @${hdr.sigOffset}(${hdr.sigLen}B)');
+
+      // Sanity check: every declared section must fit inside the file.
+      // A corrupt or mis-packed header otherwise sends `raf.read(huge)`
+      // off to allocate a multi-GB buffer and OOM the process.
+      void checkRange(String name, int offset, int len) {
+        if (offset < 0 || len < 0 || offset + len > packSize) {
+          throw FormatException(
+              'header $name out of bounds: offset=$offset len=$len, '
+              'pack=$packSize');
+        }
+      }
+      checkRange('manifest', hdr.manifestOffset, hdr.manifestLen);
+      checkRange('data',     hdr.dataOffset,     hdr.dataLen);
+      checkRange('cert',     hdr.certOffset,     hdr.certLen);
+      checkRange('sig',      hdr.sigOffset,      hdr.sigLen);
 
       // 2) Manifest section (always small — JSON text).
       await raf.setPosition(hdr.manifestOffset);
@@ -120,6 +149,13 @@ class DataUnpackFactory {
           '${manifest.files.length} file(s), '
           'compression=${manifest.compression}, '
           'encryption=${manifest.encryption}');
+      // List the file sizes so we can spot a single huge blob that
+      // would still OOM the per-file decoder (decrypt+inflate work on
+      // whole buffers; only multi-section reads are streamed).
+      for (final mf in manifest.files) {
+        dpLog('unpack:        file "${mf.relPath}"  stored=${mf.storedSize}B  '
+            'plain=${mf.size}B');
+      }
 
       // 3) Cert + chain validation. Anything without a cert + sig is
       //    refused — debug Stage-3 packs only work in dev tools.
@@ -141,11 +177,17 @@ class DataUnpackFactory {
 
       // 4) Verify the pack signature. Hash is computed over
       //      header_with_sig_zeroed ‖ manifest ‖ data ‖ cert
-      //    — same as packer.cpp. The data section is streamed in 64 KB
-      //    chunks straight from the file; nothing larger than one chunk
-      //    is held for hashing.
-      final digest =
-          await _streamedDigest(raf, hdr, manifestBytes, certBytes);
+      //    — same byte sequence packer.cpp signed. We use
+      //    `package:crypto`'s streaming SHA-256 fed by
+      //    `File.openRead(start, end)`, so the only large piece (the
+      //    data section) flows through a Stream<List<int>> instead of
+      //    landing in a Uint8List of its own. Progress is logged so a
+      //    multi-hundred-MB hash doesn't look like a hang.
+      dpLog('unpack:        hashing for signature '
+          '(${(hdr.dataLen / (1024 * 1024)).toStringAsFixed(1)} MB data '
+          'section)…');
+      final digest = await _streamedDigest(
+          file, hdr, manifestBytes, certBytes);
       await raf.setPosition(hdr.sigOffset);
       final sigBytes = await raf.read(hdr.sigLen);
       if (sigBytes.length < hdr.sigLen) {
@@ -251,35 +293,55 @@ class DataUnpackFactory {
 
   /// Streaming SHA-256 over the signed prefix
   ///   header_with_sig_zeroed ‖ manifest ‖ data ‖ cert
-  /// — the same byte sequence packer.cpp signed. Manifest and cert are
-  /// already in memory; the data section (the only large piece) is
-  /// read from [raf] in 64 KB chunks so nothing the size of the pack
-  /// is ever materialised.
+  /// — the same byte sequence packer.cpp signed. Manifest and cert
+  /// are already in memory; the data section (the only large piece)
+  /// is consumed straight from `File.openRead(start, end)` as a
+  /// `Stream<List<int>>`, so nothing the size of the pack is ever
+  /// materialised. Uses `package:crypto`'s SHA-256 (faster than the
+  /// pointycastle path for large inputs) via the streaming
+  /// `startChunkedConversion` API.
   Future<Uint8List> _streamedDigest(
-    RandomAccessFile raf,
+    File file,
     DataPackHeader hdr,
     Uint8List manifestBytes,
     Uint8List certBytes,
   ) async {
-    final st = Sha256Streamer();
-    st.add(hdr.toBytesForSigVerification());
-    st.add(manifestBytes);
-    await raf.setPosition(hdr.dataOffset);
-    var remaining = hdr.dataLen;
-    const chunkSize = 64 * 1024;
-    while (remaining > 0) {
-      final n = remaining < chunkSize ? remaining : chunkSize;
-      final buf = await raf.read(n);
-      if (buf.length != n) {
-        throw const FormatException(
-            '.dat truncated — short read in data section while hashing');
+    final sink = _DigestSink();
+    final input = crypto.sha256.startChunkedConversion(sink);
+    input.add(hdr.toBytesForSigVerification());
+    input.add(manifestBytes);
+    var hashed = 0;
+    var nextLog = 32 * 1024 * 1024; // log every 32 MB
+    await for (final chunk
+        in file.openRead(hdr.dataOffset, hdr.dataOffset + hdr.dataLen)) {
+      input.add(chunk);
+      hashed += chunk.length;
+      if (hashed >= nextLog) {
+        dpLog('unpack:        …hashed '
+            '${(hashed / (1024 * 1024)).toStringAsFixed(0)}/'
+            '${(hdr.dataLen / (1024 * 1024)).toStringAsFixed(0)} MB');
+        nextLog += 32 * 1024 * 1024;
       }
-      st.add(buf);
-      remaining -= n;
     }
-    st.add(certBytes);
-    return st.finalize();
+    if (hashed != hdr.dataLen) {
+      throw FormatException(
+          '.dat truncated while hashing — read $hashed of ${hdr.dataLen} '
+          'data bytes');
+    }
+    input.add(certBytes);
+    input.close();
+    return Uint8List.fromList(sink.digest!.bytes);
   }
+}
+
+/// One-shot sink that captures the single `Digest` emitted by
+/// `crypto.sha256.startChunkedConversion`.
+class _DigestSink implements Sink<crypto.Digest> {
+  crypto.Digest? digest;
+  @override
+  void add(crypto.Digest data) => digest = data;
+  @override
+  void close() {}
 }
 
 Uint8List _hexToBytes(String hex) {
