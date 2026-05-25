@@ -1,0 +1,10 @@
+What was wrong: A previous git merge dev-https was already in progress — it had stopped on a conflict in flutter_app/pubspec.lock and was never finished. Git refuses to start a new merge while one is still open, hence the error.
+
+What I did:
+
+git checkout --theirs flutter_app/pubspec.lock — took the incoming dev-https lockfile as a starting point.
+flutter pub get — regenerated it canonically from the merged pubspec.yaml. It resolved cleanly ("Got dependencies!").
+git add flutter_app/pubspec.lock — marked the conflict resolved.
+git commit --no-edit — completed the merge → 11082f1 Merge branch 'dev-https' into dev.
+Wrote story log and committed it (fbb4fde).
+pubspec.lock is generated — hand-merging it is always the wrong move. Always regenerate via flutter pub get.
