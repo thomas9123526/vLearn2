@@ -1,0 +1,10 @@
+In Signup screen.
+
+1. Put sync icon for 'CID Username' like 'CID (National ID)' textfield.
+2. Change placeholder for 'CID(National ID)' to 'cid'
+3. Change placeholder for 'CID Username' to 'username'
+4. set visible to gone for 'Preferred language' , cause i will set visible in the future.
+
+Let's add some more information for users.
+Add birthday , certData to vl_user_info tables and do the  necessary task on application and backend service and admin panel
+

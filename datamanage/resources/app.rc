@@ -1,0 +1,6 @@
+// RT_MANIFEST (resource type 24) — embeds the Common Controls v6 +
+// per-monitor DPI manifest in the .exe so themed controls and high-DPI
+// awareness kick in without a separate .manifest file next to the binary.
+#include <winuser.h>
+
+1 24 "app.manifest"
