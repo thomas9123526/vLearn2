@@ -133,7 +133,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 TextFormField(
                   controller: _cidCtrl,
                   decoration: InputDecoration(
-                    labelText: 'CID (National ID)',
+                    labelText: 'CID',
                     prefixIcon: const Icon(Icons.credit_card_outlined),
                     suffixIcon: _cidSyncing
                         ? const Padding(
@@ -156,7 +156,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 TextFormField(
                   controller: _cidUsernameCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'Username (CID username)',
+                    labelText: 'Username',
                     prefixIcon: Icon(Icons.badge_outlined),
                   ),
                   keyboardType: TextInputType.text,
