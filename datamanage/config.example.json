@@ -2,25 +2,35 @@
   "version": 1,
   "pack_mode": {
     "compress": "zlib",
-    "encrypt": "aes-256-gcm"
-  },
-  "encrypt_options": {
-    "mode": "full"
+    "encrypt": "none"
   },
   "signing": {
-    "cert_path": "ca/admin1.crt",
-    "key_path": "ca/admin1.key"
+    "cert_path": "ca/issued/admins/alice/admin.crt",
+    "key_path": "ca/issued/admins/alice/admin.key"
   },
   "bundles": [
     {
-      "name": "out_model",
-      "source_dir": "C:/data/models",
-      "out_folder": "models"
-    },
-    {
       "name": "out_font",
       "source_dir": "C:/data/fonts",
-      "out_folder": "fonts"
+      "out_folder": "fonts",
+      "group": "core",
+      "unpack_phase": "splash"
+    },
+    {
+      "name": "sherpa_2021",
+      "source_dir": "C:/data/models/sherpa",
+      "out_folder": "models/sherpa_2021",
+      "group": "speech",
+      "unpack_phase": "on-demand"
+    },
+    {
+      "name": "out_secret",
+      "source_dir": "C:/data/secret",
+      "out_folder": "secret",
+      "pack_mode": {
+        "compress": "zlib",
+        "encrypt": "aes-256-gcm"
+      }
     }
   ],
   "output_dir": "./output"

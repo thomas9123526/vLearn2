@@ -35,6 +35,8 @@ void test_round_trip() {
     m.created_at       = "2026-05-21T10:00:00Z";
     m.compression      = "zlib";
     m.encryption       = "aes-256-gcm";
+    m.group            = "speech";
+    m.unpack_phase     = "on-demand";
     // Encrypted packs must carry the ephemeral pubkey too. 66 hex
     // chars = a 33-byte compressed P-256 point.
     m.ephemeral_pub_hex =
@@ -61,6 +63,8 @@ void test_round_trip() {
     CHECK(m2.encryption == m.encryption,             "encryption round-trip");
     CHECK(m2.ephemeral_pub_hex == m.ephemeral_pub_hex,
           "ephemeral_pub_hex round-trip");
+    CHECK(m2.group == m.group,                       "group round-trip");
+    CHECK(m2.unpack_phase == m.unpack_phase,         "unpack_phase round-trip");
     CHECK(m2.files.size() == 1,                      "files size");
     if (m2.files.size() == 1) {
         const auto& g = m2.files[0];
@@ -181,6 +185,42 @@ void test_reject_encrypted_without_eph() {
     CHECK(threw, "rejects encrypted manifest without ephemeral_pub_hex");
 }
 
+void test_legacy_manifest_defaults() {
+    using namespace datamanage;
+    // A manifest from an older pack carries no group / unpack_phase.
+    // It must read back as core / splash — i.e. exactly the
+    // pre-feature behaviour.
+    const std::string legacy = R"({
+        "bundle_name":"old","manifest_version":1,
+        "created_at":"2026-05-21T00:00:00Z",
+        "compression":"none","encryption":"none",
+        "files":[]
+    })";
+    const Manifest m = manifestFromJson(legacy);
+    CHECK(m.group == "core",
+          "legacy manifest: group defaults to core");
+    CHECK(m.unpack_phase == "splash",
+          "legacy manifest: unpack_phase defaults to splash");
+}
+
+void test_reject_unknown_phase() {
+    using namespace datamanage;
+    const std::string bad_json = R"({
+        "bundle_name":"x","manifest_version":1,
+        "created_at":"2026-05-21T00:00:00Z",
+        "compression":"none","encryption":"none",
+        "unpack_phase":"whenever",
+        "files":[]
+    })";
+    bool threw = false;
+    try {
+        manifestFromJson(bad_json);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    CHECK(threw, "rejects unknown unpack_phase value");
+}
+
 int main() {
     test_round_trip();
     test_reject_dotdot();
@@ -188,6 +228,8 @@ int main() {
     test_reject_bad_hash();
     test_reject_unknown_algo();
     test_reject_encrypted_without_eph();
+    test_legacy_manifest_defaults();
+    test_reject_unknown_phase();
 
     if (fails == 0) {
         std::printf("manifest smoke test: PASS\n");

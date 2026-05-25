@@ -58,6 +58,15 @@ dependencies:
   package_info_plus: ^8.0.0
   device_info_plus: ^10.1.0
 
+  # DataManage `.ddp` unpacker — pure-Dart crypto. pointycastle ships
+  # SHA-256, HKDF, AES-GCM, ECDH (`ECDHBasicAgreement`), and ECDSA.
+  # archive ships zlib inflate. asn1lib parses the embedded X.509
+  # admin cert (DER) and the pinned root CA cert (PEM). No FFI, no
+  # native plugin — the .ddp pipeline runs entirely in Dart.
+  pointycastle: ^3.9.1
+  archive: ^3.6.1
+  asn1lib: ^1.6.0
+
   # STT / TTS — see todoList/0517_v2/01_stt_tts_sherpa_onnx.md.
   # `sherpa_onnx` ships the ONNX runtime + recognizer/tts FFI. Native code is
   # guarded behind ModelRegistry.isReady() so the app still boots without a
@@ -134,6 +143,10 @@ flutter:
     - assets/images/
     - assets/animations/
     - assets/icons/
+    # DataManage trust anchors. `root_ca.crt` (public) is committed
+    # and pinned for cert-chain validation. `admin.key` (private) is
+    # gitignored — each build deploy copies the right one in.
+    - assets/datamanage/
 
   # Bundled font groups (Task 05 — todoList/0517_v2/05_font_groups.md).
   # Each typeface is a *variable* TTF — one file per family carrying the full

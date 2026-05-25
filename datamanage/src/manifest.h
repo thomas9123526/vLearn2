@@ -89,6 +89,13 @@ struct Manifest {
     // matching the pack-time derivation in encrypt.cpp.
     std::string ephemeral_pub_hex;
 
+    // Phased-unpack metadata. `group` is the feature bucket
+    // ("core", "speech", …); `unpack_phase` is "splash" or
+    // "on-demand". A manifest that omits either (older packs) reads
+    // back as "core" / "splash" — identical to pre-feature behaviour.
+    std::string group        = "core";
+    std::string unpack_phase = "splash";
+
     // The files in this bundle, in the order they appear in the data
     // section.
     std::vector<ManifestFile> files;

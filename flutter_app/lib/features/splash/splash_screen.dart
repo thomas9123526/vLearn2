@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/datapack/datapack_installer.dart';
+import '../../core/datapack/datapack_provider.dart';
 import '../../core/router/app_router.dart';
 import '../../core/storage/auth_history.dart';
 
@@ -63,9 +65,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   /// fresh install (keep the Tap-to-begin CTA → /signup).
   bool? _returning;
 
+  /// Set when the datapack installer has finished scanning + unpacking. We
+  /// hold both auto-nav and the Tap-to-begin CTA until this flips true so
+  /// no part of the app reads from `<support>/datapack_unpacked/` before
+  /// the .ddp files are decoded into place.
+  bool _installDone = false;
+
+  /// Non-null when the install pass reported failures. Each entry is a
+  /// short "pack_path: error" string. Shown in a footer overlay so the
+  /// admin knows which `.ddp` to re-transfer.
+  List<String>? _installFailures;
+
   /// Fires after the entrance choreography finishes; only present when
-  /// `_returning == true`. Cancelled on dispose so we don't navigate after
-  /// the user has already moved on.
+  /// `_returning == true` AND `_installDone == true`. Cancelled on dispose
+  /// so we don't navigate after the user has already moved on.
   Timer? _autoNavTimer;
 
   /// Hold long enough for the entrance to finish (900ms controller) plus a
@@ -79,13 +92,59 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   void initState() {
     super.initState();
     _resolveReturning();
+    _runDataPackInstall();
   }
 
   Future<void> _resolveReturning() async {
     final returning = await ref.read(authHistoryProvider).hasEverSignedIn();
     if (!mounted) return;
     setState(() => _returning = returning);
-    if (!returning) return;
+    _maybeScheduleAutoNav();
+  }
+
+  /// Runs the .ddp installer once. Idempotent + cheap on warm starts (no
+  /// new .ddp files → state.json already up to date → just hashes + skips).
+  /// On first launch with new packs this is where the actual unpack
+  /// happens; the splash holds the Tap-to-begin CTA / auto-nav until it
+  /// finishes so downstream code never reads a partially-unpacked tree.
+  Future<void> _runDataPackInstall() async {
+    try {
+      final outcomes =
+          await ref.read(installPendingDataPacksProvider.future);
+      final failed = outcomes
+          .where((o) => o.status == DataPackInstallStatus.failed)
+          .map((o) {
+        final pack = o.packPath.split(RegExp(r'[/\\]')).last;
+        return '$pack: ${o.error ?? "unknown"}';
+      }).toList();
+      if (!mounted) return;
+      setState(() {
+        _installDone = true;
+        _installFailures = failed.isEmpty ? null : failed;
+      });
+    } catch (e) {
+      // Resolving paths / loading the admin key from assets can throw on
+      // a device where the assets folder is misconfigured. Surface the
+      // error but don't crash the splash — sign-in still works without
+      // the datapack content.
+      if (!mounted) return;
+      setState(() {
+        _installDone = true;
+        _installFailures = ['installer: $e'];
+      });
+    }
+    _maybeScheduleAutoNav();
+  }
+
+  /// Auto-navigate to /signin only once we know both:
+  ///   1) the device has signed in before (`_returning == true`)
+  ///   2) the .ddp installer has finished its pass (`_installDone`)
+  /// First-time users (`_returning == false`) navigate via the
+  /// Tap-to-begin CTA instead, which is itself gated on `_installDone`.
+  void _maybeScheduleAutoNav() {
+    if (_autoNavTimer != null) return;       // already scheduled
+    if (_returning != true) return;          // not a returning user
+    if (!_installDone) return;               // wait for install pass
     _autoNavTimer = Timer(_autoNavDelay, () {
       if (!mounted) return;
       // Stop the infinite bob right before navigation so the upcoming route
@@ -188,7 +247,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     // the SharedPreferences read is still in flight we keep
                     // the slot empty so the button doesn't appear and then
                     // vanish on a returning device.
-                    if (_returning == false)
+                    //
+                    // The CTA / auto-nav both wait on the .ddp installer
+                    // (`_installDone`). While it's running we show a small
+                    // "Preparing your data…" indicator so the user can see
+                    // why we're not advancing yet.
+                    if (!_installDone)
+                      _PreparingIndicator(color: inkSoft)
+                    else if (_returning == false)
                       _TapToBeginButton(
                         controller: _entrance,
                         ink: ink,
@@ -238,6 +304,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               child: _Footer(controller: _entrance, color: inkFaint),
             ),
           ),
+
+          // Install-failure overlay. Sits above the corner hints when the
+          // installer reported any failed packs, so the admin sees which
+          // .ddp to re-transfer without having to dig through logs. Doesn't
+          // block navigation — sign-in still works without the datapack
+          // content.
+          if (_installFailures != null && _installFailures!.isNotEmpty)
+            Positioned(
+              left: 18,
+              right: 18,
+              bottom: 48,
+              child: SafeArea(
+                child: _InstallFailureBanner(
+                  failures: _installFailures!,
+                  surface: scheme.surface,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -552,6 +636,104 @@ class _BackOut extends Curve {
 }
 
 // ─── Centerpiece pieces ───────────────────────────────────────────────────
+
+/// Footer-area banner listing any `.ddp` files the installer couldn't
+/// process. Non-blocking — sign-in still works without the datapacks.
+/// Each line is a `pack.ddp: error` string straight from the installer.
+class _InstallFailureBanner extends StatelessWidget {
+  const _InstallFailureBanner({
+    required this.failures,
+    required this.surface,
+  });
+
+  final List<String> failures;
+  final Color surface;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.red.shade50.withValues(alpha: 0.94),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    size: 16, color: Colors.red.shade800),
+                const SizedBox(width: 6),
+                Text(
+                  'Some data packs failed to install',
+                  style: TextStyle(
+                    fontFamily: 'EditorialBody',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red.shade900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            for (final f in failures)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  f,
+                  style: TextStyle(
+                    fontFamily: 'EditorialMono',
+                    fontSize: 10,
+                    height: 1.4,
+                    color: Colors.red.shade900,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Small "Preparing your data…" indicator that occupies the same vertical
+/// slot as the Tap-to-begin CTA while the .ddp installer is still running.
+/// Spinner sized so the overall splash layout doesn't shift when the CTA
+/// replaces it (and vice-versa).
+class _PreparingIndicator extends StatelessWidget {
+  const _PreparingIndicator({required this.color});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Preparing your data…',
+          style: TextStyle(
+            fontFamily: 'EditorialBody',
+            fontSize: 12,
+            letterSpacing: 0.6,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _DateBand extends StatelessWidget {
   const _DateBand({

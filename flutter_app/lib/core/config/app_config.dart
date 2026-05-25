@@ -108,13 +108,14 @@ class ConfigFileService {
   static const _fileName = 'app_config.json';
 
   /// ─── Code-side toggle ────────────────────────────────────────────────
-  /// `true`  → `write()` saves the file as base64-encoded JSON.
-  /// `false` → `write()` saves plain JSON (human-readable).
+  /// `false` → `write()` saves **minified** JSON — the smallest
+  ///           on-disk form (~80 B for the current config). Default.
+  /// `true`  → `write()` saves **indented**, human-readable JSON.
   ///
-  /// Reads accept either format regardless of this flag, so flipping it
-  /// won't break existing config files — the next write will re-save in
-  /// whichever format you picked.
-  static const bool encodeAsBase64 = false;
+  /// Reads are whitespace-insensitive (`jsonDecode` accepts either),
+  /// so flipping this never breaks an existing config file — the next
+  /// write just re-saves it in the chosen form.
+  static const bool prettyPrint = false;
 
   /// Resolves the absolute config-file path. Creates any missing intermediate
   /// directories on the way down.
@@ -213,21 +214,28 @@ class ConfigFileService {
 
   Future<void> write(AppConfig config, {File? file}) async {
     final target = file ?? await resolveConfigFile();
-    final jsonStr = const JsonEncoder.withIndent('  ').convert(config.toJson());
-    final payload =
-        encodeAsBase64 ? base64Encode(utf8.encode(jsonStr)) : jsonStr;
-    await target.writeAsString(payload);
+    // `prettyPrint` picks the on-disk form: minified (smallest — the
+    // default) or indented (human-readable). No base64 either way —
+    // base64 only inflates ~33%. Reads still tolerate a legacy
+    // base64 file — see _decodeContent.
+    final json = config.toJson();
+    final jsonStr = prettyPrint
+        ? const JsonEncoder.withIndent('  ').convert(json)
+        : jsonEncode(json);
+    await target.writeAsString(jsonStr);
   }
 
-  /// Decodes the file content. Accepts both base64 (new format) and plain
-  /// JSON (legacy) so existing config files are migrated transparently on
-  /// the next write rather than immediately wiped.
+  /// Decodes the file content. New writes are always plain minified
+  /// JSON; this still transparently reads a legacy base64-encoded file
+  /// (from before base64 encoding was removed) so a device carrying an
+  /// old config isn't silently reset to defaults. A JSON object always
+  /// starts with '{' — not a base64 character — so base64Decode
+  /// reliably throws on plain JSON and we fall back to the raw text.
   static String _decodeContent(String raw) {
     try {
       return utf8.decode(base64Decode(raw));
     } catch (_) {
-      // Plain JSON from before the base64 migration — use as-is.
-      return raw;
+      return raw;  // plain JSON — use as-is
     }
   }
 }

@@ -1,24 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/api/app_apis.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/cached_providers.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/router/app_router.dart';
 import '../../shared/widgets/layout_visibility.dart';
+import '../../shared/widgets/refreshing_dot.dart';
 import '../news/widgets/bell_icon.dart';
 import '../news/widgets/news_strip.dart';
-
-final _scenariosProvider = FutureProvider<List<Scenario>>((ref) async {
-  final raw = await ref.read(scenariosApiProvider).list();
-  return raw.map(Scenario.fromJson).toList();
-});
-
-final _progressProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  return ref.read(progressApiProvider).myProgress();
-});
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -26,8 +18,8 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
-    final scenarios = ref.watch(_scenariosProvider);
-    final progress = ref.watch(_progressProvider);
+    final scenarios = ref.watch(scenariosProvider);
+    final progress = ref.watch(progressSummaryProvider);
     final locale = ref.watch(localeProvider).languageCode;
     final scheme = Theme.of(context).colorScheme;
 
@@ -45,8 +37,10 @@ class HomeScreen extends ConsumerWidget {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(_scenariosProvider);
-            ref.invalidate(_progressProvider);
+            await Future.wait<void>([
+              ref.read(progressSummaryProvider.notifier).refresh(),
+              ref.read(scenariosProvider.notifier).refresh(),
+            ]);
             await ref.read(authProvider.notifier).refreshProfile();
           },
           child: ListView(
@@ -70,36 +64,28 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: progress.when(
-                  data: (p) => _QuickStats(progress: p),
-                  loading: () => const Center(child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(),
-                  )),
-                  error: (_, _) => const SizedBox.shrink(),
-                ),
+                child: _QuickStats(progress: progress),
               ),
               const SizedBox(height: 24),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'Recommended scenarios',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                child: Row(
+                  children: [
+                    Text(
+                      'Recommended scenarios',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    if (scenarios.refreshing && scenarios.hasValue) ...[
+                      const SizedBox(width: 10),
+                      const RefreshingDot(size: 13),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: scenarios.when(
-                  data: (list) => _ScenarioStrip(scenarios: list.take(4).toList(), locale: locale),
-                  loading: () => const _ScenarioStripSkeleton(),
-                  error: (e, st) {
-                    logRawError('home_screen.scenarios', e, st);
-                    return PoliteBanner(
-                      text: politeMessageFor(e, context: ErrorContext.loadList),
-                    );
-                  },
-                ),
+                child: _scenarioStrip(scenarios, locale),
               ),
               const SizedBox(height: 24),
             ],
@@ -107,6 +93,26 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Renders the recommended-scenarios strip from a [Cached] list:
+  /// the cached/fresh value when present, a skeleton on a cold first
+  /// launch, or a polite banner if the very first fetch failed.
+  Widget _scenarioStrip(Cached<List<Scenario>> scenarios, String locale) {
+    if (scenarios.hasValue) {
+      return _ScenarioStrip(
+        scenarios: scenarios.value!.take(4).toList(),
+        locale: locale,
+      );
+    }
+    if (scenarios.error != null) {
+      logRawError('home_screen.scenarios', scenarios.error!,
+          scenarios.stackTrace ?? StackTrace.current);
+      return PoliteBanner(
+        text: politeMessageFor(scenarios.error!, context: ErrorContext.loadList),
+      );
+    }
+    return const _ScenarioStripSkeleton();
   }
 }
 
@@ -192,20 +198,48 @@ class _StreakAndXp extends StatelessWidget {
 
 class _QuickStats extends StatelessWidget {
   const _QuickStats({required this.progress});
-  final Map<String, dynamic> progress;
+  final Cached<Map<String, dynamic>> progress;
 
   @override
   Widget build(BuildContext context) {
-    final sessions = (progress['sessions_total'] as num? ?? 0).toInt();
-    final minutes = (progress['minutes_spoken_total'] as num? ?? 0).toInt();
-    final scenarios = (progress['scenarios_completed'] as num? ?? 0).toInt();
-    return Row(
+    final p = progress.value;
+    if (p == null) {
+      // Nothing cached yet (cold first launch) — or a failed first fetch.
+      if (progress.error != null) return const SizedBox.shrink();
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    final sessions = (p['sessions_total'] as num? ?? 0).toInt();
+    final minutes = (p['minutes_spoken_total'] as num? ?? 0).toInt();
+    final scenarios = (p['scenarios_completed'] as num? ?? 0).toInt();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Stat(value: '$sessions', label: 'Sessions', icon: Icons.chat_bubble_outline),
-        const SizedBox(width: 8),
-        _Stat(value: '$minutes', label: 'Minutes', icon: Icons.timer_outlined),
-        const SizedBox(width: 8),
-        _Stat(value: '$scenarios', label: 'Topics', icon: Icons.map_outlined),
+        // Fixed-height slot so the cards don't jump when the background
+        // refresh finishes and the dot disappears.
+        SizedBox(
+          height: 14,
+          child: progress.refreshing
+              ? const Align(
+                  alignment: Alignment.centerRight,
+                  child: RefreshingDot(size: 13),
+                )
+              : null,
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            _Stat(value: '$sessions', label: 'Sessions', icon: Icons.chat_bubble_outline),
+            const SizedBox(width: 8),
+            _Stat(value: '$minutes', label: 'Minutes', icon: Icons.timer_outlined),
+            const SizedBox(width: 8),
+            _Stat(value: '$scenarios', label: 'Topics', icon: Icons.map_outlined),
+          ],
+        ),
       ],
     );
   }

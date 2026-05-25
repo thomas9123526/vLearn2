@@ -96,6 +96,8 @@ std::string manifestToJson(const Manifest& m) {
     j["created_at"]       = m.created_at;
     j["compression"]      = m.compression;
     j["encryption"]       = m.encryption;
+    j["group"]            = m.group;
+    j["unpack_phase"]     = m.unpack_phase;
     if (!m.ephemeral_pub_hex.empty()) {
         j["ephemeral_pub_hex"] = m.ephemeral_pub_hex;
     }
@@ -147,6 +149,19 @@ Manifest manifestFromJson(const std::string& json_text) {
         throw std::runtime_error(
             "manifest: encryption != 'none' but ephemeral_pub_hex is empty");
     }
+
+    // Phased-unpack metadata. Both optional — a manifest from an
+    // older pack omits them and reads back as core / splash, i.e.
+    // unchanged behaviour.
+    if (j.contains("group")) {
+        m.group = j.at("group").get<std::string>();
+    }
+    if (m.group.empty()) m.group = "core";
+    if (j.contains("unpack_phase")) {
+        m.unpack_phase = j.at("unpack_phase").get<std::string>();
+    }
+    validateAlgoName(m.unpack_phase, {"splash", "on-demand"},
+                     "unpack_phase");
 
     if (!j.contains("files") || !j["files"].is_array()) {
         throw std::runtime_error("manifest: 'files' must be an array");
