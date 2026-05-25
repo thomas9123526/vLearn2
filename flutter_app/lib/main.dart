@@ -19,6 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 import 'core/config/app_config.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/router/app_router.dart';
@@ -47,6 +48,11 @@ Future<void> _requestAndroidStorage() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // sherpa_onnx requires its FFI bindings to be wired up before any native
+  // object (OfflineTts / OnlineRecognizer / OfflineRecognizer) is constructed.
+  // Skipping this raises "Please initialize sherpa-onnx first" the moment a
+  // speech service tries to instantiate the engine.
+  sherpa_onnx.initBindings();
   // Request external storage permission before reading the config file so
   // that ConfigFileService can create the public 룡마/가상외국어회화 directory.
   if (Platform.isAndroid) await _requestAndroidStorage();

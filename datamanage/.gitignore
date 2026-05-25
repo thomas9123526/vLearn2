@@ -1,0 +1,33 @@
+# CMake build output
+build/
+build-*/
+out/
+cmake-build-*/
+
+# Visual Studio / IDE state
+.vs/
+*.user
+*.suo
+*.sdf
+*.opensdf
+CMakeSettings.json
+
+# CA scripts under ca/ stay tracked. The certs + keys they generate
+# (ca/issued/) never get committed — those land per-deployment and
+# the root CA private key in particular must stay offline.
+ca/issued/
+
+# Defensive: even outside ca/, never commit a private key or PEM.
+*.key
+*.pem
+*.p12
+*.pfx
+*.csr
+*.srl
+
+# Local config that may contain absolute paths from the admin's machine.
+config.json
+
+# Bundles produced by `DataManage pack` — output, not source.
+output/
+*.ddp

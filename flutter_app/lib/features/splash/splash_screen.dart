@@ -35,11 +35,14 @@ class SplashScreen extends ConsumerStatefulWidget {
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with TickerProviderStateMixin {
   /// One-shot controller driving every entrance (glyphs, wordmark, slogan).
-  /// Spans the longest entrance delay (0.45s) plus the entrance duration
-  /// (0.9s) → 1.5s total runway.
+  /// Was 1500ms to match the design's full 0.45s-delay + 0.9s-fade runway;
+  /// shortened to 900ms so returning users land on sign-in faster. The
+  /// per-element `Interval`s are normalised to 0..1 of this duration so
+  /// the choreography scales proportionally — the visual sequence is
+  /// identical, just played at ~1.67×.
   late final AnimationController _entrance = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1500),
+    duration: const Duration(milliseconds: 900),
   )..forward();
 
   /// Long-running controller for the infinite glyph bob. Each glyph reads a
@@ -65,10 +68,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   /// the user has already moved on.
   Timer? _autoNavTimer;
 
-  /// Hold long enough for the entrance to finish (1.5s controller) plus a
+  /// Hold long enough for the entrance to finish (900ms controller) plus a
   /// short beat so the wordmark actually registers visually before we pull
-  /// the user into sign-in.
-  static const _autoNavDelay = Duration(milliseconds: 2000);
+  /// the user into sign-in. Tightened from 2000ms — the old timing left
+  /// returning users staring at a finished animation for ~600ms before
+  /// navigation.
+  static const _autoNavDelay = Duration(milliseconds: 1100);
 
   @override
   void initState() {
@@ -83,6 +88,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (!returning) return;
     _autoNavTimer = Timer(_autoNavDelay, () {
       if (!mounted) return;
+      // Stop the infinite bob right before navigation so the upcoming route
+      // transition gets a clean frame budget instead of competing with 8
+      // glyphs being re-transformed at 60fps.
+      _bob.stop();
       context.go(AppRoute.signIn);
     });
   }
@@ -438,7 +447,7 @@ class _SplashLayout {
 
 // ─── Floating glyph ───────────────────────────────────────────────────────
 
-class _FloatingGlyph extends StatelessWidget {
+class _FloatingGlyph extends StatefulWidget {
   const _FloatingGlyph({
     required this.spec,
     required this.entrance,
@@ -450,7 +459,24 @@ class _FloatingGlyph extends StatelessWidget {
   final AnimationController bob;
 
   @override
+  State<_FloatingGlyph> createState() => _FloatingGlyphState();
+}
+
+class _FloatingGlyphState extends State<_FloatingGlyph> {
+  // Parse the SVG once for the lifetime of the widget. The old code parsed
+  // it inside the AnimatedBuilder builder, which meant flutter_svg re-parsed
+  // the XML string ~60×/sec per glyph — the dominant cost of the splash.
+  late final Widget _svg = IgnorePointer(
+    child: SvgPicture.string(
+      _glyphSvg(widget.spec.kind, widget.spec.color),
+      width: widget.spec.size,
+      height: widget.spec.size,
+    ),
+  );
+
+  @override
   Widget build(BuildContext context) {
+    final spec = widget.spec;
     final size = MediaQuery.sizeOf(context);
 
     // Map the per-glyph entrance delay/duration into the shared 0..1
@@ -458,59 +484,56 @@ class _FloatingGlyph extends StatelessWidget {
     final start = spec.delay / 1.5;
     final end = (spec.delay + 0.9) / 1.5;
     final entranceAnim = CurvedAnimation(
-      parent: entrance,
+      parent: widget.entrance,
       curve: Interval(start, end, curve: const _BackOut(2.0)),
     );
 
     // Phase-shift the bob per glyph so they don't all rise/fall in sync.
-    // Period varies subtly (4–6s) like the design's `${4 + i * .25}s`.
     final phaseOffset = spec.delay;
+    final specRotationRad = spec.rotation * (math.pi / 180);
 
-    return AnimatedBuilder(
-      animation: Listenable.merge([entranceAnim, bob]),
-      builder: (context, _) {
-        final t = entranceAnim.value;
-        // Bob: full sine cycle; amplitude 8px, rotation ±2deg, infinite.
-        final phase =
-            (bob.value + phaseOffset) * 2 * math.pi;
-        final bobY = math.sin(phase) * 8.0;
-        final bobRot = math.sin(phase) * (2 * math.pi / 180);
+    // Anchor the *center* of the glyph at (leftPct, topPct) so rotation
+    // pivots around its midpoint. These are static — only the bob displaces
+    // per frame, via Transform.translate inside the builder.
+    final baseLeft = size.width * spec.leftPct - spec.size / 2;
+    final baseTop = size.height * spec.topPct - spec.size / 2;
 
-        // Pop in: opacity 0→1, scale .6→1, rotation stays at spec.rotation.
-        final opacity = t.clamp(0.0, 1.0);
-        final scale = 0.6 + (1.0 - 0.6) * t;
-        final rotation =
-            spec.rotation * (math.pi / 180) + (t >= 1.0 ? bobRot : 0);
-        final dy = t >= 1.0 ? bobY : 0.0;
-
-        // Convert percent-based positions to pixels — we anchor the *center*
-        // of the glyph so rotation looks right around its own midpoint.
-        final left = size.width * spec.leftPct - spec.size / 2;
-        final top = size.height * spec.topPct - spec.size / 2;
-
-        return Positioned(
-          left: left,
-          top: top + dy,
-          width: spec.size,
-          height: spec.size,
-          child: Opacity(
-            opacity: opacity,
-            child: Transform.rotate(
-              angle: rotation,
-              child: Transform.scale(
-                scale: scale,
-                child: IgnorePointer(
-                  child: SvgPicture.string(
-                    _glyphSvg(spec.kind, spec.color),
-                    width: spec.size,
-                    height: spec.size,
-                  ),
+    return Positioned(
+      left: baseLeft,
+      top: baseTop,
+      width: spec.size,
+      height: spec.size,
+      // RepaintBoundary: each glyph paints into its own layer so its bob
+      // doesn't dirty the centerpiece (wordmark, monogram, slogan).
+      child: RepaintBoundary(
+        // FadeTransition uses RenderOpacity (no saveLayer). Much cheaper than
+        // wrapping with Opacity widget for the entrance fade-in.
+        child: FadeTransition(
+          opacity: entranceAnim,
+          child: AnimatedBuilder(
+            animation: Listenable.merge([entranceAnim, widget.bob]),
+            // Pass the parsed SVG as `child` — AnimatedBuilder receives it
+            // verbatim and doesn't rebuild it on every tick.
+            child: _svg,
+            builder: (context, child) {
+              final t = entranceAnim.value;
+              final phase = (widget.bob.value + phaseOffset) * 2 * math.pi;
+              // Bob only kicks in after the entrance pop-in completes.
+              final bobY = t >= 1.0 ? math.sin(phase) * 8.0 : 0.0;
+              final bobRot =
+                  t >= 1.0 ? math.sin(phase) * (2 * math.pi / 180) : 0.0;
+              final scale = 0.6 + (1.0 - 0.6) * t;
+              return Transform.translate(
+                offset: Offset(0, bobY),
+                child: Transform.rotate(
+                  angle: specRotationRad + bobRot,
+                  child: Transform.scale(scale: scale, child: child),
                 ),
-              ),
-            ),
+              );
+            },
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -597,77 +620,90 @@ class _MonogramBadge extends StatelessWidget {
       parent: controller,
       curve: const Interval(0.0, 0.4, curve: _BackOut(1.3)),
     );
+    final scaleAnim = Tween<double>(begin: 0.85, end: 1.0).animate(pop);
 
-    return AnimatedBuilder(
-      animation: pop,
-      builder: (context, _) {
-        final t = pop.value;
-        final scale = 0.85 + (1.0 - 0.85) * t;
-        return Opacity(
-          opacity: t.clamp(0.0, 1.0),
-          child: Transform.scale(
-            scale: scale,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: isDesktop ? 84 : 68,
-                  height: isDesktop ? 84 : 68,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    borderRadius: BorderRadius.circular(isDesktop ? 24 : 20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: accent.withValues(alpha: 0.27),
-                        blurRadius: 40,
-                        offset: const Offset(0, 18),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Transform.translate(
-                    offset: const Offset(0, 1),
-                    child: Text(
-                      'F',
-                      style: TextStyle(
-                        fontFamily: 'EditorialHeading',
-                        fontSize: isDesktop ? 56 : 44,
-                        fontStyle: FontStyle.italic,
-                        color: Colors.white,
-                        height: 1,
-                      ),
-                    ),
-                  ),
-                ),
-                // Blinking white dot at the top-right.
-                Positioned(
-                  top: -6,
-                  right: -6,
-                  child: AnimatedBuilder(
-                    animation: blink,
-                    builder: (_, _) {
-                      // Square wave 0..0.5 → visible, 0.5..1 → hidden.
-                      final visible = blink.value < 0.5;
-                      return Opacity(
-                        opacity: visible ? 1.0 : 0.0,
-                        child: Container(
-                          width: 18,
-                          height: 18,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: accent, width: 3),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+    // The static badge subtree is built once and reused across every frame
+    // of the pop-in via the child: parameter of ScaleTransition.
+    final badge = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: isDesktop ? 84 : 68,
+          height: isDesktop ? 84 : 68,
+          decoration: BoxDecoration(
+            color: accent,
+            borderRadius: BorderRadius.circular(isDesktop ? 24 : 20),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.27),
+                blurRadius: 40,
+                offset: const Offset(0, 18),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: Transform.translate(
+            offset: const Offset(0, 1),
+            child: Text(
+              'F',
+              style: TextStyle(
+                fontFamily: 'EditorialHeading',
+                fontSize: isDesktop ? 56 : 44,
+                fontStyle: FontStyle.italic,
+                color: Colors.white,
+                height: 1,
+              ),
             ),
           ),
-        );
-      },
+        ),
+        // Blinking white dot at the top-right. Keeps its own AnimatedBuilder
+        // because it cycles independently of the entrance.
+        Positioned(
+          top: -6,
+          right: -6,
+          child: _BlinkingDot(blink: blink, accent: accent),
+        ),
+      ],
+    );
+
+    // FadeTransition + ScaleTransition both use Render*-level animation, so
+    // we avoid the saveLayer that Opacity widget forces.
+    return FadeTransition(
+      opacity: pop,
+      child: ScaleTransition(
+        scale: scaleAnim,
+        child: badge,
+      ),
+    );
+  }
+}
+
+/// Square-wave blink: visible for half a cycle, hidden for the other half.
+/// Lifted out of the badge so the surrounding tree doesn't rebuild with it,
+/// and so we can wrap a RepaintBoundary that keeps the blink local.
+class _BlinkingDot extends StatelessWidget {
+  const _BlinkingDot({required this.blink, required this.accent});
+  final AnimationController blink;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final dot = Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: accent, width: 3),
+      ),
+    );
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: blink,
+        child: dot,
+        builder: (_, child) =>
+            Visibility(visible: blink.value < 0.5, child: child!),
+      ),
     );
   }
 }
@@ -692,39 +728,46 @@ class _Wordmark extends StatelessWidget {
       curve: const Interval(0.04, 0.55, curve: Curves.easeOut),
     );
 
-    return AnimatedBuilder(
-      animation: t,
-      builder: (_, _) {
-        final p = t.value;
-        return Opacity(
-          opacity: p,
-          child: Transform.translate(
-            offset: Offset(0, 8 * (1 - p)),
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(
-                  fontFamily: 'EditorialHeading',
-                  fontSize: isDesktop ? 108 : 72,
-                  height: 0.95,
-                  color: ink,
-                  letterSpacing: isDesktop ? -3 : -2,
-                ),
-                children: [
-                  const TextSpan(text: 'Free'),
-                  TextSpan(
-                    text: 'Talk',
-                    style: TextStyle(
-                      fontStyle: FontStyle.italic,
-                      color: accent,
-                    ),
-                  ),
-                ],
-              ),
-              textAlign: TextAlign.center,
+    // RichText is heavy to build — pass it as `child:` so AnimatedBuilder
+    // doesn't rebuild it on every entrance tick.
+    final wordmark = RichText(
+      text: TextSpan(
+        style: TextStyle(
+          fontFamily: 'EditorialHeading',
+          fontSize: isDesktop ? 108 : 72,
+          height: 0.95,
+          color: ink,
+          letterSpacing: isDesktop ? -3 : -2,
+        ),
+        children: [
+          const TextSpan(text: 'Free'),
+          TextSpan(
+            text: 'Talk',
+            style: TextStyle(
+              fontStyle: FontStyle.italic,
+              color: accent,
             ),
           ),
-        );
-      },
+        ],
+      ),
+      textAlign: TextAlign.center,
+    );
+
+    // FadeTransition for opacity (no saveLayer) + AnimatedBuilder limited to
+    // the translate, with the RichText cached via child:.
+    return FadeTransition(
+      opacity: t,
+      child: AnimatedBuilder(
+        animation: t,
+        child: wordmark,
+        builder: (_, child) {
+          final p = t.value;
+          return Transform.translate(
+            offset: Offset(0, 8 * (1 - p)),
+            child: child,
+          );
+        },
+      ),
     );
   }
 }
@@ -747,26 +790,29 @@ class _Slogan extends StatelessWidget {
       curve: const Interval(0.2, 0.65, curve: Curves.easeOutCubic),
     );
 
-    return AnimatedBuilder(
-      animation: t,
-      builder: (_, _) {
-        final p = t.value;
-        return Opacity(
-          opacity: p,
-          child: Transform.translate(
+    final slogan = Text(
+      'Open your mouth. Find your voice.',
+      style: TextStyle(
+        fontFamily: 'EditorialHeading',
+        fontSize: isDesktop ? 22 : 17,
+        fontStyle: FontStyle.italic,
+        color: color,
+      ),
+    );
+
+    return FadeTransition(
+      opacity: t,
+      child: AnimatedBuilder(
+        animation: t,
+        child: slogan,
+        builder: (_, child) {
+          final p = t.value;
+          return Transform.translate(
             offset: Offset(0, 18 * (1 - p)),
-            child: Text(
-              'Open your mouth. Find your voice.',
-              style: TextStyle(
-                fontFamily: 'EditorialHeading',
-                fontSize: isDesktop ? 22 : 17,
-                fontStyle: FontStyle.italic,
-                color: color,
-              ),
-            ),
-          ),
-        );
-      },
+            child: child,
+          );
+        },
+      ),
     );
   }
 }
@@ -817,85 +863,90 @@ class _TapToBeginButtonState extends ConsumerState<_TapToBeginButton> {
       curve: const Interval(0.30, 0.65, curve: Curves.easeOutCubic),
     );
 
-    return AnimatedBuilder(
-      animation: t,
-      builder: (_, _) {
-        final p = t.value;
-        return Opacity(
-          opacity: p,
-          child: Transform.translate(
-            offset: Offset(0, 18 * (1 - p)),
-            child: MouseRegion(
-              onEnter: (_) => setState(() => _hovered = true),
-              onExit: (_) => setState(() => _hovered = false),
-              cursor: SystemMouseCursors.click,
-              child: AnimatedSlide(
-                duration: const Duration(milliseconds: 150),
-                offset: _hovered ? const Offset(0, -0.05) : Offset.zero,
-                curve: Curves.easeOut,
-                child: Material(
-                  color: widget.ink,
-                  borderRadius: BorderRadius.circular(999),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: _navigating ? null : _begin,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: widget.isDesktop ? 28 : 22,
-                        vertical: widget.isDesktop ? 14 : 12,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(999),
-                        boxShadow: [
-                          BoxShadow(
-                            color: widget.accent.withValues(alpha: 0.20),
-                            blurRadius: 30,
-                            offset: const Offset(0, 14),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Tap to begin',
-                            style: TextStyle(
-                              color: widget.bg,
-                              fontFamily: 'EditorialBody',
-                              fontSize: widget.isDesktop ? 14 : 13,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            width: 22,
-                            height: 22,
-                            decoration: BoxDecoration(
-                              color: widget.accent,
-                              shape: BoxShape.circle,
-                            ),
-                            alignment: Alignment.center,
-                            child: const Text(
-                              '→',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                height: 1,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
+    // Static pill body — built once and threaded through as `child:` so the
+    // entrance animation doesn't rebuild Material/InkWell on every tick.
+    final pill = MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 150),
+        offset: _hovered ? const Offset(0, -0.05) : Offset.zero,
+        curve: Curves.easeOut,
+        child: Material(
+          color: widget.ink,
+          borderRadius: BorderRadius.circular(999),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: _navigating ? null : _begin,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.isDesktop ? 28 : 22,
+                vertical: widget.isDesktop ? 14 : 12,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.accent.withValues(alpha: 0.20),
+                    blurRadius: 30,
+                    offset: const Offset(0, 14),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Tap to begin',
+                    style: TextStyle(
+                      color: widget.bg,
+                      fontFamily: 'EditorialBody',
+                      fontSize: widget.isDesktop ? 14 : 13,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: widget.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      '→',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
+    );
+
+    return FadeTransition(
+      opacity: t,
+      child: AnimatedBuilder(
+        animation: t,
+        child: pill,
+        builder: (_, child) {
+          final p = t.value;
+          return Transform.translate(
+            offset: Offset(0, 18 * (1 - p)),
+            child: child,
+          );
+        },
+      ),
     );
   }
 }

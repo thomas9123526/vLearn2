@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "pack_mode": {
+    "compress": "zlib",
+    "encrypt": "aes-256-gcm"
+  },
+  "encrypt_options": {
+    "mode": "full"
+  },
+  "signing": {
+    "cert_path": "ca/admin1.crt",
+    "key_path": "ca/admin1.key"
+  },
+  "bundles": [
+    {
+      "name": "out_model",
+      "source_dir": "C:/data/models",
+      "out_folder": "models"
+    },
+    {
+      "name": "out_font",
+      "source_dir": "C:/data/fonts",
+      "out_folder": "fonts"
+    }
+  ],
+  "output_dir": "./output"
+}

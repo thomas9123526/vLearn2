@@ -25,9 +25,14 @@ class PersonaAvatar extends StatelessWidget {
   final double size;
   final bool isSpeaking;
 
-  static Future<bool> _assetExists(String path) async {
+  /// True only if the asset is bundled AND the `rive` runtime can parse it.
+  /// Checking that the bytes load is not enough — a `.riv` exported from a
+  /// newer Rive editor than our pinned package throws mid-parse, so we
+  /// attempt a real import and degrade to the letter fallback on failure.
+  static Future<bool> _assetUsable(String path) async {
     try {
-      await rootBundle.load(path);
+      final bytes = await rootBundle.load(path);
+      rive.RiveFile.import(bytes);
       return true;
     } catch (_) {
       return false;
@@ -61,7 +66,7 @@ class PersonaAvatar extends StatelessWidget {
         ),
         child: riveAsset != null
             ? FutureBuilder<bool>(
-                future: _assetExists(riveAsset!),
+                future: _assetUsable(riveAsset!),
                 builder: (context, snapshot) {
                   if (snapshot.data == true) {
                     return ClipOval(child: rive.RiveAnimation.asset(riveAsset!));
