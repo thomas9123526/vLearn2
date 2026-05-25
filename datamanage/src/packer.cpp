@@ -113,7 +113,9 @@ fs::path joinOutput(const std::string& output_dir,
                     const std::string& bundle_name) {
     fs::path dir(output_dir);
     fs::create_directories(dir);
-    return dir / (bundle_name + ".ddp");
+    // Output extension is ".dat". The internal format magic stays
+    // "DDDP" — only the on-disk file extension changed.
+    return dir / (bundle_name + ".dat");
 }
 
 }  // namespace
@@ -170,6 +172,8 @@ PackResult packBundle(const BundleConfig& bundle,
     manifest.created_at       = nowIso8601Utc();
     manifest.compression      = use_zlib ? "zlib" : "none";
     manifest.encryption       = use_aesgcm ? "aes-256-gcm" : "none";
+    manifest.group            = bundle.group;
+    manifest.unpack_phase     = bundle.unpack_phase;
     if (use_aesgcm) {
         manifest.ephemeral_pub_hex = encryptor->ephemeralPubHex();
     }
@@ -267,7 +271,7 @@ PackResult packBundle(const BundleConfig& bundle,
         hdr.sig_offset = hdr.cert_offset + hdr.cert_len;
     }
 
-    // Emit the .ddp file in section order.
+    // Emit the .dat pack file in section order.
     const fs::path out_path = joinOutput(output_dir, bundle.name);
     std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
     if (!out) {
@@ -303,9 +307,11 @@ std::vector<PackResult> packAll(const Config& config,
     std::vector<PackResult> results;
     results.reserve(config.bundles.size());
     for (const auto& b : config.bundles) {
+        // Each bundle carries its own resolved pack_mode (its own
+        // override, or a copy of the global — loadConfig settled that).
         results.push_back(
             packBundle(b, config.output_dir, progress,
-                       config.pack_mode, config.signing));
+                       b.pack_mode, config.signing));
     }
     return results;
 }

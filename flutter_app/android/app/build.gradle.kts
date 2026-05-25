@@ -21,7 +21,10 @@ android {
 
     defaultConfig {
         applicationId = "com.ryongma.vfls"
-        minSdk = 24            // sqlite3_flutter_libs + flutter_secure_storage require API 24+
+        // Minimum supported platform: API 24 (Android 7.0) — also the
+        // plugin floor (sqlite3_flutter_libs + flutter_secure_storage
+        // both require API 24+).
+        minSdk = 24
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName

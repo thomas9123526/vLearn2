@@ -53,6 +53,11 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   bool _sending = false;
   bool _ending = false;
 
+  /// Number of messages last rendered — used to detect when a new turn
+  /// (the user's own bubble or the AI's reply) lands so we can scroll
+  /// the chat to the bottom.
+  int _lastMessageCount = 0;
+
   /// Local "currently viewing" mode. Defaults to the session's stored mode
   /// (set at start time) but the user can flip it via the AppBar toggle.
   String? _viewMode;
@@ -64,6 +69,36 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     super.dispose();
   }
 
+  /// Scrolls the chat list to the newest message. [jump] skips the
+  /// animation (first load); later turns animate so the user's eye
+  /// follows the new bubble in. A second pass corrects for the
+  /// ListView's lazy extent estimate once the trailing bubbles are
+  /// laid out.
+  void _scrollToBottom({bool jump = false}) {
+    if (!_scroll.hasClients) return;
+    final target = _scroll.position.maxScrollExtent;
+    if (jump) {
+      _scroll.jumpTo(target);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) {
+          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        }
+      });
+    } else {
+      _scroll
+          .animateTo(
+            target,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          )
+          .then((_) {
+        if (_scroll.hasClients) {
+          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        }
+      });
+    }
+  }
+
   /// Submit a text turn to the backend and refresh the local view.
   /// Used both by the chat-mode text input and by tutor-mode (after STT).
   Future<void> _send(String text) async {
@@ -73,16 +108,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     try {
       await ref.read(conversationsApiProvider).sendMessage(widget.sessionId, trimmed);
       _input.clear();
+      // The refetch adds the new turn(s); the ref.listen in build()
+      // sees the longer message list and scrolls the chat to the bottom.
       ref.invalidate(_sessionProvider(widget.sessionId));
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scroll.hasClients) {
-          _scroll.animateTo(
-            _scroll.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-          );
-        }
-      });
     } on Exception catch (e, st) {
       if (mounted) {
         showPoliteErrorSnack(
@@ -126,6 +154,23 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(_sessionProvider(widget.sessionId));
+
+    // Whenever the message list grows — the user's own turn or the AI's
+    // reply landing after a refetch — scroll the chat to the bottom so
+    // the newest bubble is visible. First load jumps, later turns animate.
+    ref.listen(_sessionProvider(widget.sessionId), (prev, next) {
+      final messages = next.valueOrNull?.messages;
+      if (messages == null) return; // still loading / error — ignore
+      final count = messages.length;
+      if (count > _lastMessageCount) {
+        final firstLoad = _lastMessageCount == 0;
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _scrollToBottom(jump: firstLoad),
+        );
+      }
+      _lastMessageCount = count;
+    });
+
     final scheme = Theme.of(context).colorScheme;
     final bubbleStyle = ref.watch(bubbleStyleProvider);
     final isTutorMode = data.maybeWhen(

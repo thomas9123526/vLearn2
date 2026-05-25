@@ -120,6 +120,12 @@ class I18nText {
   final String? ko;
   final String? zh;
 
+  Map<String, dynamic> toJson() => {
+        'en': en,
+        if (ko != null) 'ko': ko,
+        if (zh != null) 'zh': zh,
+      };
+
   String forLocale(String locale) {
     switch (locale) {
       case 'ko':
@@ -156,6 +162,20 @@ class Scenario {
         xpReward: (j['xp_reward'] as num? ?? j['xpReward'] as num? ?? 50).toInt(),
         imageUrl: j['image_url'] as String? ?? j['imageUrl'] as String?,
       );
+
+  /// Inverse of [Scenario.fromJson] — used to cache the list to SQLite.
+  /// Keys match the snake_case form `fromJson` reads back.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'slug': slug,
+        'category': category,
+        'difficulty': difficulty,
+        'title': title.toJson(),
+        'description': description.toJson(),
+        'estimated_minutes': estimatedMinutes,
+        'xp_reward': xpReward,
+        if (imageUrl != null) 'image_url': imageUrl,
+      };
 
   final String id;
   final String slug;
