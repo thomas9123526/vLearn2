@@ -23,19 +23,22 @@ class AppConfig {
   });
 
   /// JSON shape — short field names per the spec (`baseurl`, `reqTout`,
-  /// `tSync`, `dev`). `dev` is a string, not a boolean. `model` is an
-  /// optional absolute path that, when set, lets the app use on-device
-  /// speech models the admin pre-placed — skipping the `.dat` unpack
-  /// entirely. See [modelPath].
-  factory AppConfig.fromJson(Map<String, dynamic> j) => AppConfig(
-        backendBaseUrl: (j['baseurl'] as String?) ?? defaults.backendBaseUrl,
-        requestTimeout: (j['reqTout'] as num?)?.toInt() ?? defaults.requestTimeout,
-        topicSyncInterval: (j['tSync'] as num?)?.toInt() ?? defaults.topicSyncInterval,
-        environment: (j['dev'] as String?) ?? defaults.environment,
-        modelPath: (j['model'] as String?)?.trim().isEmpty == true
-            ? null
-            : j['model'] as String?,
-      );
+  /// `tSync`, `dev`). `dev` is a string, not a boolean. `model` (or
+  /// `models` as a forgiving alias — both are accepted on read; we
+  /// always write `model`) is an optional absolute path that, when set,
+  /// lets the app use on-device speech models the admin pre-placed —
+  /// skipping the `.dat` unpack entirely. See [modelPath].
+  factory AppConfig.fromJson(Map<String, dynamic> j) {
+    final rawModel = (j['model'] as String?) ?? (j['models'] as String?);
+    return AppConfig(
+      backendBaseUrl: (j['baseurl'] as String?) ?? defaults.backendBaseUrl,
+      requestTimeout: (j['reqTout'] as num?)?.toInt() ?? defaults.requestTimeout,
+      topicSyncInterval: (j['tSync'] as num?)?.toInt() ?? defaults.topicSyncInterval,
+      environment: (j['dev'] as String?) ?? defaults.environment,
+      modelPath:
+          (rawModel == null || rawModel.trim().isEmpty) ? null : rawModel,
+    );
+  }
 
   static void logx(String tag, Object message) {
     debugPrint('[$tag] $message');
