@@ -59,6 +59,9 @@ String politeMessageFor(
   if (i18nKey == 'auth.post_signin_failed') {
     return 'Signed in, but we could not load your profile. Check that the app points at the right server and try again.';
   }
+  if (i18nKey == 'network.offline') {
+    return "You're offline. Connect to Wi-Fi or mobile data and try again.";
+  }
 
   if (error is ApiException && error.isNetwork) {
     return "Couldn't reach the server. Check your connection and try again.";
