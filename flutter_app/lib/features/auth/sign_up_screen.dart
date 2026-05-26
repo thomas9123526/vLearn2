@@ -97,9 +97,27 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             displayName: name,
             birthday: birthday,
           );
-      if (mounted) setState(() => _suggestions = list);
-    } catch (_) {
-      // Silent — suggestions are best-effort.
+      if (mounted) {
+        setState(() => _suggestions = list);
+        if (list.isEmpty) {
+          // The backend returned 200 but had nothing to offer
+          // (e.g. CJK name with no romanizable letters, or every
+          // candidate is already taken). Tell the user instead of
+          // leaving them staring at an empty UI.
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No available suggestions for that name + birthday. Try a different birthday or type your own username.')),
+          );
+        }
+      }
+    } catch (e) {
+      // Connection refused / 404 / DTO rejection -- surface a
+      // visible error so a misconfigured backend or offline
+      // server doesn't look like a no-op button click.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not fetch suggestions: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _suggestingUsernames = false);
     }
