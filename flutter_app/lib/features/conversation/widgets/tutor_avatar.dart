@@ -279,14 +279,21 @@ class _TutorAvatarState extends State<TutorAvatar>
     }
   }
 
+  /// Single Rive asset used for every tutor, regardless of what the
+  /// backend `personas.rive_asset` column says. The DB still drives
+  /// gradient colours and the fallback letter; only the .riv binary is
+  /// pinned. Swap this constant (or revert to `widget.persona.riveAsset`)
+  /// once per-tutor Rive files are ready.
+  static const String _forcedRiveAsset = 'tutor_hiro.riv';
+
   @override
   Widget build(BuildContext context) {
     final from = _hex(widget.persona.gradientFrom);
     final to = _hex(widget.persona.gradientTo);
-    final asset = widget.persona.riveAsset;
+    const asset = _forcedRiveAsset;
 
     AppConfig.logx('assets for', widget.persona.name);
-    AppConfig.logx('assets path', asset ?? '(none)');
+    AppConfig.logx('assets path', '$asset (forced; DB value ignored)');
 
 
 
@@ -349,33 +356,26 @@ class _TutorAvatarState extends State<TutorAvatar>
                     ],
                   ),
                   child: ClipOval(
-                    child: asset != null
-                        ? FutureBuilder<bool>(
-                            key: ValueKey('rive-${widget.persona.id}-$asset'),
-                            future: _riveAssetUsable('assets/animations/$asset'),
-                            builder: (context, snap) {
-                              if (snap.data == true) {
-                                return rive.RiveAnimation.asset(
-                                  'assets/animations/$asset',
-                                  key: ValueKey(asset),
-                                  fit: BoxFit.cover,
-                                  onInit: _onRiveInit,
-                                );
-                              }
-                              return CartoonFace(
-                                key: ValueKey('face-${widget.persona.id}'),
-                                persona: widget.persona,
-                                mood: widget.mood,
-                                size: widget.size,
-                              );
-                            },
-                          )
-                        : CartoonFace(
-                            key: ValueKey('face-${widget.persona.id}'),
-                            persona: widget.persona,
-                            mood: widget.mood,
-                            size: widget.size,
-                          ),
+                    child: FutureBuilder<bool>(
+                      key: ValueKey('rive-${widget.persona.id}-$asset'),
+                      future: _riveAssetUsable('assets/animations/$asset'),
+                      builder: (context, snap) {
+                        if (snap.data == true) {
+                          return rive.RiveAnimation.asset(
+                            'assets/animations/$asset',
+                            key: const ValueKey(asset),
+                            fit: BoxFit.cover,
+                            onInit: _onRiveInit,
+                          );
+                        }
+                        return CartoonFace(
+                          key: ValueKey('face-${widget.persona.id}'),
+                          persona: widget.persona,
+                          mood: widget.mood,
+                          size: widget.size,
+                        );
+                      },
+                    ),
                   ),
                 ),
               );
