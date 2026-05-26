@@ -31,6 +31,12 @@ enum TutorMood {
   /// User has been silent for a while — gentle "go ahead, you got this"
   /// encouragement.
   encouraging,
+
+  /// User turn just finished and the app is awaiting the AI reply. Mic
+  /// is disabled, status pill shows a progress indicator. Visually
+  /// neutral on the current `.riv` (no `think` input yet); swap to the
+  /// dedicated state-machine input when the thinking animation ships.
+  thinking,
 }
 
 /// Big tutor avatar used in Tutor (Face) mode. Combines:
@@ -287,6 +293,15 @@ class _TutorAvatarState extends State<TutorAvatar>
           _emotionInput?.value = 1;
           _attentionInput?.value = false;
           _stopMouthCycle();
+        case TutorMood.thinking:
+          // No dedicated `think` input on tutor_hiro.riv yet — keep the
+          // face neutral and not leaned-in. The status pill and mic
+          // spinner carry the visual cue until a thinking animation
+          // ships. Wire `sm.boolean('think')?.value = true` here when it
+          // does.
+          _emotionInput?.value = 0;
+          _attentionInput?.value = false;
+          _stopMouthCycle();
       }
     } catch (e) {
       AppConfig.logx('rive-mood failed', '$mood: $e');
@@ -312,8 +327,8 @@ class _TutorAvatarState extends State<TutorAvatar>
     final to = _hex(widget.persona.gradientTo);
     const asset = _forcedRiveAsset;
 
-    AppConfig.logx('assets for', widget.persona.name);
-    AppConfig.logx('assets path', '$asset (forced; DB value ignored)');
+    //AppConfig.logx('assets for', widget.persona.name);
+    //AppConfig.logx('assets path', '$asset (forced; DB value ignored)');
 
 
 

@@ -125,6 +125,11 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
       _latestForRole('assistant') != null;
 
   Future<void> _startRecording() async {
+    // Hard guard: don't open the mic while a previous turn is still
+    // being transcribed / waiting for the AI reply. The mic button is
+    // already disabled in this mood, but a programmatic toggle could
+    // sneak through otherwise.
+    if (_mood == TutorMood.thinking) return;
     final recorder = ref.read(audioRecorderProvider);
     final granted = await recorder.requestPermission();
     if (!granted) {
@@ -156,15 +161,16 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     final recorder = ref.read(audioRecorderProvider);
     final capture = await recorder.stop();
     if (!mounted) return;
-    setState(() => _mood = TutorMood.idle);
     if (capture == null) {
       debugPrint('[stt] mic.stop -> no capture (null)');
+      setState(() => _mood = TutorMood.idle);
       return;
     }
     debugPrint('[stt] mic.stop -> ${capture.pcm.length} bytes pcm captured');
 
     if (!ref.read(speechReadyProvider)) {
       debugPrint('[stt] aborted — speech models not ready');
+      setState(() => _mood = TutorMood.idle);
       final snap = ref.read(modelRegistrySnapshotProvider).valueOrNull;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -174,6 +180,14 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
       );
       return;
     }
+
+    // From this point on we own the turn. Flip to `thinking` so the
+    // mic button disables, the status pill shows a spinner, and the
+    // avatar is in a neutral pose ready for the eventual TTS reply.
+    // The mood is cleared in `finally` so a failure can't leave the
+    // UI stuck disabled forever.
+    setState(() => _mood = TutorMood.thinking);
+
     final stt = ref.read(sttServiceProvider);
     final swatch = Stopwatch()..start();
     try {
@@ -188,6 +202,8 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
         debugPrint('[stt] empty result — not sending');
         return;
       }
+      // Sends the turn upstream and awaits the AI reply — keeps us
+      // in `thinking` mood for the whole round-trip.
       await widget.onSendText(text);
     } catch (e, st) {
       swatch.stop();
@@ -195,6 +211,14 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
       logRawError('tutor_mode.stt', e, st);
       if (mounted) {
         showPoliteErrorSnack(context, e, tag: 'tutor_mode.stt', stack: st);
+      }
+    } finally {
+      if (mounted && _mood == TutorMood.thinking) {
+        // The TTS isSpeakingStream subscriber will flip us to
+        // `speaking` the moment audio playback starts; until then,
+        // hand back to `idle` so the mic re-enables and the user
+        // can interrupt with a new turn if they want.
+        setState(() => _mood = TutorMood.idle);
       }
     }
   }
@@ -355,6 +379,7 @@ class _AvatarStage extends StatelessWidget {
         final statusLabel = switch (mood) {
           TutorMood.listening => 'Listening…',
           TutorMood.speaking => 'Speaking…',
+          TutorMood.thinking => 'Thinking…',
           TutorMood.encouraging => 'Your turn',
           _ => 'Tap the mic below to speak',
         };
@@ -415,8 +440,23 @@ class _StatusPill extends StatelessWidget {
           scheme.onPrimaryContainer,
           Icons.graphic_eq_rounded,
         ),
+      TutorMood.thinking => (
+          scheme.tertiaryContainer,
+          scheme.onTertiaryContainer,
+          Icons.hourglass_top_rounded,
+        ),
       _ => (scheme.surfaceContainerHigh, scheme.onSurfaceVariant, Icons.mic_none),
     };
+
+    // Tiny spinner replaces the static icon while we're awaiting the
+    // AI reply, so the "Thinking…" pill is visibly alive.
+    final leading = mood == TutorMood.thinking
+        ? SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2, color: fg),
+          )
+        : Icon(icon, size: 18, color: fg);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -427,7 +467,7 @@ class _StatusPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: fg),
+          leading,
           const SizedBox(width: 8),
           Text(
             label,
@@ -629,6 +669,10 @@ class _RecordDock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // Mic is locked while:
+    //  * the tutor is speaking (don't talk over its TTS), and
+    //  * we're awaiting the AI reply for the user's last turn.
+    final enabled = mood != TutorMood.speaking && mood != TutorMood.thinking;
     return Material(
       color: scheme.surfaceContainerLow,
       child: SafeArea(
@@ -637,7 +681,8 @@ class _RecordDock extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
           child: _MicButton(
             recording: recording,
-            enabled: mood != TutorMood.speaking,
+            thinking: mood == TutorMood.thinking,
+            enabled: enabled,
             onToggle: onToggle,
           ),
         ),
@@ -649,11 +694,13 @@ class _RecordDock extends StatelessWidget {
 class _MicButton extends StatelessWidget {
   const _MicButton({
     required this.recording,
+    required this.thinking,
     required this.enabled,
     required this.onToggle,
   });
 
   final bool recording;
+  final bool thinking;
   final bool enabled;
   final Future<void> Function() onToggle;
 
@@ -661,6 +708,12 @@ class _MicButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final active = enabled || recording;
+    final color = recording
+        ? scheme.error
+        : (thinking ? scheme.surfaceContainerHighest : scheme.primary);
+    final fg = recording
+        ? scheme.onError
+        : (thinking ? scheme.onSurfaceVariant : scheme.onPrimary);
 
     return Opacity(
       opacity: active ? 1 : 0.45,
@@ -672,21 +725,31 @@ class _MicButton extends StatelessWidget {
           height: recording ? 88 : 76,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: recording ? scheme.error : scheme.primary,
+            color: color,
             boxShadow: [
               BoxShadow(
-                color: (recording ? scheme.error : scheme.primary)
-                    .withValues(alpha: recording ? 0.45 : 0.28),
+                color: color.withValues(alpha: recording ? 0.45 : 0.28),
                 blurRadius: recording ? 28 : 16,
                 spreadRadius: recording ? 4 : 0,
               ),
             ],
           ),
-          child: Icon(
-            recording ? Icons.stop_rounded : Icons.mic_rounded,
-            size: recording ? 40 : 34,
-            color: recording ? scheme.onError : scheme.onPrimary,
-          ),
+          // Spinner replaces the mic glyph while the AI is thinking so
+          // the user gets unmistakable feedback that a request is in
+          // flight and the button is intentionally locked.
+          child: thinking
+              ? Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: fg,
+                  ),
+                )
+              : Icon(
+                  recording ? Icons.stop_rounded : Icons.mic_rounded,
+                  size: recording ? 40 : 34,
+                  color: fg,
+                ),
         ),
       ),
     );
