@@ -60,7 +60,7 @@ export class AuthController {
       'Resolve a registered CID to its login username (pre-signin convenience)',
   })
   @ApiQuery({ name: 'cid', required: true })
-  @ApiOkResponse({ schema: { example: { cidUsername: 'alex_kr' } } })
+  @ApiOkResponse({ schema: { example: { cidUsername: 'kky1206' } } })
   @HttpCode(HttpStatus.OK)
   lookupUsername(
     @Query('cid') cid: string,
