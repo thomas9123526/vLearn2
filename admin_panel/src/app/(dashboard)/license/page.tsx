@@ -61,7 +61,7 @@ export default function LicensePage() {
         <p className="text-sm text-muted-foreground">
           Toggle licensing for the Flutter app and configure the verification chain.
           When disabled, every user is licensed permanently and the License item is
-          hidden from the app's Settings screen.
+          hidden from the app&apos;s Settings screen.
         </p>
       </div>
 
