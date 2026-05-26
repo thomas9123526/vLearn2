@@ -309,6 +309,7 @@ class _FacePainter extends CustomPainter {
           rotation: -0.04,
         );
       case TutorMood.encouraging:
+      case TutorMood.thinking:
       case TutorMood.idle:
         return _HeadTransform(
           dx: 0,
@@ -575,6 +576,7 @@ class _FacePainter extends CustomPainter {
           path.quadraticBezierTo(100, 142, 116, 150);
           break;
         case TutorMood.encouraging:
+        case TutorMood.thinking:
         case TutorMood.listening:
         case TutorMood.idle:
         case TutorMood.speaking:
