@@ -105,32 +105,33 @@ class ModelRegistrySnapshot {
 class ModelRegistry {
   ModelRegistry({
     @visibleForTesting Directory? overrideRoot,
-    String? sttOverridePath,
+    String? modelOverridePath,
   })  : _overrideRoot = overrideRoot,
-        _sttOverridePath = sttOverridePath;
+        _modelOverridePath = modelOverridePath;
 
   final Directory? _overrideRoot;
 
-  /// Optional sdcard path from `app_config.json` `stt` field. When set
-  /// AND it contains a recognisable sherpa-onnx layout, this is used
-  /// in place of the unpacked-datapack location — the `.dat` unpack
-  /// step is skipped entirely.
-  final String? _sttOverridePath;
+  /// Optional sdcard path from `app_config.json` `model` field. When
+  /// set AND it contains a recognisable on-device speech layout
+  /// (`stt/` + `tts/` + `vad/` subfolders alongside `manifest.json`),
+  /// this is used in place of the unpacked-datapack location — the
+  /// `.dat` unpack step is skipped entirely.
+  final String? _modelOverridePath;
 
   /// Set by the last [resolveModelRoot] call: true when the root came
-  /// from the [_sttOverridePath] short-circuit. Used by [loadManifest]
+  /// from the [_modelOverridePath] short-circuit. Used by [loadManifest]
   /// / [verifyAll] to decide whether to synthesise a manifest and skip
   /// hash verification.
   bool _resolvedFromOverride = false;
 
-  /// Resolves the on-disk root where the sherpa-onnx models live.
+  /// Resolves the on-disk root where the on-device speech models live.
   ///
   /// Resolution order:
   ///   1. Test `overrideRoot` (highest priority — keeps existing tests).
-  ///   2. `app_config.json` `stt` path, if set AND the directory has
-  ///      a usable sherpa layout (see [_hasSherpaLayout]). Lets the
-  ///      admin pre-place models on the sdcard and skip every `.dat`
-  ///      unpack at runtime.
+  ///   2. `app_config.json` `model` path, if set AND the directory has
+  ///      a usable layout (see [_hasSherpaLayout]). Lets the admin
+  ///      pre-place models on the sdcard and skip every `.dat` unpack
+  ///      at runtime.
   ///   3. The unpacked-datapack location, read back from the install
   ///      state file via [unpackedRootForGroup] — the original flow.
   ///
@@ -143,16 +144,19 @@ class ModelRegistry {
 
     if (_overrideRoot != null) {
       root = Directory(p.join(_overrideRoot.path, 'models'));
-    } else if (_sttOverridePath != null && _sttOverridePath.isNotEmpty) {
-      final dir = Directory(_sttOverridePath);
+    } else if (_modelOverridePath != null && _modelOverridePath.isNotEmpty) {
+      final dir = Directory(_modelOverridePath);
       if (dir.existsSync() && _hasSherpaLayout(dir)) {
-        debugPrint('[model-registry] using app_config.json stt override '
+        debugPrint('[model-registry] using app_config.json model override '
             '→ ${dir.path}');
         _resolvedFromOverride = true;
         root = dir;
       } else {
-        debugPrint('[model-registry] stt override path "$_sttOverridePath" '
-            'missing or has no sherpa layout — falling back to unpacked .dat');
+        debugPrint(
+            '[model-registry] model override path "$_modelOverridePath" '
+            'missing or has no expected layout '
+            '(needs stt/ with .onnx + tokens, plus tts/ and vad/) — '
+            'falling back to unpacked .dat');
         root = await _resolveUnpackedRoot();
       }
     } else {
@@ -327,12 +331,12 @@ class ModelRegistry {
 }
 
 final modelRegistryProvider = Provider<ModelRegistry>((ref) {
-  // Pull the optional `stt` override path out of app_config.json so
+  // Pull the optional `model` override path out of app_config.json so
   // the registry can short-circuit straight to admin-placed models.
   // `valueOrNull` is null until appConfigProvider resolves; at app
   // boot we await appConfigProvider before this is read.
   final cfg = ref.watch(appConfigProvider).valueOrNull;
-  return ModelRegistry(sttOverridePath: cfg?.sttModelPath);
+  return ModelRegistry(modelOverridePath: cfg?.modelPath);
 });
 
 /// Snapshot used to gate UI (Models not installed screen, mic button visibility,
