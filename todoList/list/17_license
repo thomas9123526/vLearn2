@@ -1,0 +1,50 @@
+I want put license for this application.
+I want license tab on admin panel.
+In this task, let's put license logic like the following and it consists of some projects.
+Put checkbox for "Enable License" on "License" tab.
+If I uncheck "Enable License" , application for android and windows should not show "License" on settings screen and the app user will be licensed permanantly. In this case, it's simple license logic.
+
+Let's think about when admin check the "Enable License" on "License" Tab of admin panel.
+There are two types of "License".
+The user license can be period license or permanant license. Period License means the app user is licensed for a particular periods, for example "The License expires in 100 days."
+Permanant License means the app user is licensed permanantly, means there's no expire days and user will be licensed all the time. This logic can be done by give the user 100 year license.
+
+
+
+So If I check "Enable License" on "License" Tab of admin panel, there should be "License" Item in Settings screen of Application on both windows and android.
+
+
+If the user tap "License" Item on Settings screen, it should show information about user license.
+License information include the machineID for device and the status for this user license.
+If there's no license or license is expired in case the admin checked "Enable License", then show "Get License" Button. If the user tap "Get License", the application should show camera application which scans qrcode and receive license information. I have put qrlib.aar and there's QRScanActivity. So for test purpose, launch the QRScanActivity with intent.putExtra("mode","test_license") and you will get some text content or binary content.
+
+For "Machine ID", it must show id for devices for each android and windows.
+For Android, Can u make a  Android Native Java Project which provide function to get device id using both java and jni native call? Let's call this project as AndroidDevIDLib. So I will compile this AndroidDevIDLib.aar and combine with this aar and call the corresponding function and get device id and show it to "Machine ID" Label.
+For Windows, plz make Microsoft Visual Studio 2022 project to get device id and export function to get deviceID. Let's call this project as WindowsDevIDLib.  So I will compile this WindowsDevIDLib.dll and combine with this dll and call the corresponding function and get device id and show it to "Machine ID" Label for windows one.
+
+
+
+For checking "license content", put logic like the following.
+I want use certificate like we have already done for datamanage tool.
+so the "license content" include allowed days information. "license content" can be like cert like format but suggest me how can we check the "license content" securley and allow the user's license with the specified day period. When generate "licese content" Leaf CA will be used.
+So Root CA issue Key CA and Key CA issue Leaf Ca1, Leaf Ca2 and Root CA is already used in datamanage tool.
+So when the app find the "license content" in /sdcard/룡마/가상외국어회화/lic or get "license content" via qrscanactivity, it uploads the cert like license content  onto server backend api.
+The Backend Api checks the "license content" and returns analyzed information like license valid or not, and if license is valid, return the period days, etc.
+The Application receives the analyzed "license content" information and save the it to the application side and update corresponding controls to show license status.
+
+There should be license generator project as Microsoft Visual Studio 2022.
+Let's call this project as "KeyGenerator". 
+It will be gui project that accepts the necessary files like Leaf CA or other information and  input number for "License Days".
+And If i click generate, it will produce cert file and corresponding qrcode image. 
+I want "KeyGenerator" can be compiled also in RHEL 9.0 Server Environment. so plz make both for Microsoft Visual Studio 2022 project and RHLE 9.0 qt based project. QT Version can be QT5.
+When i generate , it must insert logs to POSTGRESQL for generate action. The DatabaseName can be "vLearnLicense". Please insert information to proper tables.
+
+Remember that the anylyzed "license content" size should not exceeds 1kb or 1500 bytes. so when construct license logic, consider about it.
+
+
+
+
+
+
+
+

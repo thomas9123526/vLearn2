@@ -1,0 +1,5 @@
+In signin screen, there is cid username.
+On sign_in_screen.dar , I want put IconButton inside Username TextFormField like CID control.
+if user tap IconButton for Username, it fetches username from the backend and fill value.
+So make backend api to fetch username which the cid matches on the cid TextFormField.
+Be sure the backend api should not accept AUTH token because the application user will not receive the JWT TOKEN before signin success.
