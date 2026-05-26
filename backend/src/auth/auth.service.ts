@@ -128,6 +128,33 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
+  // ─── Lookup username by CID (pre-signin convenience) ────
+  /**
+   * Returns the cid_username registered against the given CID, so the
+   * sign-in screen can auto-fill the username field once the user has
+   * synced their CID. Public on purpose — the caller has no JWT yet —
+   * but **only** returns the username for active accounts. Suspended
+   * or deleted users get a 404 to avoid disclosing their state.
+   *
+   * Rate-limiting / brute-force protection is the responsibility of
+   * the ingress (nginx) and the global throttler module — this method
+   * does not implement either.
+   */
+  async lookupUsernameByCid(cid: string): Promise<{ cidUsername: string }> {
+    const trimmed = cid.trim();
+    if (!trimmed) {
+      throw new UnauthorizedException({ i18nKey: 'auth.cid_required' });
+    }
+    const user = await this.users.findOne({
+      where: { cid: trimmed },
+      select: ['id', 'cid_username'],
+    });
+    if (!user || !user.cid_username) {
+      throw new UnauthorizedException({ i18nKey: 'auth.cid_not_registered' });
+    }
+    return { cidUsername: user.cid_username };
+  }
+
   // ─── Sign-out ───────────────────────────────────────────
   async signOut(userId: string, refreshToken?: string): Promise<void> {
     if (refreshToken) {

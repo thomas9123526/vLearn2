@@ -5,11 +5,13 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiTags,
   ApiOkResponse,
   ApiCreatedResponse,
@@ -48,6 +50,21 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   signIn(@Body() dto: SignInDto): Promise<AuthResponseDto> {
     return this.auth.signIn(dto);
+  }
+
+  @Public()
+  @Get('lookup-username')
+  @ApiOperation({
+    summary:
+      'Resolve a registered CID to its login username (pre-signin convenience)',
+  })
+  @ApiQuery({ name: 'cid', required: true })
+  @ApiOkResponse({ schema: { example: { cidUsername: 'alex_kr' } } })
+  @HttpCode(HttpStatus.OK)
+  lookupUsername(
+    @Query('cid') cid: string,
+  ): Promise<{ cidUsername: string }> {
+    return this.auth.lookupUsernameByCid(cid ?? '');
   }
 
   @Public()

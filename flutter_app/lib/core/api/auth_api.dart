@@ -27,6 +27,19 @@ class AuthApi {
     return res.data!;
   }
 
+  /// Pre-signin convenience: resolve a registered CID to its login
+  /// username. The endpoint is `@Public()` on the backend — the caller
+  /// has no JWT at this point — so we pass `skipAuth` to bypass the
+  /// AuthInterceptor.
+  Future<String> lookupUsernameByCid(String cid) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/auth/lookup-username',
+      queryParameters: {'cid': cid},
+      options: Options(extra: const {'skipAuth': true}),
+    );
+    return res.data!['cidUsername'] as String;
+  }
+
   Future<Map<String, dynamic>> signIn({
     required String cidUsername,
     required String password,
