@@ -98,10 +98,13 @@ class _TutorAvatarState extends State<TutorAvatar>
   rive.TriggerInput? _shakeInput;
   rive.BooleanInput? _attentionInput;
 
-  /// Lazily-built file loader for tutor_hiro.riv. We hold it on the
-  /// state instead of rebuilding it every frame so the asset is
-  /// decoded once per avatar instance.
-  late final rive.FileLoader _fileLoader = rive.FileLoader.fromAsset(
+  /// Shared file loader for tutor_hiro.riv. Lifted to `static final` so
+  /// the asset decodes **once per app session** rather than every time
+  /// a TutorAvatar mounts — without this, leaving and re-entering the
+  /// conversation screen flashes the CartoonFace fallback for a frame
+  /// while the .riv decodes again. FileLoader caches the decoded
+  /// rive.File internally, so subsequent reads are instant.
+  static final rive.FileLoader _fileLoader = rive.FileLoader.fromAsset(
     'assets/animations/$_forcedRiveAsset',
     riveFactory: rive.Factory.rive,
   );
@@ -389,7 +392,13 @@ class _TutorAvatarState extends State<TutorAvatar>
                               fit: rive.Fit.cover,
                             );
                           case rive.RiveLoading():
+                            // Briefly transparent — the parent gradient
+                            // circle stays visible — instead of flashing
+                            // CartoonFace before tutor_hiro.riv decodes.
+                            return const SizedBox.expand();
                           case rive.RiveFailed():
+                            // Only show the cartoon fallback when the
+                            // .riv genuinely fails to load.
                             return CartoonFace(
                               key: ValueKey('face-${widget.persona.id}'),
                               persona: widget.persona,
