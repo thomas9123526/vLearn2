@@ -25,7 +25,8 @@
     "db:migrate": "npm run typeorm -- migration:run",
     "db:migrate:revert": "npm run typeorm -- migration:revert",
     "db:migrate:generate": "typeorm-ts-node-commonjs migration:generate -d ./src/database/data-source.ts",
-    "db:seed": "ts-node ./src/database/seeds/run-seeds.ts"
+    "db:seed": "ts-node ./src/database/seeds/run-seeds.ts",
+    "docs:openapi": "ts-node ./src/scripts/export-openapi.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",

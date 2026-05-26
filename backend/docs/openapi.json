@@ -1,0 +1,3563 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_liveness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Liveness probe (no DB check)",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/auth/signup": {
+      "post": {
+        "operationId": "AuthController_signUp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignUpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Register a new user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/signin": {
+      "post": {
+        "operationId": "AuthController_signIn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Authenticate and receive a JWT pair",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/lookup-username": {
+      "get": {
+        "operationId": "AuthController_lookupUsername",
+        "parameters": [
+          {
+            "name": "cid",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "cidUsername": "kky1206"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve a registered CID to its login username (pre-signin convenience)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/suggest-cid-username": {
+      "post": {
+        "operationId": "AuthController_suggestCidUsername",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestCidUsernameDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "suggestions": [
+                      "hlj94317",
+                      "hlj317"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Suggest available cid_usernames from display name + birthday",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rotate refresh token for a new access/refresh pair",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/signout": {
+      "post": {
+        "operationId": "AuthController_signOut",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke the current (or all) refresh token(s)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the JWT-decoded user (without DB roundtrip)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/users/profile": {
+      "get": {
+        "operationId": "UsersController_profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the current user profile",
+        "tags": [
+          "Users"
+        ]
+      },
+      "patch": {
+        "operationId": "UsersController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update the current user profile",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/api/users/avatar": {
+      "post": {
+        "operationId": "UsersController_uploadAvatar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/api/personas": {
+      "get": {
+        "operationId": "PersonasController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List active tutor personas",
+        "tags": [
+          "Personas"
+        ]
+      }
+    },
+    "/api/personas/{id}": {
+      "get": {
+        "operationId": "PersonasController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get one persona by id",
+        "tags": [
+          "Personas"
+        ]
+      }
+    },
+    "/api/scenarios": {
+      "get": {
+        "operationId": "ScenariosController_list",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "difficulty",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List published scenarios with optional filters",
+        "tags": [
+          "Scenarios"
+        ]
+      }
+    },
+    "/api/scenarios/{idOrSlug}": {
+      "get": {
+        "operationId": "ScenariosController_get",
+        "parameters": [
+          {
+            "name": "idOrSlug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get scenario by id or slug",
+        "tags": [
+          "Scenarios"
+        ]
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "operationId": "CategoriesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List active scenario categories",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/api/courses": {
+      "get": {
+        "operationId": "CoursesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List published courses",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
+    "/api/courses/{idOrSlug}": {
+      "get": {
+        "operationId": "CoursesController_get",
+        "parameters": [
+          {
+            "name": "idOrSlug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get course by id or slug, with ordered scenarios",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
+    "/api/conversations/sessions": {
+      "post": {
+        "operationId": "ConversationsController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a new conversation session",
+        "tags": [
+          "Conversations"
+        ]
+      },
+      "get": {
+        "operationId": "ConversationsController_list",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scenarioId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List my sessions (most recent first)",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/conversations/sessions/{id}": {
+      "get": {
+        "operationId": "ConversationsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a session with all its messages",
+        "tags": [
+          "Conversations"
+        ]
+      },
+      "delete": {
+        "operationId": "ConversationsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete the session and its messages/scores (guard violations are kept, FK nulled)",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/conversations/sessions/{id}/messages": {
+      "post": {
+        "operationId": "ConversationsController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send a user message and get the tutor reply",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/conversations/sessions/{id}/end": {
+      "post": {
+        "operationId": "ConversationsController_end",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "End the session and compute final XP",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/conversations/sessions/{id}/suggest": {
+      "post": {
+        "operationId": "ConversationsController_suggest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a short suggested user line (used by tutor-mode idle prompt)",
+        "tags": [
+          "Conversations"
+        ]
+      }
+    },
+    "/api/progress": {
+      "get": {
+        "operationId": "ProgressController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get my aggregated progress + latest skill snapshot",
+        "tags": [
+          "Progress"
+        ]
+      }
+    },
+    "/api/progress/snapshots": {
+      "get": {
+        "operationId": "ProgressController_snapshots",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List my weekly skill snapshots (latest first)",
+        "tags": [
+          "Progress"
+        ]
+      },
+      "post": {
+        "operationId": "ProgressController_postSnapshot",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Submit today's skill snapshot (app-side heuristics)",
+        "tags": [
+          "Progress"
+        ]
+      }
+    },
+    "/api/progress/completions": {
+      "get": {
+        "operationId": "ProgressController_completions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List my scenario completions",
+        "tags": [
+          "Progress"
+        ]
+      }
+    },
+    "/api/achievements": {
+      "get": {
+        "operationId": "AchievementsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all achievements (catalog)",
+        "tags": [
+          "Achievements"
+        ]
+      }
+    },
+    "/api/achievements/mine": {
+      "get": {
+        "operationId": "AchievementsController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List achievements I have earned",
+        "tags": [
+          "Achievements"
+        ]
+      }
+    },
+    "/api/admin/auth/signup": {
+      "post": {
+        "operationId": "AdminAuthController_signup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSignupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Sign up as an admin. First signup = superadmin, subsequent = admin.",
+        "tags": [
+          "Admin / Auth"
+        ]
+      }
+    },
+    "/api/admin/auth/signin": {
+      "post": {
+        "operationId": "AdminAuthController_signin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSignInDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Sign in as an admin",
+        "tags": [
+          "Admin / Auth"
+        ]
+      }
+    },
+    "/api/admin/auth/refresh": {
+      "post": {
+        "operationId": "AdminAuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminRefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Rotate the admin refresh token",
+        "tags": [
+          "Admin / Auth"
+        ]
+      }
+    },
+    "/api/admin/auth/signout": {
+      "post": {
+        "operationId": "AdminAuthController_signout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSignOutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke admin refresh token(s)",
+        "tags": [
+          "Admin / Auth"
+        ]
+      }
+    },
+    "/api/admin/admins/catalog": {
+      "get": {
+        "operationId": "AdminAdminsController_catalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Permission catalog (used by the admin panel UI)",
+        "tags": [
+          "Admin / Admins"
+        ]
+      }
+    },
+    "/api/admin/admins/me/permissions": {
+      "get": {
+        "operationId": "AdminAdminsController_myPermissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Current admin's effective permission set (used by the admin panel UI)",
+        "tags": [
+          "Admin / Admins"
+        ]
+      }
+    },
+    "/api/admin/admins": {
+      "get": {
+        "operationId": "AdminAdminsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all sub-admins with their permissions",
+        "tags": [
+          "Admin / Admins"
+        ]
+      },
+      "post": {
+        "operationId": "AdminAdminsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new sub-admin with an initial permission set",
+        "tags": [
+          "Admin / Admins"
+        ]
+      }
+    },
+    "/api/admin/admins/{id}/permissions": {
+      "put": {
+        "operationId": "AdminAdminsController_replacePerms",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplacePermissionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the permission set for a sub-admin",
+        "tags": [
+          "Admin / Admins"
+        ]
+      }
+    },
+    "/api/admin/admins/{id}/permissions/{perm}": {
+      "post": {
+        "operationId": "AdminAdminsController_grantOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "perm",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Grant a single permission",
+        "tags": [
+          "Admin / Admins"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminAdminsController_revokeOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "perm",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a single permission",
+        "tags": [
+          "Admin / Admins"
+        ]
+      }
+    },
+    "/api/admin/admins/{id}/suspend": {
+      "post": {
+        "operationId": "AdminAdminsController_suspend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suspend a sub-admin",
+        "tags": [
+          "Admin / Admins"
+        ]
+      }
+    },
+    "/api/admin/admins/{id}/restore": {
+      "post": {
+        "operationId": "AdminAdminsController_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Admins"
+        ]
+      }
+    },
+    "/api/admin/admins/{id}": {
+      "delete": {
+        "operationId": "AdminAdminsController_softDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Admins"
+        ]
+      }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "operationId": "AdminStatsController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cheap dashboard counters for the admin panel",
+        "tags": [
+          "Admin / Stats"
+        ]
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "operationId": "AdminUsersController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search users with pagination",
+        "tags": [
+          "Admin / Users"
+        ]
+      }
+    },
+    "/api/admin/users/{id}": {
+      "get": {
+        "operationId": "AdminUsersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Users"
+        ]
+      }
+    },
+    "/api/admin/users/{id}/suspend": {
+      "post": {
+        "operationId": "AdminUsersController_suspend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuspendUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suspend (block) a user — sub-admins use this to stop abusers",
+        "tags": [
+          "Admin / Users"
+        ]
+      }
+    },
+    "/api/admin/users/{id}/restore": {
+      "post": {
+        "operationId": "AdminUsersController_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Restore a previously suspended user",
+        "tags": [
+          "Admin / Users"
+        ]
+      }
+    },
+    "/api/admin/users/{id}/reset-password": {
+      "post": {
+        "operationId": "AdminUsersController_resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reset a user’s password (overwrite + revoke sessions)",
+        "tags": [
+          "Admin / Users"
+        ]
+      }
+    },
+    "/api/admin/scenarios": {
+      "get": {
+        "operationId": "AdminScenariosController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Scenarios"
+        ]
+      },
+      "post": {
+        "operationId": "AdminScenariosController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScenarioDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Scenarios"
+        ]
+      }
+    },
+    "/api/admin/scenarios/{id}": {
+      "get": {
+        "operationId": "AdminScenariosController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Scenarios"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminScenariosController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScenarioDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Scenarios"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminScenariosController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Scenarios"
+        ]
+      }
+    },
+    "/api/admin/scenarios/{id}/publish": {
+      "post": {
+        "operationId": "AdminScenariosController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Scenarios"
+        ]
+      }
+    },
+    "/api/admin/scenarios/{id}/archive": {
+      "post": {
+        "operationId": "AdminScenariosController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Scenarios"
+        ]
+      }
+    },
+    "/api/admin/scenarios/{id}/image": {
+      "post": {
+        "operationId": "AdminScenariosController_uploadImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Scenarios"
+        ]
+      }
+    },
+    "/api/admin/personas": {
+      "get": {
+        "operationId": "AdminPersonasController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all personas (including inactive)",
+        "tags": [
+          "Admin / Personas"
+        ]
+      },
+      "post": {
+        "operationId": "AdminPersonasController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePersonaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Personas"
+        ]
+      }
+    },
+    "/api/admin/personas/{id}": {
+      "get": {
+        "operationId": "AdminPersonasController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Personas"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminPersonasController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePersonaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Personas"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminPersonasController_deactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Personas"
+        ]
+      }
+    },
+    "/api/admin/personas/{id}/restore": {
+      "post": {
+        "operationId": "AdminPersonasController_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Personas"
+        ]
+      }
+    },
+    "/api/admin/personas/{id}/image": {
+      "post": {
+        "operationId": "AdminPersonasController_uploadImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Personas"
+        ]
+      }
+    },
+    "/api/admin/leaderboard": {
+      "get": {
+        "operationId": "AdminLeaderboardController_top",
+        "parameters": [
+          {
+            "name": "metric",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "xp_total",
+                "streak_days",
+                "current_level"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "language",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Top users by chosen metric",
+        "tags": [
+          "Admin / Leaderboard"
+        ]
+      }
+    },
+    "/api/admin/prompt-templates": {
+      "get": {
+        "operationId": "AdminPromptTemplatesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all prompt templates",
+        "tags": [
+          "Admin / Prompt templates"
+        ]
+      }
+    },
+    "/api/admin/prompt-templates/{kind}": {
+      "get": {
+        "operationId": "AdminPromptTemplatesController_get",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get one prompt template by kind",
+        "tags": [
+          "Admin / Prompt templates"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminPromptTemplatesController_update",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePromptTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update prompt template fields (label/template/is_active)",
+        "tags": [
+          "Admin / Prompt templates"
+        ]
+      }
+    },
+    "/api/admin/categories": {
+      "get": {
+        "operationId": "AdminCategoriesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all categories (including inactive)",
+        "tags": [
+          "Admin / Categories"
+        ]
+      },
+      "post": {
+        "operationId": "AdminCategoriesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Categories"
+        ]
+      }
+    },
+    "/api/admin/categories/{id}": {
+      "get": {
+        "operationId": "AdminCategoriesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Categories"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminCategoriesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Categories"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminCategoriesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Categories"
+        ]
+      }
+    },
+    "/api/admin/audit": {
+      "get": {
+        "operationId": "AdminAuditController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List admin audit-log entries with filters and pagination",
+        "tags": [
+          "Admin / Audit log"
+        ]
+      }
+    },
+    "/api/app-config": {
+      "get": {
+        "operationId": "AppConfigController_flags",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "All visibility flags for the Flutter app to cache",
+        "tags": [
+          "App Config"
+        ]
+      }
+    },
+    "/api/admin/config": {
+      "get": {
+        "operationId": "AdminConfigController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Config"
+        ]
+      }
+    },
+    "/api/admin/config/{key}": {
+      "get": {
+        "operationId": "AdminConfigController_get",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Config"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminConfigController_update",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Config"
+        ]
+      }
+    },
+    "/api/admin/config/reset/{key}": {
+      "post": {
+        "operationId": "AdminConfigController_reset",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Config"
+        ]
+      }
+    },
+    "/api/admin/config/reset-all": {
+      "post": {
+        "operationId": "AdminConfigController_resetAll",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / Config"
+        ]
+      }
+    },
+    "/api/license/verify": {
+      "post": {
+        "operationId": "LicenseController_verify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyLicenseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyLicenseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Verify a license cert blob against the configured Leaf CA.",
+        "tags": [
+          "License"
+        ]
+      }
+    },
+    "/api/news": {
+      "get": {
+        "operationId": "NewsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List published news posts with per-user read flags",
+        "tags": [
+          "News"
+        ]
+      }
+    },
+    "/api/news/unread-count": {
+      "get": {
+        "operationId": "NewsController_unreadCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Current unread count for the bell-icon badge",
+        "tags": [
+          "News"
+        ]
+      }
+    },
+    "/api/news/read-all": {
+      "post": {
+        "operationId": "NewsController_readAll",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark every currently-published post as read for this user",
+        "tags": [
+          "News"
+        ]
+      }
+    },
+    "/api/news/{id}/read": {
+      "post": {
+        "operationId": "NewsController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Idempotent mark-read for one post",
+        "tags": [
+          "News"
+        ]
+      }
+    },
+    "/api/news/{idOrSlug}": {
+      "get": {
+        "operationId": "NewsController_get",
+        "parameters": [
+          {
+            "name": "idOrSlug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single published post; auto-marks read",
+        "tags": [
+          "News"
+        ]
+      }
+    },
+    "/api/admin/news": {
+      "get": {
+        "operationId": "AdminNewsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all news posts (drafts included)",
+        "tags": [
+          "Admin / News"
+        ]
+      },
+      "post": {
+        "operationId": "AdminNewsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNewsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / News"
+        ]
+      }
+    },
+    "/api/admin/news/{id}": {
+      "get": {
+        "operationId": "AdminNewsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / News"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminNewsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNewsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / News"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminNewsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / News"
+        ]
+      }
+    },
+    "/api/admin/news/{id}/publish": {
+      "post": {
+        "operationId": "AdminNewsController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / News"
+        ]
+      }
+    },
+    "/api/admin/news/{id}/archive": {
+      "post": {
+        "operationId": "AdminNewsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin / News"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "vLearn2 API",
+    "description": "Backend API for the vLearn2 English-learning app.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "SignUpDto": {
+        "type": "object",
+        "properties": {
+          "cid": {
+            "type": "string",
+            "example": "A1234567",
+            "description": "National ID / citizen ID (max 10 chars)"
+          },
+          "cidUsername": {
+            "type": "string",
+            "example": "kky1206",
+            "description": "Login username. Letters + digits only, with at least 2 letters and at least 2 digits (e.g. kky1206, ks10, ksg19970890)."
+          },
+          "password": {
+            "type": "string",
+            "example": "mypass1"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Alex"
+          },
+          "uiLanguage": {
+            "type": "string",
+            "default": "en",
+            "enum": [
+              "en",
+              "ko",
+              "zh"
+            ]
+          }
+        },
+        "required": [
+          "cid",
+          "cidUsername",
+          "password",
+          "displayName"
+        ]
+      },
+      "AuthResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number",
+            "description": "Access-token expiry in seconds from now"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "cidUsername": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin",
+              "superadmin"
+            ]
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "expiresIn",
+          "userId",
+          "cidUsername",
+          "displayName",
+          "role"
+        ]
+      },
+      "SignInDto": {
+        "type": "object",
+        "properties": {
+          "cidUsername": {
+            "type": "string",
+            "example": "kky1206",
+            "description": "Login username (cid_username)"
+          },
+          "password": {
+            "type": "string",
+            "example": "StrongP@ssw0rd"
+          }
+        },
+        "required": [
+          "cidUsername",
+          "password"
+        ]
+      },
+      "SuggestCidUsernameDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "example": "Hong Li Jun",
+            "description": "Display name to derive initials from"
+          },
+          "birthday": {
+            "type": "string",
+            "example": "1994-03-17",
+            "description": "Birthday in YYYY-MM-DD format"
+          }
+        },
+        "required": [
+          "displayName",
+          "birthday"
+        ]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "TokenPairDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number",
+            "description": "Access-token expiry in seconds from now"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "expiresIn"
+        ]
+      },
+      "UserProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "avatarEmoji": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "gender": {
+            "type": "string"
+          },
+          "nativeLanguage": {
+            "type": "string"
+          },
+          "uiLanguage": {
+            "type": "string"
+          },
+          "currentLevel": {
+            "type": "number"
+          },
+          "xpTotal": {
+            "type": "number"
+          },
+          "streakDays": {
+            "type": "number"
+          },
+          "activePersonaId": {
+            "type": "object"
+          },
+          "activeTheme": {
+            "type": "string"
+          },
+          "onboardingDone": {
+            "type": "boolean"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "avatarEmoji",
+          "avatarUrl",
+          "gender",
+          "nativeLanguage",
+          "uiLanguage",
+          "currentLevel",
+          "xpTotal",
+          "streakDays",
+          "activePersonaId",
+          "activeTheme",
+          "onboardingDone",
+          "role",
+          "status"
+        ]
+      },
+      "UpdateProfileDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "avatarEmoji": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "nonbinary",
+              "unspecified"
+            ]
+          },
+          "uiLanguage": {
+            "type": "string",
+            "enum": [
+              "en",
+              "ko",
+              "zh"
+            ]
+          },
+          "activeTheme": {
+            "type": "string"
+          },
+          "activePersonaId": {
+            "type": "string"
+          },
+          "onboardingDone": {
+            "type": "boolean"
+          },
+          "newPassword": {
+            "type": "string"
+          },
+          "currentPassword": {
+            "type": "string"
+          }
+        }
+      },
+      "StartSessionDto": {
+        "type": "object",
+        "properties": {
+          "scenarioId": {
+            "type": "string",
+            "description": "Scenario id; omit for free talk"
+          },
+          "personaId": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "face"
+            ]
+          }
+        },
+        "required": [
+          "personaId",
+          "mode"
+        ]
+      },
+      "SendMessageDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "audioUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "EndSessionDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "default": "completed",
+            "enum": [
+              "completed",
+              "abandoned"
+            ]
+          }
+        }
+      },
+      "AdminSignupDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "founder@example.com"
+          },
+          "password": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "displayName"
+        ]
+      },
+      "AdminSignInDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "AdminRefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "AdminSignOutDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateSubAdminDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "displayName"
+        ]
+      },
+      "ReplacePermissionsDto": {
+        "type": "object",
+        "properties": {
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "permissions"
+        ]
+      },
+      "SuspendUserDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "until": {
+            "type": "string",
+            "description": "ISO timestamp; omit for indefinite"
+          }
+        }
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "newPassword": {
+            "type": "string",
+            "description": "New plain-text password chosen by the admin. Must satisfy the same length-only rule as user sign-up (≥ 6 chars).",
+            "example": "temp1234"
+          }
+        },
+        "required": [
+          "newPassword"
+        ]
+      },
+      "I18nTextDto": {
+        "type": "object",
+        "properties": {
+          "en": {
+            "type": "string"
+          },
+          "ko": {
+            "type": "string"
+          },
+          "zh": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "CreateScenarioDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "difficulty": {
+            "type": "number"
+          },
+          "title": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "scene_description": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "user_role": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "tutor_role": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "objectives": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "key_phrases": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "estimated_minutes": {
+            "type": "number"
+          },
+          "xp_reward": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "slug",
+          "category",
+          "difficulty",
+          "title",
+          "description",
+          "scene_description",
+          "user_role",
+          "tutor_role",
+          "objectives",
+          "key_phrases"
+        ]
+      },
+      "UpdateScenarioDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "difficulty": {
+            "type": "number"
+          },
+          "title": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "scene_description": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "user_role": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "tutor_role": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "objectives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "key_phrases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "estimated_minutes": {
+            "type": "number"
+          },
+          "xp_reward": {
+            "type": "number"
+          }
+        }
+      },
+      "CreatePersonaDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "accent": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "specialties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "gradient_from": {
+            "type": "string"
+          },
+          "gradient_to": {
+            "type": "string"
+          },
+          "rive_asset": {
+            "type": "object"
+          },
+          "voice_id": {
+            "type": "object"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "female",
+              "male",
+              "neutral"
+            ]
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "accent",
+          "style",
+          "specialties",
+          "gradient_from",
+          "gradient_to"
+        ]
+      },
+      "UpdatePersonaDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "accent": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "specialties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "gradient_from": {
+            "type": "string"
+          },
+          "gradient_to": {
+            "type": "string"
+          },
+          "rive_asset": {
+            "type": "object"
+          },
+          "voice_id": {
+            "type": "object"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "female",
+              "male",
+              "neutral"
+            ]
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdatePromptTemplateDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object"
+          },
+          "template": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "order_index": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "slug",
+          "title"
+        ]
+      },
+      "UpdateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "order_index": {
+            "type": "number"
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VerifyLicenseDto": {
+        "type": "object",
+        "properties": {
+          "licenseContent": {
+            "type": "string",
+            "description": "Base64-encoded DER cert bytes (≤ ~1500 bytes)."
+          },
+          "machineId": {
+            "type": "string",
+            "description": "Opaque device fingerprint from native lib."
+          },
+          "userId": {
+            "type": "string",
+            "description": "App user UUID to bind the license to."
+          }
+        },
+        "required": [
+          "licenseContent",
+          "machineId"
+        ]
+      },
+      "VerifyLicenseResponseDto": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "period",
+              "permanent"
+            ]
+          },
+          "daysRemaining": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "valid"
+        ]
+      },
+      "CreateNewsDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "body": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "body"
+        ]
+      },
+      "UpdateNewsDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "body": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/I18nTextDto"
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
