@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -71,6 +72,40 @@ class _TutorAvatarState extends State<TutorAvatar>
       AnimationController(vsync: this, duration: const Duration(seconds: 4))
         ..repeat();
 
+  // ─── Rive state-machine integration ───────────────────────────────
+  //
+  // The character `.riv` (e.g. tutor_hiro.riv) exposes a state machine
+  // with these inputs (any may be missing on stub assets — we look
+  // each one up with `findInput` and `is`-check the runtime type, so
+  // a missing input cleanly becomes a no-op):
+  //
+  //   trigger blink       — fire to play one blink
+  //   number  emotion     — 0 neutral, 1 smile, 2 sad, 3 surprised, …
+  //   number  mouth_shape — 0 closed, 1 "A", 2 "E", 3 "I", 4 "O", 5 "U"
+  //   trigger nod         — head nod (praising)
+  //   trigger shake       — head shake (disappointed)
+  //   bool    attention   — leaning-in / listening pose
+  //
+  // Only blink, emotion=1, and mouth_shape=1 ship in tutor_hiro.riv
+  // right now; everything else is wired here so the moment the .riv
+  // gains the missing animations no Flutter change is needed.
+  rive.SMITrigger? _blinkInput;
+  rive.SMINumber? _emotionInput;
+  rive.SMINumber? _mouthShapeInput;
+  rive.SMITrigger? _nodInput;
+  rive.SMITrigger? _shakeInput;
+  rive.SMIBool? _attentionInput;
+
+  /// Random natural-blink scheduler — independent of mood so the
+  /// character keeps blinking while speaking or listening too.
+  Timer? _blinkTimer;
+  final math.Random _rng = math.Random();
+
+  /// Mouth-viseme cycler — only runs while [TutorMood.speaking]. With
+  /// only `mouth_shape == 1` built today this just toggles open/close;
+  /// when E/I/O/U ship, change [_visemeAt] to cycle 1..5.
+  Timer? _mouthTimer;
+
   @override
   void didUpdateWidget(covariant TutorAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -82,14 +117,144 @@ class _TutorAvatarState extends State<TutorAvatar>
       _pulse.stop();
       _pulse.value = 0;
     }
+    if (oldWidget.mood != widget.mood) {
+      _applyMoodToRive(widget.mood);
+    }
   }
 
   @override
   void dispose() {
+    _blinkTimer?.cancel();
+    _mouthTimer?.cancel();
+    // The state-machine controller is owned by the Rive artboard;
+    // disposing the artboard (which Rive does when its widget is
+    // unmounted) tears it down for us — nothing to drop here.
     _breath.dispose();
     _pulse.dispose();
     _ring.dispose();
     super.dispose();
+  }
+
+  // ─── Rive helpers ─────────────────────────────────────────────────
+
+  /// Called by [rive.RiveAnimation.asset] once the artboard is loaded.
+  /// Attaches the state machine, resolves every input, kicks off the
+  /// blink timer, and applies the current mood so the character isn't
+  /// stuck on its default pose for one frame.
+  void _onRiveInit(rive.Artboard artboard) {
+    if (!mounted) return;
+    if (artboard.stateMachines.isEmpty) {
+      AppConfig.logx('rive-init', 'no state machines on ${widget.persona.id}');
+      return;
+    }
+    final smName = artboard.stateMachines.first.name;
+    final controller =
+        rive.StateMachineController.fromArtboard(artboard, smName);
+    if (controller == null) {
+      AppConfig.logx('rive-init', 'could not build SM "$smName"');
+      return;
+    }
+    // The artboard keeps the controller alive once added — we only
+    // need handles to the inputs from here on, not the controller.
+    artboard.addController(controller);
+
+    // findInput<T>('name') returns the SMIInput<T>? — runtime subtype
+    // (SMITrigger / SMIBool / SMINumber) is checked with `is` so a
+    // shape mismatch between Dart and the Rive file degrades to a
+    // no-op rather than a runtime cast error.
+    final blink     = controller.findInput<bool>('blink');
+    final nod       = controller.findInput<bool>('nod');
+    final shake     = controller.findInput<bool>('shake');
+    final attention = controller.findInput<bool>('attention');
+    final emotion   = controller.findInput<double>('emotion');
+    final mouth     = controller.findInput<double>('mouth_shape');
+    if (blink     is rive.SMITrigger) _blinkInput     = blink;
+    if (nod       is rive.SMITrigger) _nodInput       = nod;
+    if (shake     is rive.SMITrigger) _shakeInput     = shake;
+    if (attention is rive.SMIBool)    _attentionInput = attention;
+    if (emotion   is rive.SMINumber)  _emotionInput   = emotion;
+    if (mouth     is rive.SMINumber)  _mouthShapeInput = mouth;
+
+    AppConfig.logx(
+      'rive-init',
+      '${widget.persona.id} SM "$smName" — inputs: '
+          'blink=${_blinkInput != null}, '
+          'emotion=${_emotionInput != null}, '
+          'mouth_shape=${_mouthShapeInput != null}, '
+          'nod=${_nodInput != null}, '
+          'shake=${_shakeInput != null}, '
+          'attention=${_attentionInput != null}',
+    );
+
+    _scheduleNextBlink();
+    _applyMoodToRive(widget.mood);
+  }
+
+  /// Re-arms [_blinkTimer] with a random 3.5–7 s delay. Recursive — the
+  /// timer callback fires the blink and immediately schedules the next.
+  void _scheduleNextBlink() {
+    _blinkTimer?.cancel();
+    if (_blinkInput == null) return; // no blink rig — don't burn a timer
+    final ms = 3500 + _rng.nextInt(3500);
+    _blinkTimer = Timer(Duration(milliseconds: ms), () {
+      if (!mounted) return;
+      _blinkInput?.fire();
+      _scheduleNextBlink();
+    });
+  }
+
+  /// Viseme value to drive at the [tick]th 160 ms slot while speaking.
+  /// Currently alternates 1 ("A") and 0 (closed) to give a simple
+  /// talking mouth with the only viseme that's built. Swap for
+  /// `((tick % 5) + 1).toDouble()` once E/I/O/U ship.
+  double _visemeAt(int tick) => (tick % 2 == 0) ? 1.0 : 0.0;
+
+  void _startMouthCycle() {
+    _mouthTimer?.cancel();
+    if (_mouthShapeInput == null) return;
+    _mouthTimer = Timer.periodic(const Duration(milliseconds: 160), (t) {
+      _mouthShapeInput?.value = _visemeAt(t.tick);
+    });
+  }
+
+  void _stopMouthCycle() {
+    _mouthTimer?.cancel();
+    _mouthTimer = null;
+    _mouthShapeInput?.value = 0;
+  }
+
+  /// Translates [TutorMood] into Rive input state. Safe to call before
+  /// `_onRiveInit` has run — all the inputs are null then and nothing
+  /// happens.
+  void _applyMoodToRive(TutorMood mood) {
+    switch (mood) {
+      case TutorMood.idle:
+        _emotionInput?.value = 0;
+        _attentionInput?.value = false;
+        _stopMouthCycle();
+      case TutorMood.speaking:
+        _emotionInput?.value = 1; // gentle smile while talking
+        _attentionInput?.value = false;
+        _startMouthCycle();
+      case TutorMood.listening:
+        _emotionInput?.value = 0;
+        _attentionInput?.value = true;
+        _stopMouthCycle();
+      case TutorMood.praising:
+        _emotionInput?.value = 1;
+        _nodInput?.fire();
+        _attentionInput?.value = false;
+        _stopMouthCycle();
+      case TutorMood.disappointed:
+        _emotionInput?.value = 2; // no-op until "sad" viseme ships
+        _shakeInput?.fire();
+        _attentionInput?.value = false;
+        _stopMouthCycle();
+      case TutorMood.encouraging:
+        _emotionInput?.value = 1;
+        _attentionInput?.value = false;
+        _stopMouthCycle();
+    }
   }
 
   Color _hex(String s) {
@@ -194,6 +359,7 @@ class _TutorAvatarState extends State<TutorAvatar>
                                   'assets/animations/$asset',
                                   key: ValueKey(asset),
                                   fit: BoxFit.cover,
+                                  onInit: _onRiveInit,
                                 );
                               }
                               return CartoonFace(
