@@ -141,53 +141,73 @@ class _TutorAvatarState extends State<TutorAvatar>
   /// Attaches the state machine, resolves every input, kicks off the
   /// blink timer, and applies the current mood so the character isn't
   /// stuck on its default pose for one frame.
+  ///
+  /// Everything inside is wrapped in a try/catch because the rive
+  /// 0.13.x runtime has been seen to throw `RangeError (length): … 0..1: 2`
+  /// when reading state-machine internals exported by a newer Rive
+  /// editor. A throw here would otherwise bubble up as an unhandled
+  /// FlutterError; instead we log it and let the animation play
+  /// without state-machine wiring (default timeline only).
   void _onRiveInit(rive.Artboard artboard) {
     if (!mounted) return;
-    if (artboard.stateMachines.isEmpty) {
-      AppConfig.logx('rive-init', 'no state machines on ${widget.persona.id}');
-      return;
+    try {
+      if (artboard.stateMachines.isEmpty) {
+        AppConfig.logx('rive-init', 'no state machines on ${widget.persona.id}');
+        return;
+      }
+      final smName = artboard.stateMachines.first.name;
+      final controller =
+          rive.StateMachineController.fromArtboard(artboard, smName);
+      if (controller == null) {
+        AppConfig.logx('rive-init', 'could not build SM "$smName"');
+        return;
+      }
+      // The artboard keeps the controller alive once added — we only
+      // need handles to the inputs from here on, not the controller.
+      artboard.addController(controller);
+
+      // findInput<T>('name') returns the SMIInput<T>? — runtime subtype
+      // (SMITrigger / SMIBool / SMINumber) is checked with `is` so a
+      // shape mismatch between Dart and the Rive file degrades to a
+      // no-op rather than a runtime cast error.
+      final blink     = controller.findInput<bool>('blink');
+      final nod       = controller.findInput<bool>('nod');
+      final shake     = controller.findInput<bool>('shake');
+      final attention = controller.findInput<bool>('attention');
+      final emotion   = controller.findInput<double>('emotion');
+      final mouth     = controller.findInput<double>('mouth_shape');
+      if (blink     is rive.SMITrigger) _blinkInput     = blink;
+      if (nod       is rive.SMITrigger) _nodInput       = nod;
+      if (shake     is rive.SMITrigger) _shakeInput     = shake;
+      if (attention is rive.SMIBool)    _attentionInput = attention;
+      if (emotion   is rive.SMINumber)  _emotionInput   = emotion;
+      if (mouth     is rive.SMINumber)  _mouthShapeInput = mouth;
+
+      AppConfig.logx(
+        'rive-init',
+        '${widget.persona.id} SM "$smName" — inputs: '
+            'blink=${_blinkInput != null}, '
+            'emotion=${_emotionInput != null}, '
+            'mouth_shape=${_mouthShapeInput != null}, '
+            'nod=${_nodInput != null}, '
+            'shake=${_shakeInput != null}, '
+            'attention=${_attentionInput != null}',
+      );
+
+      _scheduleNextBlink();
+      _applyMoodToRive(widget.mood);
+    } catch (e, st) {
+      AppConfig.logx('rive-init failed',
+          '${widget.persona.id}: $e\n$st');
+      // Drop any partially-attached inputs so writes don't fire into a
+      // half-broken state machine.
+      _blinkInput = null;
+      _emotionInput = null;
+      _mouthShapeInput = null;
+      _nodInput = null;
+      _shakeInput = null;
+      _attentionInput = null;
     }
-    final smName = artboard.stateMachines.first.name;
-    final controller =
-        rive.StateMachineController.fromArtboard(artboard, smName);
-    if (controller == null) {
-      AppConfig.logx('rive-init', 'could not build SM "$smName"');
-      return;
-    }
-    // The artboard keeps the controller alive once added — we only
-    // need handles to the inputs from here on, not the controller.
-    artboard.addController(controller);
-
-    // findInput<T>('name') returns the SMIInput<T>? — runtime subtype
-    // (SMITrigger / SMIBool / SMINumber) is checked with `is` so a
-    // shape mismatch between Dart and the Rive file degrades to a
-    // no-op rather than a runtime cast error.
-    final blink     = controller.findInput<bool>('blink');
-    final nod       = controller.findInput<bool>('nod');
-    final shake     = controller.findInput<bool>('shake');
-    final attention = controller.findInput<bool>('attention');
-    final emotion   = controller.findInput<double>('emotion');
-    final mouth     = controller.findInput<double>('mouth_shape');
-    if (blink     is rive.SMITrigger) _blinkInput     = blink;
-    if (nod       is rive.SMITrigger) _nodInput       = nod;
-    if (shake     is rive.SMITrigger) _shakeInput     = shake;
-    if (attention is rive.SMIBool)    _attentionInput = attention;
-    if (emotion   is rive.SMINumber)  _emotionInput   = emotion;
-    if (mouth     is rive.SMINumber)  _mouthShapeInput = mouth;
-
-    AppConfig.logx(
-      'rive-init',
-      '${widget.persona.id} SM "$smName" — inputs: '
-          'blink=${_blinkInput != null}, '
-          'emotion=${_emotionInput != null}, '
-          'mouth_shape=${_mouthShapeInput != null}, '
-          'nod=${_nodInput != null}, '
-          'shake=${_shakeInput != null}, '
-          'attention=${_attentionInput != null}',
-    );
-
-    _scheduleNextBlink();
-    _applyMoodToRive(widget.mood);
   }
 
   /// Re-arms [_blinkTimer] with a random 3.5–7 s delay. Recursive — the
@@ -225,35 +245,48 @@ class _TutorAvatarState extends State<TutorAvatar>
 
   /// Translates [TutorMood] into Rive input state. Safe to call before
   /// `_onRiveInit` has run — all the inputs are null then and nothing
-  /// happens.
+  /// happens. Also wrapped in a try/catch: the rive 0.13.x runtime can
+  /// throw on `.value =` or `.fire()` when the underlying state-machine
+  /// graph (exported by a newer editor) doesn't have a state for the
+  /// value we're pushing. A throw here would otherwise bubble up as a
+  /// Flutter framework error mid-frame; we'd rather just keep the
+  /// previous pose.
   void _applyMoodToRive(TutorMood mood) {
-    switch (mood) {
-      case TutorMood.idle:
-        _emotionInput?.value = 0;
-        _attentionInput?.value = false;
-        _stopMouthCycle();
-      case TutorMood.speaking:
-        _emotionInput?.value = 1; // gentle smile while talking
-        _attentionInput?.value = false;
-        _startMouthCycle();
-      case TutorMood.listening:
-        _emotionInput?.value = 0;
-        _attentionInput?.value = true;
-        _stopMouthCycle();
-      case TutorMood.praising:
-        _emotionInput?.value = 1;
-        _nodInput?.fire();
-        _attentionInput?.value = false;
-        _stopMouthCycle();
-      case TutorMood.disappointed:
-        _emotionInput?.value = 2; // no-op until "sad" viseme ships
-        _shakeInput?.fire();
-        _attentionInput?.value = false;
-        _stopMouthCycle();
-      case TutorMood.encouraging:
-        _emotionInput?.value = 1;
-        _attentionInput?.value = false;
-        _stopMouthCycle();
+    try {
+      switch (mood) {
+        case TutorMood.idle:
+          _emotionInput?.value = 0;
+          _attentionInput?.value = false;
+          _stopMouthCycle();
+        case TutorMood.speaking:
+          _emotionInput?.value = 1; // gentle smile while talking
+          _attentionInput?.value = false;
+          _startMouthCycle();
+        case TutorMood.listening:
+          _emotionInput?.value = 0;
+          _attentionInput?.value = true;
+          _stopMouthCycle();
+        case TutorMood.praising:
+          _emotionInput?.value = 1;
+          _nodInput?.fire();
+          _attentionInput?.value = false;
+          _stopMouthCycle();
+        case TutorMood.disappointed:
+          // tutor_hiro.riv only defines emotion states 0 and 1 today;
+          // pushing 2 has been seen to RangeError inside the runtime.
+          // Clamp to the highest known "sad-ish" state until a real
+          // sad viseme ships — gentle degradation, not a crash.
+          _emotionInput?.value = 1;
+          _shakeInput?.fire();
+          _attentionInput?.value = false;
+          _stopMouthCycle();
+        case TutorMood.encouraging:
+          _emotionInput?.value = 1;
+          _attentionInput?.value = false;
+          _stopMouthCycle();
+      }
+    } catch (e) {
+      AppConfig.logx('rive-mood failed', '$mood: $e');
     }
   }
 
