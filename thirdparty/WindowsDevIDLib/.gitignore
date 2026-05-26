@@ -1,0 +1,14 @@
+# CMake out-of-source build trees.
+build/
+out/
+
+# Visual Studio user state.
+.vs/
+*.user
+*.suo
+*.sln.docstates
+
+# CMake artefacts in case anyone configures in-source.
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
