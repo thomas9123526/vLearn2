@@ -19,22 +19,22 @@ class AppConfig {
     required this.requestTimeout,
     required this.topicSyncInterval,
     required this.environment,
-    this.sttModelPath,
+    this.modelPath,
   });
 
   /// JSON shape — short field names per the spec (`baseurl`, `reqTout`,
-  /// `tSync`, `dev`). `dev` is a string, not a boolean. `stt` is an
-  /// optional absolute path that, when set, lets the app use sherpa-onnx
-  /// models the admin pre-placed on the device — skipping the `.dat`
-  /// unpack entirely. See [sttModelPath].
+  /// `tSync`, `dev`). `dev` is a string, not a boolean. `model` is an
+  /// optional absolute path that, when set, lets the app use on-device
+  /// speech models the admin pre-placed — skipping the `.dat` unpack
+  /// entirely. See [modelPath].
   factory AppConfig.fromJson(Map<String, dynamic> j) => AppConfig(
         backendBaseUrl: (j['baseurl'] as String?) ?? defaults.backendBaseUrl,
         requestTimeout: (j['reqTout'] as num?)?.toInt() ?? defaults.requestTimeout,
         topicSyncInterval: (j['tSync'] as num?)?.toInt() ?? defaults.topicSyncInterval,
         environment: (j['dev'] as String?) ?? defaults.environment,
-        sttModelPath: (j['stt'] as String?)?.trim().isEmpty == true
+        modelPath: (j['model'] as String?)?.trim().isEmpty == true
             ? null
-            : j['stt'] as String?,
+            : j['model'] as String?,
       );
 
   static void logx(String tag, Object message) {
@@ -54,17 +54,26 @@ class AppConfig {
   final String environment;
 
   /// Optional absolute path on the device pointing at a pre-placed
-  /// sherpa-onnx model root — same layout as a `.dat`'s unpacked output
-  /// (i.e. `<path>/stt/encoder*.onnx`, `decoder*.onnx`, `joiner*.onnx`,
-  /// `tokens.*`, and optionally a `manifest.json` next to them).
+  /// on-device speech model root — same layout as a `.dat`'s unpacked
+  /// output. Expected to contain `stt/`, `tts/`, `vad/` subfolders
+  /// (each with its model files) and a top-level `manifest.json`:
   ///
-  /// When set AND the directory looks like a usable sherpa layout, the
-  /// app initialises STT straight from this path and never unpacks a
-  /// `.dat`. If the path is null, empty, or doesn't have the expected
-  /// files, the unpacker pipeline runs as before.
+  /// ```
+  /// <modelPath>/
+  ///   manifest.json
+  ///   stt/  encoder*.onnx  decoder*.onnx  joiner*.onnx  tokens.*
+  ///   tts/  ...
+  ///   vad/  ...
+  /// ```
   ///
-  /// On-disk key: `"stt"`. Example value: `/storage/emulated/0/룡마/가상외국어회화/data/sherpa-models`.
-  final String? sttModelPath;
+  /// When set AND the directory looks like a usable layout, the app
+  /// initialises straight from this path and never unpacks a `.dat`.
+  /// If the path is null, empty, or doesn't have the expected files,
+  /// the unpacker pipeline runs as before.
+  ///
+  /// On-disk key: `"model"`. Example value:
+  /// `/storage/emulated/0/룡마/가상외국어회화/data/models`.
+  final String? modelPath;
 
   bool get isDev => environment == 'dev';
 
@@ -96,8 +105,7 @@ class AppConfig {
         'dev': environment,
         // Only write the key when set, so devices without an override
         // keep the smallest possible file.
-        if (sttModelPath != null && sttModelPath!.isNotEmpty)
-          'stt': sttModelPath,
+        if (modelPath != null && modelPath!.isNotEmpty) 'model': modelPath,
       };
 
   AppConfig copyWith({
@@ -105,14 +113,14 @@ class AppConfig {
     int? requestTimeout,
     int? topicSyncInterval,
     String? environment,
-    String? sttModelPath,
+    String? modelPath,
   }) =>
       AppConfig(
         backendBaseUrl: backendBaseUrl ?? this.backendBaseUrl,
         requestTimeout: requestTimeout ?? this.requestTimeout,
         topicSyncInterval: topicSyncInterval ?? this.topicSyncInterval,
         environment: environment ?? this.environment,
-        sttModelPath: sttModelPath ?? this.sttModelPath,
+        modelPath: modelPath ?? this.modelPath,
       );
 }
 
