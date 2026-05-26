@@ -26,6 +26,63 @@ import type {
 
 const BCRYPT_ROUNDS = 10;
 
+// ─── Hangul (Korean) romanization for cid_username suggestions ────────────
+//
+// Simplified Revised Romanization, single-letter per Hangul syllable.
+// Each precomposed Hangul syllable U+AC00..U+D7A3 decomposes into
+//   syllable = 0xAC00 + cho * 21 * 28 + jung * 28 + jong
+// where `cho` is the initial-consonant (choseong) index 0..18 and
+// `jung` is the vowel (jungseong) index 0..20. For a silent ㅇ initial
+// (cho == 11) we fall back to the first letter of the vowel's
+// romanization so the syllable still contributes one ASCII letter.
+const HANGUL_CHOSEONG_INITIAL: readonly string[] = [
+  'g', 'k', 'n', 'd', 't',
+  'r', 'm', 'b', 'p', 's',
+  's', '',  'j', 'j', 'c',
+  'k', 't', 'p', 'h',
+];
+const HANGUL_JUNGSEONG_INITIAL: readonly string[] = [
+  'a', 'a', 'y', 'y', 'e',
+  'e', 'y', 'y', 'o', 'w',
+  'w', 'o', 'y', 'u', 'w',
+  'w', 'w', 'y', 'e', 'u',
+  'i',
+];
+
+function romanizeHangulSyllable(ch: string): string {
+  const code = ch.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return '';
+  const offset = code - 0xac00;
+  const cho = Math.floor(offset / (21 * 28));
+  const cons = HANGUL_CHOSEONG_INITIAL[cho];
+  if (cons) return cons;
+  // Silent ㅇ -> use the syllable's vowel.
+  const jung = Math.floor((offset % (21 * 28)) / 28);
+  return HANGUL_JUNGSEONG_INITIAL[jung] ?? '';
+}
+
+// Produces one or more ASCII letters for a single name "word".
+//   ASCII word ("Alex")  -> first letter, lowercased ("a")
+//   Hangul word ("신영명") -> one letter per syllable ("sym")
+//   Mixed ("Kim신")       -> 'k' (first ASCII letter; mixed words are rare)
+// Anything else (kanji, hanzi, Cyrillic, …) returns ''.
+function wordInitials(word: string): string {
+  if (!word) return '';
+  // Pure Hangul handling: every syllable contributes a letter.
+  // A word qualifies as "Hangul" when it contains at least one
+  // Hangul syllable and no leading ASCII letter.
+  const firstAscii = word.match(/[a-zA-Z]/);
+  if (!firstAscii && /[가-힣]/.test(word)) {
+    let out = '';
+    for (const ch of word) {
+      const r = romanizeHangulSyllable(ch);
+      if (r) out += r;
+    }
+    return out;
+  }
+  return firstAscii ? firstAscii[0].toLowerCase() : '';
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -168,32 +225,30 @@ export class AuthService {
   // Output candidates obey the same constraint enforced by
   // SignUpDto.cidUsername (>=2 ASCII letters + >=2 digits, letters
   // + digits only). The initials prefix has to carry the letter
-  // half of the budget, so we fall back to the first 2 ASCII
-  // letters of the display name when first-of-each-word does not
-  // produce enough of them.
+  // half of the budget, so Korean syllables get romanized one
+  // letter each (신영명 -> sym) and ASCII words give one initial
+  // per word (Hong Li Jun -> hlj). Mixed names round-trip cleanly.
   async suggestCidUsernames(
     dto: SuggestCidUsernameDto,
   ): Promise<{ suggestions: string[] }> {
     let initials = dto.displayName
       .trim()
       .split(/\s+/)
-      .map((w) => w[0] ?? '')
-      .join('')
-      .replace(/[^a-zA-Z]/g, '')
-      .toLowerCase();
+      .map((w) => wordInitials(w))
+      .join('');
 
-    // Single-word names ("Alex" -> "a") and Unicode-heavy names
-    // ("안녕" -> "") fall through here. Pull the first two ASCII
-    // letters from the whole name as a fallback.
+    // Single-letter result ("Alex" -> "a") falls through: pull
+    // the first two ASCII letters of the entire name as a fallback.
     if (initials.length < 2) {
       initials = dto.displayName
         .toLowerCase()
         .replace(/[^a-z]/g, '')
         .slice(0, 2);
     }
-    // If the name still has no usable ASCII letters, we can't
-    // generate constraint-conformant suggestions. Return empty;
-    // the operator will type their own cid_username.
+    // If the name still has no usable letters (e.g. all-Chinese,
+    // all-Japanese name -- those aren't romanized here), bail with
+    // empty suggestions; the operator will type their own
+    // cid_username.
     if (initials.length < 2) {
       return { suggestions: [] };
     }
