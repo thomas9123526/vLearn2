@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-DB_USER="${DB_USER:-postgres}"
+DB_USER="${DB_USER:-myuser}"
 DB_NAME="${DB_NAME:-vlearn2}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
