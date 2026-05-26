@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/app_apis.dart';
+import '../../core/config/app_config.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/auth_provider.dart';
@@ -349,7 +350,28 @@ class _HeroCard extends StatelessWidget {
     final levelLabel = scenario.difficulty >= 1 && scenario.difficulty <= 6
         ? levelLabels[scenario.difficulty - 1]
         : '—';
-    return Container(
+    // When the admin uploaded a scenario image, drop it in above the
+    // gradient hero. /uploads/... URLs are absolute against the API
+    // origin — Dio's baseUrl is /vfls/api on prod, but the static
+    // mount lives at the server root, so we strip the suffix here.
+    final imageUrl = scenario.imageUrl;
+    return Column(
+      children: [
+        if (imageUrl != null && imageUrl.isNotEmpty)
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.network(
+                _resolveScenarioImage(imageUrl),
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Container(
+                  color: scheme.surfaceContainerHighest,
+                ),
+              ),
+            ),
+          ),
+        Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -357,7 +379,12 @@ class _HeroCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.vertical(
+          top: imageUrl != null && imageUrl.isNotEmpty
+              ? Radius.zero
+              : const Radius.circular(20),
+          bottom: const Radius.circular(20),
+        ),
         border: Border.all(color: scheme.outline.withValues(alpha: 0.3)),
       ),
       child: Column(
@@ -408,7 +435,25 @@ class _HeroCard extends StatelessWidget {
           ),
         ],
       ),
+    ),
+      ],
     );
+  }
+
+  /// `/uploads/...` is mounted at the server root, not behind /api or
+  /// /vfls. Strip whichever suffix the configured backendBaseUrl has
+  /// before joining.
+  String _resolveScenarioImage(String relative) {
+    if (relative.startsWith('http')) return relative;
+    final base = AppConfig.defaults.backendBaseUrl;
+    final cut1 = _stripSuffix(base, '/api');
+    final cut2 = _stripSuffix(cut1, '/vfls');
+    return '$cut2$relative';
+  }
+
+  String _stripSuffix(String s, String suffix) {
+    final i = s.indexOf(suffix);
+    return i > 0 ? s.substring(0, i) : s;
   }
 }
 

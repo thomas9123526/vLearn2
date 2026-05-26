@@ -55,6 +55,10 @@ dependencies:
   # Dio timeout.
   connectivity_plus: ^6.0.5
 
+  # Pick a profile photo from camera or gallery. Used by the Edit
+  # Profile dialog to upload an avatar to /users/avatar.
+  image_picker: ^1.1.2
+
   # Storage
   shared_preferences: ^2.2.3
   flutter_secure_storage: ^9.2.2

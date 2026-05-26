@@ -27,6 +27,20 @@ export class UserInfoEntity {
   @Column({ type: 'varchar', length: 10, default: '🐣' })
   avatar_emoji!: string;
 
+  /**
+   * On-disk relative path of the uploaded photo (e.g.
+   * `avatars/<user_id>.jpg`). Nullable when the user never uploaded.
+   * The avatar_emoji fallback above is what the UI renders in that case.
+   */
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  avatar_storage_key!: string | null;
+
+  /// Public URL `/uploads/avatars/<file>` — mirrored from
+  /// avatar_storage_key on upload so clients don't have to know about
+  /// UPLOADS_DIR. Nullable; same fallback as above.
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  avatar_url!: string | null;
+
   @Column({ type: 'varchar', length: 10, default: 'en' })
   native_language!: string;
 
