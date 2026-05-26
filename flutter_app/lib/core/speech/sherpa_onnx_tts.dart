@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:logger/logger.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -155,23 +156,29 @@ class SherpaOnnxTtsService extends TextToSpeechService {
   }) async {
     if (!_initialized) await initialize();
     if (!_available || _engine == null) {
+      debugPrint('[tts] engine unavailable — models not installed?');
       throw TtsUnavailableException(
         'Speech models are not installed yet. Ask your admin to drop the '
         'sherpa-onnx bundle into the models folder.',
       );
     }
+    final swatch = Stopwatch()..start();
     final wav = await synthesize(
       text,
       voiceId: voiceId,
       language: language,
       rate: rate,
     );
+    swatch.stop();
+    debugPrint('[tts] engine.synthesize voice=$voiceId rate=$rate '
+        'len=${text.length} wav=${wav.length}B in ${swatch.elapsedMilliseconds}ms');
     _setSpeaking(true);
     try {
       await _player.play(ap.BytesSource(wav));
       // onPlayerStateChanged will toggle isSpeaking back to false on
       // completion — see initialize().
     } catch (e, st) {
+      debugPrint('[tts] playback failed: $e');
       _log.e('TTS: playback failed', error: e, stackTrace: st);
       _setSpeaking(false);
       rethrow;
