@@ -63,6 +63,19 @@ class AuthApi {
       data: refreshToken == null ? null : {'refreshToken': refreshToken},
     );
   }
+
+  /// Returns up to 6 available cid_username suggestions derived from
+  /// [displayName] initials and [birthday] (format: 'YYYY-MM-DD').
+  Future<List<String>> suggestCidUsernames({
+    required String displayName,
+    required String birthday,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/auth/suggest-cid-username',
+      data: {'displayName': displayName, 'birthday': birthday},
+    );
+    return (res.data!['suggestions'] as List<dynamic>).cast<String>();
+  }
 }
 
 final authApiProvider = Provider<AuthApi>((ref) => AuthApi(ref.watch(apiClientProvider)));
