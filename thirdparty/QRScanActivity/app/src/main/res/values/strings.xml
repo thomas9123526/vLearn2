@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">QR Scanner</string>
+
+    <!-- MainActivity (demo launcher) -->
+    <string name="main_title">QR Scanner</string>
+    <string name="main_subtitle">A reusable custom-camera QR scanner activity, built on CameraX and an offline copy of the ZXing library.</string>
+    <string name="scan_button">Scan QR code</string>
+    <string name="test_license_button">Run test_license mode</string>
+    <string name="file_license_button">Run file_license mode</string>
+    <string name="demo_license_path">/sdcard/룡마/가상외국어회화/license/a1.key</string>
+    <string name="status_idle">No QR code scanned yet.</string>
+    <string name="result_heading">Scanned (%1$s)</string>
+    <string name="result_license_heading">License (from assets/license.txt)</string>
+    <string name="result_file_license_heading">License file (%1$d bytes from %2$s)</string>
+    <string name="result_cancelled">Scan cancelled.</string>
+
+    <!-- Demo override passed to QRScanActivity via EXTRA_PROMPT_MESSAGE.
+         The scanner's own default prompt is qrscan_scan_prompt in :scanner. -->
+    <string name="scan_prompt">Point the camera at a QR code</string>
+</resources>
