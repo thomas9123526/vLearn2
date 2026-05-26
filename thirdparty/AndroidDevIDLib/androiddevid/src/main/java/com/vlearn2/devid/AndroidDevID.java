@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Build;
 import android.provider.Settings;
 
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -11,33 +12,24 @@ import java.security.NoSuchAlgorithmException;
 /**
  * Stable per-device fingerprint for the vLearn2 license feature.
  *
- * <p>Returns a 64-char hex {@code SHA-256} over a {@code |}-joined
- * combination of three sources:
- *
+ * <p>Returns a <b>20-digit decimal string</b>:
  * <ul>
- *   <li>{@code ANDROID_ID} — {@link Settings.Secure#ANDROID_ID}.
- *       Stable per (app signing key, user) pair on Android 8+.</li>
- *   <li>{@code FINGERPRINT} — {@link Build#FINGERPRINT}. Image
- *       identifier; changes on OS update.</li>
- *   <li>{@code cpu_serial} — Serial line from {@code /proc/cpuinfo}
- *       read by the native side. Empty on most modern devices —
- *       still folded into the hash so the input shape is fixed.</li>
+ *   <li>Characters 0–15: content — first 8 bytes of SHA-256 treated as a
+ *       big-endian unsigned 64-bit integer, taken mod 10^16, zero-padded.</li>
+ *   <li>Characters 16–19: checksum — weighted digit sum
+ *       (Σ (i+1)·d[i] for i=0..15) mod 10000, zero-padded to 4 digits.</li>
  * </ul>
  *
- * <p>The native side is compiled into {@code libdevid.so}; failing
- * to load (e.g. when the host is running tests on a non-Android
- * JVM) falls back to the two Java-side sources only, so the method
- * never throws.
+ * <p>Input to SHA-256 is a pipe-joined combination of three sources:
+ * <ul>
+ *   <li>{@code ANDROID_ID} — {@link Settings.Secure#ANDROID_ID}.</li>
+ *   <li>{@code FINGERPRINT} — {@link Build#FINGERPRINT}.</li>
+ *   <li>{@code cpu_serial} — Serial line from {@code /proc/cpuinfo} via JNI.</li>
+ * </ul>
  */
 public final class AndroidDevID {
     private static final String TAG = "AndroidDevID";
 
-    /**
-     * True once {@code System.loadLibrary("devid")} has succeeded.
-     * Read by {@link #readCpuSerialSafely()} so a missing .so on a
-     * host JVM degrades gracefully instead of throwing
-     * {@link UnsatisfiedLinkError} mid-call.
-     */
     private static final boolean NATIVE_LOADED;
 
     static {
@@ -51,39 +43,48 @@ public final class AndroidDevID {
         NATIVE_LOADED = loaded;
     }
 
-    private AndroidDevID() {
-        // Utility class — not instantiable.
-    }
+    private AndroidDevID() {}
 
     /**
-     * Returns the device fingerprint hex string. Never returns null;
-     * an empty input set still produces a deterministic 64-char hash.
+     * Returns the 20-digit device fingerprint. Never returns null.
      *
-     * @param context any non-null {@link Context} — {@code Application}
-     *                context is fine.
+     * @param context any non-null {@link Context}.
      */
     public static String getDeviceId(Context context) {
         if (context == null) {
             throw new IllegalArgumentException("context == null");
         }
         final String androidId = safe(Settings.Secure.getString(
-            context.getContentResolver(),
-            Settings.Secure.ANDROID_ID));
+            context.getContentResolver(), Settings.Secure.ANDROID_ID));
         final String fingerprint = safe(Build.FINGERPRINT);
         final String cpuSerial = safe(readCpuSerialSafely());
 
-        // Pipe-joined, key=value form so a future caller can spot the
-        // structure in logs / audits without needing the source.
         final String input =
             "android_id=" + androidId
             + "|fingerprint=" + fingerprint
             + "|cpu_serial=" + cpuSerial;
-        return sha256Hex(input);
+
+        final byte[] digest = sha256Bytes(input);
+
+        // 16-digit content: first 8 bytes as big-endian uint64 mod 10^16
+        final BigInteger MOD = BigInteger.TEN.pow(16);
+        final byte[] slice = new byte[]{
+            digest[0], digest[1], digest[2], digest[3],
+            digest[4], digest[5], digest[6], digest[7]
+        };
+        final long content = new BigInteger(1, slice).mod(MOD).longValue();
+        final String contentStr = String.format("%016d", content);
+
+        // 4-digit weighted checksum: Σ (i+1)*digit[i] mod 10000
+        int sum = 0;
+        for (int i = 0; i < 16; i++) {
+            sum += (i + 1) * (contentStr.charAt(i) - '0');
+        }
+        final String checksumStr = String.format("%04d", sum % 10000);
+
+        return contentStr + checksumStr;
     }
 
-    /// Native side — see src/main/cpp/devid_jni.cpp. Returns the
-    /// Serial line from /proc/cpuinfo, or empty string when the
-    /// kernel doesn't expose it (vanilla AOSP on most retail devices).
     private static native String nativeReadCpuSerial();
 
     private static String readCpuSerialSafely() {
@@ -100,21 +101,12 @@ public final class AndroidDevID {
         return s == null ? "" : s;
     }
 
-    private static String sha256Hex(String s) {
+    private static byte[] sha256Bytes(String s) {
         try {
             final MessageDigest md = MessageDigest.getInstance("SHA-256");
-            final byte[] digest = md.digest(s.getBytes(StandardCharsets.UTF_8));
-            final StringBuilder sb = new StringBuilder(digest.length * 2);
-            for (byte b : digest) {
-                sb.append(Character.forDigit((b >> 4) & 0xF, 16));
-                sb.append(Character.forDigit(b & 0xF, 16));
-            }
-            return sb.toString();
+            return md.digest(s.getBytes(StandardCharsets.UTF_8));
         } catch (NoSuchAlgorithmException e) {
-            // SHA-256 is mandated on every Android — this branch is
-            // effectively unreachable. Keep it total instead of
-            // propagating so the public API never throws on input.
-            return "";
+            return new byte[32]; // SHA-256 is mandated on every Android
         }
     }
 }

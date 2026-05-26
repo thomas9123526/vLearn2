@@ -7,25 +7,20 @@
 #include <bcrypt.h>
 #include <intrin.h>
 
+#include <cinttypes>
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
 #include <string>
 
 namespace {
 
-// HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid is created once
-// at install time and survives reinstalls of every component
-// except the OS itself. Treated as the strongest stable per-install
-// identifier on Windows.
 std::string ReadMachineGuid() {
     HKEY key = nullptr;
     if (RegOpenKeyExW(
             HKEY_LOCAL_MACHINE,
             L"SOFTWARE\\Microsoft\\Cryptography",
             0,
-            // KEY_WOW64_64KEY: even if a 32-bit caller ever loads
-            // this DLL, we still read the canonical 64-bit hive
-            // entry instead of the redirected Wow6432Node copy.
             KEY_READ | KEY_WOW64_64KEY,
             &key) != ERROR_SUCCESS) {
         return {};
@@ -40,7 +35,6 @@ std::string ReadMachineGuid() {
     if (status != ERROR_SUCCESS || type != REG_SZ) {
         return {};
     }
-    // MachineGuid is ASCII hex+dashes -- a narrow cast is lossless.
     std::string out;
     out.reserve(wcslen(wbuf));
     for (size_t i = 0; wbuf[i] != L'\0'; ++i) {
@@ -61,9 +55,6 @@ std::string ReadVolumeSerial() {
     return hex;
 }
 
-// CPUID leaf 0x80000002..0x80000004 returns the processor brand
-// string -- 48 chars across three calls. Available on every x86_64
-// processor (the spec has required it since the early 2000s).
 std::string ReadCpuBrand() {
     int info[4] = {0};
     __cpuid(info, 0x80000000);
@@ -77,8 +68,6 @@ std::string ReadCpuBrand() {
     std::memcpy(brand + 16, info, 16);
     __cpuid(info, 0x80000004);
     std::memcpy(brand + 32, info, 16);
-    // Vendors pad the brand string with leading/trailing spaces;
-    // strip them so the hashed input is canonical across kernels.
     std::string s(brand);
     const auto first = s.find_first_not_of(' ');
     if (first == std::string::npos) return {};
@@ -86,8 +75,6 @@ std::string ReadCpuBrand() {
     return s.substr(first, last - first + 1);
 }
 
-// SHA-256 via Windows CNG (BCrypt). Available since Windows 8.1,
-// well below the Flutter Windows floor of Windows 10. Never throws.
 bool Sha256(const std::string& input, unsigned char out[32]) {
     BCRYPT_ALG_HANDLE alg = nullptr;
     NTSTATUS status = BCryptOpenAlgorithmProvider(
@@ -95,8 +82,6 @@ bool Sha256(const std::string& input, unsigned char out[32]) {
     if (status != 0) {
         return false;
     }
-    // BCryptHash is the one-shot API -- Open/Hash/Close, no
-    // intermediate state object. Fine for a single short input.
     status = BCryptHash(
         alg, nullptr, 0,
         reinterpret_cast<PUCHAR>(const_cast<char*>(input.data())),
@@ -108,8 +93,16 @@ bool Sha256(const std::string& input, unsigned char out[32]) {
 
 }  // namespace
 
-extern "C" int WindowsDevID_GetDeviceId(char* buf, int bufSize) {
-    if (buf == nullptr || bufSize < 65) {
+// Produces a 20-digit decimal string:
+//   characters  0-15 : content  — first 8 SHA-256 bytes as big-endian
+//                                 uint64, taken mod 10^16, zero-padded
+//   characters 16-19 : checksum — weighted digit sum
+//                                 (Σ (i+1)·d[i] for i=0..15) mod 10000,
+//                                 zero-padded to 4 digits
+//
+// buf must be at least 21 bytes. Returns 20 on success, 0 on bad args.
+extern "C" WINDEVID_API int WindowsDevID_GetDeviceId(char* buf, int bufSize) {
+    if (buf == nullptr || bufSize < 21) {
         return 0;
     }
     const std::string input =
@@ -119,16 +112,27 @@ extern "C" int WindowsDevID_GetDeviceId(char* buf, int bufSize) {
 
     unsigned char hash[32] = {0};
     if (!Sha256(input, hash)) {
-        // CNG should never fail on a supported Windows. Keep the
-        // function total: emit a deterministic empty-input hash
-        // rather than write a garbage buffer.
         std::memset(hash, 0, sizeof(hash));
     }
-    static const char kHex[] = "0123456789abcdef";
-    for (int i = 0; i < 32; ++i) {
-        buf[i * 2]     = kHex[(hash[i] >> 4) & 0xF];
-        buf[i * 2 + 1] = kHex[hash[i] & 0xF];
+
+    // 16-digit content
+    uint64_t raw = 0;
+    for (int i = 0; i < 8; ++i) {
+        raw = (raw << 8) | static_cast<uint64_t>(hash[i]);
     }
-    buf[64] = '\0';
-    return 64;
+    const uint64_t MOD = 10000000000000000ULL;  // 10^16
+    const uint64_t content = raw % MOD;
+
+    char content_str[17];
+    std::snprintf(content_str, sizeof(content_str), "%016" PRIu64, content);
+
+    // 4-digit weighted checksum
+    int sum = 0;
+    for (int i = 0; i < 16; ++i) {
+        sum += (i + 1) * (content_str[i] - '0');
+    }
+    const int checksum = sum % 10000;
+
+    std::snprintf(buf, static_cast<size_t>(bufSize), "%s%04d", content_str, checksum);
+    return 20;
 }

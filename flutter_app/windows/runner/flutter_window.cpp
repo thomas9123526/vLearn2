@@ -9,8 +9,7 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
-typedef const char* (*WindowsDevID_GetFn)();
-typedef void        (*WindowsDevID_FreeFn)(const char*);
+typedef int (*WindowsDevID_GetDeviceIdFn)(char*, int);
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -54,18 +53,16 @@ bool FlutterWindow::OnCreate() {
                         "WindowsDevID.dll not found beside the executable");
           return;
         }
-        auto fn = reinterpret_cast<WindowsDevID_GetFn>(
-            GetProcAddress(devid_dll_, "WindowsDevID_Get"));
-        auto freeFn = reinterpret_cast<WindowsDevID_FreeFn>(
-            GetProcAddress(devid_dll_, "WindowsDevID_Free"));
+        auto fn = reinterpret_cast<WindowsDevID_GetDeviceIdFn>(
+            GetProcAddress(devid_dll_, "WindowsDevID_GetDeviceId"));
         if (!fn) {
-          result->Error("PROC_ERROR", "WindowsDevID_Get export not found");
+          result->Error("PROC_ERROR",
+                        "WindowsDevID_GetDeviceId export not found");
           return;
         }
-        const char* id = fn();
-        std::string idStr(id ? id : "");
-        if (freeFn && id) freeFn(id);
-        result->Success(flutter::EncodableValue(idStr));
+        char buf[21] = {0};
+        fn(buf, sizeof(buf));
+        result->Success(flutter::EncodableValue(std::string(buf)));
       });
 
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
