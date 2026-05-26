@@ -63,6 +63,25 @@ KeyGenerator/
 
 ## Build
 
+Two equivalent paths -- pick the one that fits your workflow.
+
+### A. Open `KeyGenerator.sln` in Visual Studio 2022 (no CMake)
+
+Set two env vars once, then File -> Open -> `thirdparty\KeyGenerator\KeyGenerator.sln`:
+
+```bat
+setx QTDIR             "C:\Qt\5.15.2\msvc2019_64"
+setx OPENSSL_ROOT_DIR  "C:\vcpkg\installed\x64-windows"
+```
+
+On first build the project's pre-build event clones Nayuki QR
+into `external\qrcodegen\` (needs `git` on PATH). moc / uic run
+as custom build steps; windeployqt runs as the post-build step
+so the Qt DLLs land next to `KeyGenerator.exe` in
+`bin\x64\Release\`.
+
+### B. CMake (cross-platform, also produces a .sln in `build\`)
+
 Toolchain:
 
 | Tool | Version | Notes |

@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hand-rolled VS 2022 project for KeyGenerator. Lets you open
+  KeyGenerator.sln directly in VS 2022 without running CMake first.
+
+  Environment variables this project reads:
+    QTDIR              -> Qt 5.15 MSVC 2019 64-bit install root,
+                          e.g. C:\Qt\5.15.2\msvc2019_64
+    OPENSSL_ROOT_DIR   -> OpenSSL install root with include/ and lib/
+                          (vcpkg installed/x64-windows works directly)
+
+  Build outputs land in bin\$(Platform)\$(Configuration)\KeyGenerator.exe.
+  Pre-build clones Nayuki QR-Code-generator v1.8.0 into external\
+  on first build. Post-build runs windeployqt so the Qt DLLs land
+  next to the exe.
+
+  See README.md for the equivalent CMake-based build.
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{9F4A8B23-7C11-4E58-A1D2-7B4C5E6F8A91}</ProjectGuid>
+    <RootNamespace>KeyGenerator</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+
+  <PropertyGroup Label="UserMacros">
+    <!-- All four are MSBuild-time captures of env vars; if a user
+         hasn't set QTDIR/OPENSSL_ROOT_DIR the build will fail at
+         compile time with a clear "Qt headers not found" error. -->
+    <QtBin>$(QTDIR)\bin</QtBin>
+    <QtInclude>$(QTDIR)\include</QtInclude>
+    <QtLib>$(QTDIR)\lib</QtLib>
+    <GeneratedDir>$(ProjectDir)generated\</GeneratedDir>
+    <QrCodeDir>$(ProjectDir)external\qrcodegen\cpp</QrCodeDir>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>KeyGenerator</TargetName>
+  </PropertyGroup>
+
+  <!-- Shared compile/link settings for both configs. -->
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(GeneratedDir);$(QrCodeDir);$(QtInclude);$(QtInclude)\QtCore;$(QtInclude)\QtGui;$(QtInclude)\QtWidgets;$(QtInclude)\QtSql;$(OPENSSL_ROOT_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>UNICODE;_UNICODE;WIN32;_WIN32;WIN32_LEAN_AND_MEAN;NOMINMAX;QT_NO_KEYWORDS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalLibraryDirectories>$(QtLib);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <!-- WIN32 GUI exe but we want the standard CRT main entry,
+           not WinMain. qtmain feeds argc/argv through. -->
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;QT_NO_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(QtLib);$(OPENSSL_ROOT_DIR)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Qt5Widgets.lib;Qt5Gui.lib;Qt5Core.lib;Qt5Sql.lib;libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <!-- vcpkg puts debug-mode OpenSSL libs under debug/lib. -->
+      <AdditionalLibraryDirectories>$(QtLib);$(OPENSSL_ROOT_DIR)\debug\lib;$(OPENSSL_ROOT_DIR)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Qt5Widgetsd.lib;Qt5Guid.lib;Qt5Cored.lib;Qt5Sqld.lib;libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- Pre/post-build events (shared across configs). -->
+  <ItemDefinitionGroup>
+    <PreBuildEvent>
+      <Message>Ensuring Nayuki QR + generated/ exist</Message>
+      <Command>if not exist "$(ProjectDir)external\qrcodegen\cpp\qrcodegen.cpp" (
+    echo Cloning Nayuki QR-Code-generator v1.8.0...
+    if not exist "$(ProjectDir)external" mkdir "$(ProjectDir)external"
+    git clone --depth 1 --branch v1.8.0 https://github.com/nayuki/QR-Code-generator.git "$(ProjectDir)external\qrcodegen"
+    if errorlevel 1 exit /b 1
+)
+if not exist "$(GeneratedDir)" mkdir "$(GeneratedDir)"</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Message>Running windeployqt</Message>
+      <Command>"$(QtBin)\windeployqt.exe" --no-translations --no-system-d3d-compiler --no-opengl-sw "$(TargetPath)"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+
+  <!-- Hand-written source files. -->
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\MainWindow.cpp" />
+    <ClCompile Include="src\LeafCa.cpp" />
+    <ClCompile Include="src\CertIssuer.cpp" />
+    <ClCompile Include="src\QrWriter.cpp" />
+    <ClCompile Include="src\LicenseLog.cpp" />
+    <!-- Generated by the moc CustomBuild step below. Marked
+         dependent so MSBuild waits for moc to finish before
+         compiling it. -->
+    <ClCompile Include="generated\moc_MainWindow.cpp">
+      <AdditionalInputs>src\MainWindow.h</AdditionalInputs>
+    </ClCompile>
+    <!-- Nayuki QR source (cloned by the pre-build step). -->
+    <ClCompile Include="external\qrcodegen\cpp\qrcodegen.cpp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClInclude Include="src\LeafCa.h" />
+    <ClInclude Include="src\CertIssuer.h" />
+    <ClInclude Include="src\QrWriter.h" />
+    <ClInclude Include="src\LicenseLog.h" />
+  </ItemGroup>
+
+  <!-- moc on MainWindow.h (has Q_OBJECT). The output lands in
+       generated\moc_MainWindow.cpp, picked up by the ClCompile
+       item above. -->
+  <ItemGroup>
+    <CustomBuild Include="src\MainWindow.h">
+      <FileType>Document</FileType>
+      <Message>moc %(Filename).h</Message>
+      <Command>"$(QtBin)\moc.exe" -DUNICODE -D_UNICODE -DWIN32 -I"$(ProjectDir)src" -I"$(QtInclude)" -I"$(QtInclude)\QtCore" -I"$(QtInclude)\QtGui" -I"$(QtInclude)\QtWidgets" "%(FullPath)" -o "$(GeneratedDir)moc_%(Filename).cpp"</Command>
+      <Outputs>$(GeneratedDir)moc_%(Filename).cpp</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="src\MainWindow.ui">
+      <FileType>Document</FileType>
+      <Message>uic %(Filename).ui</Message>
+      <Command>"$(QtBin)\uic.exe" "%(FullPath)" -o "$(GeneratedDir)ui_%(Filename).h"</Command>
+      <Outputs>$(GeneratedDir)ui_%(Filename).h</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>
