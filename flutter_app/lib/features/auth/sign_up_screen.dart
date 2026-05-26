@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/api/app_apis.dart';
+import '../../core/api/auth_api.dart';
 import '../../core/api/interceptors/error_interceptor.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
