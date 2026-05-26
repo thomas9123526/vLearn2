@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
@@ -156,9 +157,25 @@ class SherpaOnnxSttService extends SpeechToTextService {
     final flavour = _online != null
         ? 'online-transducer'
         : (_offline != null ? 'offline-whisper' : 'none');
+    // Peak + RMS so we can tell at a glance whether the mic captured
+    // anything. Sherpa-onnx expects samples in roughly [-1, +1]; on a
+    // healthy room voice peak should be 0.1–0.9 and RMS ~0.02–0.2.
+    // A peak <0.01 means the buffer is effectively silent (mic muted,
+    // input level too low, or wrong device selected).
+    var peak = 0.0;
+    var sumSq = 0.0;
+    for (var i = 0; i < samples.length; i++) {
+      final v = samples[i];
+      final a = v < 0 ? -v : v;
+      if (a > peak) peak = a;
+      sumSq += v * v;
+    }
+    final rms = samples.isEmpty ? 0.0 : (sumSq / samples.length);
+    final rmsRoot = rms <= 0 ? 0.0 : math.sqrt(rms);
     debugPrint(
       '[stt] engine.transcribe flavour=$flavour '
-      'samples=${samples.length} duration=${durationSeconds.toStringAsFixed(2)}s',
+      'samples=${samples.length} duration=${durationSeconds.toStringAsFixed(2)}s '
+      'peak=${peak.toStringAsFixed(3)} rms=${rmsRoot.toStringAsFixed(4)}',
     );
 
     try {
