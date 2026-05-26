@@ -16,6 +16,7 @@ import {
   Sparkles,
   MessageSquareCode,
   ListTree,
+  KeyRound,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { tokenStore, currentClaims } from '@/lib/auth';
@@ -33,6 +34,7 @@ const NAV = [
   { href: '/audit', label: 'Audit log', icon: ScrollText, perm: 'audit.view' },
   { href: '/admins', label: 'Admins', icon: ShieldCheck, perm: 'admins.view' },
   { href: '/config', label: 'Config flags', icon: Settings, perm: 'config.view' },
+  { href: '/license', label: 'License', icon: KeyRound, perm: 'config.view' },
   { href: '/settings', label: 'Settings', icon: Settings, perm: null },
 ] as const;
 
