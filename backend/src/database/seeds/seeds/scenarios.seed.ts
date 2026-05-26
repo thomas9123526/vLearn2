@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { CategoryEntity } from '../../entities/category.entity';
 import { ScenarioEntity } from '../../entities/scenario.entity';
 
 interface ScenarioSeed {
@@ -528,11 +529,30 @@ const SCENARIOS: ScenarioSeed[] = [
 
 export async function seedScenarios(ds: DataSource): Promise<void> {
   const repo = ds.getRepository(ScenarioEntity);
+
+  // vl_scenarios.category_id is NOT NULL with a FK to vl_categories.
+  // The categories rows were seeded by migration 1780400000000; we
+  // just need to look them up by slug and stamp the id on each
+  // scenario. Build the slug -> id map once up front rather than
+  // re-querying inside the loop.
+  const categoryRows = await ds
+    .getRepository(CategoryEntity)
+    .find({ select: ['id', 'slug'] });
+  const categoryIdBySlug = new Map(categoryRows.map((c) => [c.slug, c.id]));
+
   let order = 0;
   for (const s of SCENARIOS) {
+    const categoryId = categoryIdBySlug.get(s.category);
+    if (!categoryId) {
+      throw new Error(
+        `seedScenarios: vl_categories has no row for slug "${s.category}" ` +
+          `(scenario "${s.slug}"). Run migrations first, then re-seed.`,
+      );
+    }
     const data = {
       slug: s.slug,
       category: s.category,
+      category_id: categoryId,
       difficulty: s.difficulty,
       title: { en: s.title_en, ko: s.title_ko, zh: s.title_zh },
       description: { en: s.description_en },
