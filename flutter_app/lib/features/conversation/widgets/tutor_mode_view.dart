@@ -110,7 +110,12 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
         (tts.capabilities.availableVoices.isNotEmpty
             ? tts.capabilities.availableVoices.first
             : '');
+    final preview = last.content.length > 80
+        ? '${last.content.substring(0, 80)}…'
+        : last.content;
+    debugPrint('[tts] speak voice=$voiceId len=${last.content.length} "$preview"');
     tts.speak(last.content, voiceId: voiceId).catchError((Object e, StackTrace st) {
+      debugPrint('[tts] failed: $e');
       logRawError('tutor_mode.tts', e, st);
     });
   }
@@ -135,12 +140,14 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     }
     final started = await recorder.start();
     if (!started) {
+      debugPrint('[stt] mic.start failed — recorder returned false');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not open the microphone.')),
       );
       return;
     }
+    debugPrint('[stt] mic.start ok — listening');
     setState(() => _mood = TutorMood.listening);
     await ref.read(ttsServiceProvider).stop();
   }
@@ -150,9 +157,14 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     final capture = await recorder.stop();
     if (!mounted) return;
     setState(() => _mood = TutorMood.idle);
-    if (capture == null) return;
+    if (capture == null) {
+      debugPrint('[stt] mic.stop -> no capture (null)');
+      return;
+    }
+    debugPrint('[stt] mic.stop -> ${capture.pcm.length} bytes pcm captured');
 
     if (!ref.read(speechReadyProvider)) {
+      debugPrint('[stt] aborted — speech models not ready');
       final snap = ref.read(modelRegistrySnapshotProvider).valueOrNull;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -163,12 +175,23 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
       return;
     }
     final stt = ref.read(sttServiceProvider);
+    final swatch = Stopwatch()..start();
     try {
       final result = await stt.transcribe(capture.pcm, language: 'en');
+      swatch.stop();
       final text = result.text.trim();
-      if (text.isEmpty) return;
+      debugPrint(
+        '[stt] transcribed in ${swatch.elapsedMilliseconds}ms: '
+        '"$text" (audio ${result.audioDuration.inMilliseconds}ms)',
+      );
+      if (text.isEmpty) {
+        debugPrint('[stt] empty result — not sending');
+        return;
+      }
       await widget.onSendText(text);
     } catch (e, st) {
+      swatch.stop();
+      debugPrint('[stt] transcribe failed after ${swatch.elapsedMilliseconds}ms: $e');
       logRawError('tutor_mode.stt', e, st);
       if (mounted) {
         showPoliteErrorSnack(context, e, tag: 'tutor_mode.stt', stack: st);

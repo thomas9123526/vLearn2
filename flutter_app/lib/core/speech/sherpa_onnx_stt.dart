@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as so;
 
@@ -141,6 +141,7 @@ class SherpaOnnxSttService extends SpeechToTextService {
   Future<SttResult> transcribe(Uint8List audioData, {String? language}) async {
     if (!_initialized) await initialize();
     if (!_available) {
+      debugPrint('[stt] engine unavailable — models not installed?');
       throw SttUnavailableException(
         'Speech models are not installed yet. Ask your admin to drop the '
         'sherpa-onnx bundle into the models folder.',
@@ -152,6 +153,13 @@ class SherpaOnnxSttService extends SpeechToTextService {
     final samples = _pcm16ToFloat32(audioData);
     const sampleRate = 16000;
     final durationSeconds = samples.length / sampleRate;
+    final flavour = _online != null
+        ? 'online-transducer'
+        : (_offline != null ? 'offline-whisper' : 'none');
+    debugPrint(
+      '[stt] engine.transcribe flavour=$flavour '
+      'samples=${samples.length} duration=${durationSeconds.toStringAsFixed(2)}s',
+    );
 
     try {
       if (_online != null) {
@@ -163,6 +171,7 @@ class SherpaOnnxSttService extends SpeechToTextService {
         }
         final text = _online!.getResult(stream).text;
         stream.free();
+        debugPrint('[stt] engine.result (online) = "${text.trim()}"');
         return SttResult(
           text: text.trim(),
           confidence: 1.0, // sherpa-onnx doesn't expose per-utterance scores
@@ -174,6 +183,8 @@ class SherpaOnnxSttService extends SpeechToTextService {
         _offline!.decode(stream);
         final result = _offline!.getResult(stream);
         stream.free();
+        debugPrint('[stt] engine.result (whisper) = "${result.text.trim()}" '
+            'lang=${result.lang.isEmpty ? "?" : result.lang}');
         return SttResult(
           text: result.text.trim(),
           confidence: 1.0,
@@ -183,6 +194,7 @@ class SherpaOnnxSttService extends SpeechToTextService {
       }
       throw SttUnavailableException('No recognizer was constructed.');
     } catch (e, st) {
+      debugPrint('[stt] engine.transcribe crashed: $e');
       _log.e('STT: transcribe failed', error: e, stackTrace: st);
       throw SttUnavailableException(
         'The recognizer crashed while transcribing your audio. Please try '
