@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/app_apis.dart';
+import '../../core/config/layout_config_provider.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/personas_provider.dart';
@@ -12,6 +13,7 @@ import '../../core/theme/bubble_style.dart';
 import '../../core/theme/font_group.dart';
 import '../../features/conversation/widgets/chat_bubble.dart';
 import '../../core/models/models.dart';
+import '../license/license_screen.dart';
 import 'change_password_dialog.dart';
 import 'edit_profile_dialog.dart';
 
@@ -99,6 +101,27 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(),
           const _SectionHeader(text: 'Storage'),
           const _ModelStorageTile(),
+          // License — only rendered when the admin has flipped
+          // `license.enabled` on. The flag rides on layoutConfigProvider
+          // (vl_app_config.is_visible_to_app = true).
+          if (ref.watch(layoutConfigProvider).maybeWhen(
+                data: (cfg) => cfg.get<bool>('license.enabled') ?? false,
+                orElse: () => false,
+              )) ...[
+            const Divider(),
+            const _SectionHeader(text: 'License'),
+            ListTile(
+              leading: const Icon(Icons.key_outlined),
+              title: const Text('License'),
+              subtitle: const Text('Machine ID and license status'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const LicenseScreen(),
+                ),
+              ),
+            ),
+          ],
           const Divider(),
           const _SectionHeader(text: 'Account'),
           ListTile(
