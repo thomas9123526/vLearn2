@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_app/core/config/app_config.dart';
 import 'package:rive/rive.dart' as rive;
 
@@ -75,9 +74,8 @@ class _TutorAvatarState extends State<TutorAvatar>
   // ─── Rive state-machine integration ───────────────────────────────
   //
   // The character `.riv` (e.g. tutor_hiro.riv) exposes a state machine
-  // with these inputs (any may be missing on stub assets — we look
-  // each one up with `findInput` and `is`-check the runtime type, so
-  // a missing input cleanly becomes a no-op):
+  // with these inputs (any may be missing on stub assets — the typed
+  // accessors return null in that case and we treat it as a no-op):
   //
   //   trigger blink       — fire to play one blink
   //   number  emotion     — 0 neutral, 1 smile, 2 sad, 3 surprised, …
@@ -89,12 +87,24 @@ class _TutorAvatarState extends State<TutorAvatar>
   // Only blink, emotion=1, and mouth_shape=1 ship in tutor_hiro.riv
   // right now; everything else is wired here so the moment the .riv
   // gains the missing animations no Flutter change is needed.
-  rive.SMITrigger? _blinkInput;
-  rive.SMINumber? _emotionInput;
-  rive.SMINumber? _mouthShapeInput;
-  rive.SMITrigger? _nodInput;
-  rive.SMITrigger? _shakeInput;
-  rive.SMIBool? _attentionInput;
+  //
+  // Migrated for rive 0.14: the input types moved from `SMI*` to
+  // `*Input` and are now looked up via stateMachine.trigger/boolean/
+  // number(name) on the loaded controller (see [_onRiveLoaded]).
+  rive.TriggerInput? _blinkInput;
+  rive.NumberInput? _emotionInput;
+  rive.NumberInput? _mouthShapeInput;
+  rive.TriggerInput? _nodInput;
+  rive.TriggerInput? _shakeInput;
+  rive.BooleanInput? _attentionInput;
+
+  /// Lazily-built file loader for tutor_hiro.riv. We hold it on the
+  /// state instead of rebuilding it every frame so the asset is
+  /// decoded once per avatar instance.
+  late final rive.FileLoader _fileLoader = rive.FileLoader.fromAsset(
+    'assets/animations/$_forcedRiveAsset',
+    riveFactory: rive.Factory.rive,
+  );
 
   /// Random natural-blink scheduler — independent of mood so the
   /// character keeps blinking while speaking or listening too.
@@ -137,55 +147,45 @@ class _TutorAvatarState extends State<TutorAvatar>
 
   // ─── Rive helpers ─────────────────────────────────────────────────
 
-  /// Called by [rive.RiveAnimation.asset] once the artboard is loaded.
-  /// Attaches the state machine, resolves every input, kicks off the
-  /// blink timer, and applies the current mood so the character isn't
-  /// stuck on its default pose for one frame.
+  /// Called by [rive.RiveWidgetBuilder] once the file has loaded and the
+  /// controller has selected the default state machine. Resolves every
+  /// named input, kicks off the blink timer, and applies the current
+  /// mood so the character isn't stuck on its default pose for one
+  /// frame.
   ///
-  /// Everything inside is wrapped in a try/catch because the rive
-  /// 0.13.x runtime has been seen to throw `RangeError (length): … 0..1: 2`
-  /// when reading state-machine internals exported by a newer Rive
-  /// editor. A throw here would otherwise bubble up as an unhandled
-  /// FlutterError; instead we log it and let the animation play
-  /// without state-machine wiring (default timeline only).
-  void _onRiveInit(rive.Artboard artboard) {
+  /// Wrapped in a try/catch because malformed or version-mismatched
+  /// `.riv` files have been seen to throw deep inside the runtime when
+  /// the state machine is first walked. A throw here would otherwise
+  /// bubble up as an unhandled FlutterError; instead we log it and let
+  /// the animation play without state-machine wiring (default timeline
+  /// only).
+  void _onRiveLoaded(rive.RiveLoaded state) {
     if (!mounted) return;
     try {
-      if (artboard.stateMachines.isEmpty) {
-        AppConfig.logx('rive-init', 'no state machines on ${widget.persona.id}');
-        return;
-      }
-      final smName = artboard.stateMachines.first.name;
-      final controller =
-          rive.StateMachineController.fromArtboard(artboard, smName);
-      if (controller == null) {
-        AppConfig.logx('rive-init', 'could not build SM "$smName"');
-        return;
-      }
-      // The artboard keeps the controller alive once added — we only
-      // need handles to the inputs from here on, not the controller.
-      artboard.addController(controller);
-
-      // findInput<T>('name') returns the SMIInput<T>? — runtime subtype
-      // (SMITrigger / SMIBool / SMINumber) is checked with `is` so a
-      // shape mismatch between Dart and the Rive file degrades to a
-      // no-op rather than a runtime cast error.
-      final blink     = controller.findInput<bool>('blink');
-      final nod       = controller.findInput<bool>('nod');
-      final shake     = controller.findInput<bool>('shake');
-      final attention = controller.findInput<bool>('attention');
-      final emotion   = controller.findInput<double>('emotion');
-      final mouth     = controller.findInput<double>('mouth_shape');
-      if (blink     is rive.SMITrigger) _blinkInput     = blink;
-      if (nod       is rive.SMITrigger) _nodInput       = nod;
-      if (shake     is rive.SMITrigger) _shakeInput     = shake;
-      if (attention is rive.SMIBool)    _attentionInput = attention;
-      if (emotion   is rive.SMINumber)  _emotionInput   = emotion;
-      if (mouth     is rive.SMINumber)  _mouthShapeInput = mouth;
+      final sm = state.controller.stateMachine;
+      // In rive 0.14 input lookup is typed: separate accessors for
+      // trigger / boolean / number return the corresponding *Input?
+      // or null if the name isn't defined on the state machine.
+      // The classic SM-input lookup API is marked `@deprecated` in
+      // rive 0.14 in favour of Data Binding, but the legacy accessors
+      // still ship and work for our use case. Migration to view-model
+      // bindings can come later — out of scope for the version bump.
+      // ignore: deprecated_member_use
+      _blinkInput      = sm.trigger('blink');
+      // ignore: deprecated_member_use
+      _nodInput        = sm.trigger('nod');
+      // ignore: deprecated_member_use
+      _shakeInput      = sm.trigger('shake');
+      // ignore: deprecated_member_use
+      _attentionInput  = sm.boolean('attention');
+      // ignore: deprecated_member_use
+      _emotionInput    = sm.number('emotion');
+      // ignore: deprecated_member_use
+      _mouthShapeInput = sm.number('mouth_shape');
 
       AppConfig.logx(
         'rive-init',
-        '${widget.persona.id} SM "$smName" — inputs: '
+        '${widget.persona.id} SM "${sm.name}" — inputs: '
             'blink=${_blinkInput != null}, '
             'emotion=${_emotionInput != null}, '
             'mouth_shape=${_mouthShapeInput != null}, '
@@ -296,22 +296,6 @@ class _TutorAvatarState extends State<TutorAvatar>
     return Color(v);
   }
 
-  /// True only if the asset is bundled AND the `rive` runtime can actually
-  /// parse it. A `.riv` exported from a newer Rive editor than our pinned
-  /// `rive` package throws mid-parse (RangeError from the binary reader) —
-  /// checking that the bytes load is not enough, so we attempt a real import
-  /// and let the avatar fall back to [CartoonFace] when it fails.
-  Future<bool> _riveAssetUsable(String path) async {
-    try {
-      final bytes = await rootBundle.load(path);
-      rive.RiveFile.import(bytes);
-      return true;
-    } catch (e) {
-      AppConfig.logx('rive parse failed', '$path: $e');
-      return false;
-    }
-  }
-
   /// Single Rive asset used for every tutor, regardless of what the
   /// backend `personas.rive_asset` column says. The DB still drives
   /// gradient colours and the fallback letter; only the .riv binary is
@@ -389,24 +373,30 @@ class _TutorAvatarState extends State<TutorAvatar>
                     ],
                   ),
                   child: ClipOval(
-                    child: FutureBuilder<bool>(
+                    child: rive.RiveWidgetBuilder(
                       key: ValueKey('rive-${widget.persona.id}-$asset'),
-                      future: _riveAssetUsable('assets/animations/$asset'),
-                      builder: (context, snap) {
-                        if (snap.data == true) {
-                          return rive.RiveAnimation.asset(
-                            'assets/animations/$asset',
-                            key: const ValueKey(asset),
-                            fit: BoxFit.cover,
-                            onInit: _onRiveInit,
-                          );
+                      fileLoader: _fileLoader,
+                      onLoaded: _onRiveLoaded,
+                      onFailed: (e, st) => AppConfig.logx(
+                        'rive parse failed',
+                        '$asset: $e',
+                      ),
+                      builder: (context, state) {
+                        switch (state) {
+                          case rive.RiveLoaded(:final controller):
+                            return rive.RiveWidget(
+                              controller: controller,
+                              fit: rive.Fit.cover,
+                            );
+                          case rive.RiveLoading():
+                          case rive.RiveFailed():
+                            return CartoonFace(
+                              key: ValueKey('face-${widget.persona.id}'),
+                              persona: widget.persona,
+                              mood: widget.mood,
+                              size: widget.size,
+                            );
                         }
-                        return CartoonFace(
-                          key: ValueKey('face-${widget.persona.id}'),
-                          persona: widget.persona,
-                          mood: widget.mood,
-                          size: widget.size,
-                        );
                       },
                     ),
                   ),
