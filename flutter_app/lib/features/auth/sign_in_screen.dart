@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/api/auth_api.dart';
 import '../../core/auth/remembered_credentials.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
@@ -22,6 +23,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   bool _obscure = true;
   bool _rememberMe = true;
   bool _cidSyncing = false;
+  bool _usernameSyncing = false;
 
   String? _politeError;
 
@@ -48,6 +50,40 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     _cidUsernameCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
+  }
+
+  /// Resolves the username for the CID currently typed (or just synced)
+  /// in the CID field by hitting the public `/auth/lookup-username`
+  /// endpoint. Fills the Username field on success; shows a snackbar
+  /// with the polite error on failure.
+  Future<void> _syncUsername() async {
+    final cid = _cidCtrl.text.trim();
+    if (cid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter or sync your CID first.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _usernameSyncing = true);
+    try {
+      final username = await ref.read(authApiProvider).lookupUsernameByCid(cid);
+      if (mounted) setState(() => _cidUsernameCtrl.text = username);
+    } catch (e, st) {
+      logRawError('sign_in_screen.lookup_username', e, st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              politeMessageFor(e, context: ErrorContext.signIn),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _usernameSyncing = false);
+    }
   }
 
   Future<void> _syncCid() async {
@@ -155,9 +191,26 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _cidUsernameCtrl,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Username',
-                    prefixIcon: Icon(Icons.badge_outlined),
+                    prefixIcon: const Icon(Icons.badge_outlined),
+                    // Mirrors the CID field's sync control: tap once the
+                    // CID is filled to pull the registered username
+                    // from the backend (`GET /auth/lookup-username`).
+                    suffixIcon: _usernameSyncing
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            tooltip: 'Fetch username for this CID',
+                            icon: const Icon(Icons.sync),
+                            onPressed: isLoading ? null : _syncUsername,
+                          ),
                   ),
                   keyboardType: TextInputType.text,
                   autofillHints: const [AutofillHints.username],
