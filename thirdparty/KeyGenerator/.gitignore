@@ -19,3 +19,11 @@ CMakeLists.txt.user*
 
 # FetchContent download cache (re-populated by every fresh build).
 _deps/
+
+# Outputs of the hand-rolled .vcxproj path (KeyGenerator.sln).
+# `external/qrcodegen/` is cloned by the .vcxproj's pre-build event;
+# `generated/` holds moc/uic output. Both are regenerated on demand.
+bin/
+obj/
+generated/
+external/
