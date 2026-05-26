@@ -36,6 +36,15 @@ export class UserEntity {
   @OneToOne(() => UserInfoEntity, (i) => i.user, { eager: true, cascade: ['insert', 'update'] })
   info!: UserInfoEntity;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  license_valid_until!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  license_machine_id!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  license_serial!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at!: Date;
 
