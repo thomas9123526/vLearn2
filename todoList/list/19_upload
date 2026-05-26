@@ -1,0 +1,6 @@
+In "Edit Profile" dialog of Settings Screen on application,
+I want the user upload his photo via camera or local image.
+And the backend api accepts and show it for each user on users tab on admin panel.
+
+Also I want put image for scenario and if there's image available for scenario,
+show image on android and windows application when the user tap a "Scenario" and enter Scenario Description Screen.
