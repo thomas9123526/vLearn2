@@ -46,7 +46,7 @@ function AuthSidePanel({ theme, isDesktop, persona }) {
       </div>
 
       <div style={{ position: 'relative', zIndex: 1, fontSize: 12, opacity: .7, letterSpacing: '.18em', textTransform: 'uppercase' }}>
-        Windows · Android · 한국어 · 中文 · English
+        Windows · Android · 조선어 · 中文 · English
       </div>
     </div>
   );

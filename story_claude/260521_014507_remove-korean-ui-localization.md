@@ -7,9 +7,9 @@ Dropped Korean from the Flutter UI localization layer. Specifically:
 - Deleted `flutter_app/lib/l10n/app_ko.arb` and the generated
   `app_localizations_ko.dart`.
 - Removed `Locale('ko')` from `supportedLocales` in `main.dart`.
-- Removed the `'ko' / '한국어'` row from the Settings → Language picker
+- Removed the `'ko' / '조선어'` row from the Settings → Language picker
   and the matching case in `_languageLabel`.
-- Removed the `한국어` dropdown item from the sign-up screen.
+- Removed the `조선어` dropdown item from the sign-up screen.
 - Ran `flutter gen-l10n` to refresh `app_localizations.dart` so the
   generated `supportedLocales` and locale switch only reference `en`
   and `zh`.

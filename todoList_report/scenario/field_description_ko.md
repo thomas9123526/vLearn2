@@ -31,14 +31,14 @@
 | **estimated_minutes** | `estimated_minutes` | integer | Metadata Estimated Minutes와 동일. |
 | **xp_reward** | `xp_reward` | integer | Metadata XP Reward와 동일. |
 | **title_en** | `title->>'en'` | jsonb (I18nText) | 영어 표시 제목. 브리프 화면의 앱바와 시나리오 카드에 표시됩니다. `title` 컬럼은 `{en, ko, zh}` JSON 객체이며, `title_en`은 영어 부분입니다. |
-| **title_ko** | `title->>'ko'` | jsonb (I18nText) | 제목의 한국어 번역. UI 언어가 `ko`일 때 표시됩니다. |
+| **title_ko** | `title->>'ko'` | jsonb (I18nText) | 제목의 조선어 번역. UI 언어가 `ko`일 때 표시됩니다. |
 | **title_zh** | `title->>'zh'` | jsonb (I18nText) | 제목의 중국어 간체 번역. UI 언어가 `zh`일 때 표시됩니다. |
 | **description** | `description->>'en'` | jsonb (I18nText) | 히어로 카드 본문에 표시되는 한 문장 영어 요약. 학습자가 전체 브리프를 읽기 전에 어떤 연습을 할지 빠르게 파악할 수 있도록 합니다. |
 | **scene_en** | `scene_description->>'en'` | jsonb (I18nText) | 대화의 물리적·상황적 배경을 설정합니다. AI 시스템 프롬프트에 `{{scenario.setting}}`으로 주입됩니다. AI가 대화가 이루어지는 장소를 일관되게 유지하는 데 사용됩니다. 예시: *"공항 항공사 체크인 카운터 앞에 있습니다."* |
 | **user_role_en** | `user_role->>'en'` | jsonb (I18nText) | 이 시나리오에서 학습자가 맡는 역할을 설명합니다. 시스템 프롬프트에 `{{scenario.user_role}}`로 주입됩니다. AI가 학습자의 관점과 어휘 수준에 맞게 응답하도록 돕습니다. 예시: *"수하물을 체크인하려는 여행자."* |
 | **tutor_role_en** | `tutor_role->>'en'` | jsonb (I18nText) | AI 튜터가 연기하는 캐릭터를 설명합니다. 시스템 프롬프트에 `{{scenario.tutor_role}}`로 주입됩니다. 시나리오가 진행되는 동안 튜터의 기본 페르소나 역할을 이것으로 대체합니다. 예시: *"친절한 항공사 직원."* |
 | **objectives_en** | `objectives` (jsonb array) | `{en: string}[]` | 세션 동안 학습자가 달성해야 하는 대화 목표의 순서 있는 목록. `, `로 연결되어 `{{scenario.objectives}}`로 주입됩니다. AI는 이를 통해 특정 연습 목표(예: 좌석 업그레이드 요청, 탑승권 받기)를 향해 자연스럽게 대화를 유도합니다. |
-| **key_phrases** | `key_phrases` (jsonb array) | `{phrase: string, ko?, zh?}[]` | 학습자가 사용해보아야 할 영어 표현. 브리프 화면의 인용 카드("Phrases worth stealing")에 표시되고, `{{scenario.key_phrases}}`로 주입되어 AI가 학습자가 자연스럽게 해당 표현을 사용할 때 인식하고 칭찬할 수 있습니다. 선택적 한국어/중국어 번역은 브리프 화면 표시 전용이며 AI에는 전송되지 않습니다. |
+| **key_phrases** | `key_phrases` (jsonb array) | `{phrase: string, ko?, zh?}[]` | 학습자가 사용해보아야 할 영어 표현. 브리프 화면의 인용 카드("Phrases worth stealing")에 표시되고, `{{scenario.key_phrases}}`로 주입되어 AI가 학습자가 자연스럽게 해당 표현을 사용할 때 인식하고 칭찬할 수 있습니다. 선택적 조선어/중국어 번역은 브리프 화면 표시 전용이며 AI에는 전송되지 않습니다. |
 | **status** | `status` | varchar | 게시 상태. `draft`(앱에 표시 안 됨), `published`(표시 및 플레이 가능), `archived`(숨김) 중 하나. `GET /scenarios` 응답과 `POST /conversations/sessions` 허용은 `published` 상태의 시나리오만 해당됩니다. |
 
 ---
