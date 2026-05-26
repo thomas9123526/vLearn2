@@ -15,6 +15,8 @@
 
 set -euo pipefail
 
+DB_HOST="${DB_HOST:-localhost}"
+DB_PORT="${DB_PORT:-5432}"
 DB_USER="${DB_USER:-myuser}"
 DB_NAME="${DB_NAME:-vlearn2}"
 
@@ -71,6 +73,6 @@ fi
 
 # ── Run ────────────────────────────────────────────────────────────────────
 echo
-"$PSQL" -U "$DB_USER" -d "$DB_NAME" -f "$SQL_FILE"
+"$PSQL" -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$SQL_FILE"
 echo
 echo "Done."
