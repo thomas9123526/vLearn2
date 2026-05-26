@@ -19,11 +19,28 @@ import 'edit_profile_dialog.dart';
 
 final _settingsPersonasProvider = personasListProvider;
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // The license.enabled flag (and any other admin-toggled flag we
+    // gate Settings rows on) lives in layoutConfigProvider's cache.
+    // Re-fetch on every open so flipping "Enable License" in the
+    // admin panel propagates without an app restart.
+    Future.microtask(
+      () => ref.read(layoutConfigProvider.notifier).refresh(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
     final settings = ref.watch(appSettingsProvider);
     final fontGroup = ref.watch(fontGroupProvider);
