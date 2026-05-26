@@ -36,7 +36,7 @@ Done — committed as `9491a65`.
 - [`flutter_app/lib/l10n/generated/app_localizations_ko.dart`](flutter_app/lib/l10n/generated/app_localizations_ko.dart) — deleted; regenerated `app_localizations.dart` no longer references `ko`
 - `Locale('ko')` from [`main.dart:93-97`](flutter_app/lib/main.dart#L93-L97) `supportedLocales`
 - Korean row from the Settings language picker and `_languageLabel` switch in [`settings_screen.dart`](flutter_app/lib/features/settings/settings_screen.dart)
-- 한국어 dropdown item from [`sign_up_screen.dart:200-204`](flutter_app/lib/features/auth/sign_up_screen.dart#L200-L204)
+- 조선어 dropdown item from [`sign_up_screen.dart:200-204`](flutter_app/lib/features/auth/sign_up_screen.dart#L200-L204)
 
 **Left intact (different layer — flag if you want them stripped too):**
 - `I18nText.ko` field on the content model (backend still ships `{en, ko, zh}` payloads).

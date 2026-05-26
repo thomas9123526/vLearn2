@@ -6607,7 +6607,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'en', child: Text('English')),
-                    DropdownMenuItem(value: 'ko', child: Text('한국어')),
+                    DropdownMenuItem(value: 'ko', child: Text('조선어')),
                     DropdownMenuItem(value: 'zh', child: Text('中文')),
                   ],
                   onChanged: (v) => setState(() => _language = v ?? 'en'),
@@ -6869,7 +6869,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   String _languageLabel(String code) => switch (code) {
-        'ko' => '한국어',
+        'ko' => '조선어',
         'zh' => '中文',
         _ => 'English',
       };
@@ -6896,7 +6896,7 @@ class SettingsScreen extends ConsumerWidget {
       builder: (_) => ListView(
         shrinkWrap: true,
         children: [
-          for (final l in const [('en', 'English'), ('ko', '한국어'), ('zh', '中文')])
+          for (final l in const [('en', 'English'), ('ko', '조선어'), ('zh', '中文')])
             ListTile(
               title: Text(l.$2),
               onTap: () => Navigator.pop(context, l.$1),
