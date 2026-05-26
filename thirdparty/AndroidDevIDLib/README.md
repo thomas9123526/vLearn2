@@ -43,10 +43,23 @@ AndroidDevIDLib/
 
 ## Build
 
-Standard Android library build. You need:
+Standard Android library build. The toolchain is kept in lockstep
+with `flutter_app/android` so the resulting `.aar` drops in cleanly:
 
-* Android SDK with **platform 34**, **build-tools 34.x**.
-* **NDK 25.2+** (CMake 3.22.1 picked up automatically).
+| Tool | Version | Source of truth |
+| --- | --- | --- |
+| AGP | 8.11.1 | `flutter_app/android/settings.gradle.kts` |
+| Gradle | 8.14 | `flutter_app/android/gradle/wrapper/gradle-wrapper.properties` |
+| compileSdk | 35 | `flutter.compileSdkVersion` |
+| minSdk | 24 | `flutter_app/android/app/build.gradle.kts` |
+| targetSdk | 35 | `flutter_app/android/app/build.gradle.kts` |
+| ABIs | `arm64-v8a`, `x86_64` | `flutter_app/android/app/build.gradle.kts` |
+| JDK | 17 | `compileOptions` in app + library |
+
+Plus:
+
+* Android SDK with **platform 35**, **build-tools 35.x**.
+* **NDK 27.0+** (CMake 3.22.1 picked up automatically).
 * **JDK 17** on PATH (`java -version` should show 17).
 
 First time only — bootstrap the Gradle wrapper (the wrapper jar
@@ -54,8 +67,12 @@ intentionally isn't committed, see [Why no wrapper jar](#why-no-wrapper-jar)):
 
 ```bash
 cd thirdparty/AndroidDevIDLib
-gradle wrapper --gradle-version 8.7
+gradle wrapper --gradle-version 8.14 --distribution-type all
 ```
+
+Or just run `thirdparty/build_AndroidDevIDLib.bat` from the repo
+root — it does the bootstrap, the build, and copies the resulting
+`.aar` into `flutter_app/android/app/libs/` for you.
 
 Then build the `.aar`:
 
@@ -64,13 +81,13 @@ Then build the `.aar`:
 # Output: androiddevid/build/outputs/aar/androiddevid-release.aar
 ```
 
-Drop the resulting `.aar` into `flutter_app/android/app/libs/` and
-add to the Flutter app's `android/app/build.gradle`:
+The build script copies that file to
+`flutter_app/android/app/libs/AndroidDevIDLib.aar`. Add to the
+Flutter app's `android/app/build.gradle.kts`:
 
-```gradle
-android { ... }
+```kotlin
 dependencies {
-    implementation files('libs/androiddevid-release.aar')
+    implementation(files("libs/AndroidDevIDLib.aar"))
 }
 ```
 

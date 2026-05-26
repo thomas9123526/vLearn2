@@ -1,6 +1,9 @@
 // Top-level — only pins the Android Gradle Plugin version so every
-// submodule resolves to the same AGP. Real config lives in
+// submodule resolves to the same AGP. Kept in lockstep with
+// flutter_app/android/settings.gradle.kts (currently AGP 8.11.1)
+// so the .aar this project produces builds against the same
+// toolchain the host Flutter app uses. Real config lives in
 // androiddevid/build.gradle.
 plugins {
-    id 'com.android.library' version '8.5.0' apply false
+    id 'com.android.library' version '8.11.1' apply false
 }
