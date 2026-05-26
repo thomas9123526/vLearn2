@@ -19,15 +19,22 @@ class AppConfig {
     required this.requestTimeout,
     required this.topicSyncInterval,
     required this.environment,
+    this.sttModelPath,
   });
 
   /// JSON shape — short field names per the spec (`baseurl`, `reqTout`,
-  /// `tSync`, `dev`). `dev` is a string, not a boolean.
+  /// `tSync`, `dev`). `dev` is a string, not a boolean. `stt` is an
+  /// optional absolute path that, when set, lets the app use sherpa-onnx
+  /// models the admin pre-placed on the device — skipping the `.dat`
+  /// unpack entirely. See [sttModelPath].
   factory AppConfig.fromJson(Map<String, dynamic> j) => AppConfig(
         backendBaseUrl: (j['baseurl'] as String?) ?? defaults.backendBaseUrl,
         requestTimeout: (j['reqTout'] as num?)?.toInt() ?? defaults.requestTimeout,
         topicSyncInterval: (j['tSync'] as num?)?.toInt() ?? defaults.topicSyncInterval,
         environment: (j['dev'] as String?) ?? defaults.environment,
+        sttModelPath: (j['stt'] as String?)?.trim().isEmpty == true
+            ? null
+            : j['stt'] as String?,
       );
 
   static void logx(String tag, Object message) {
@@ -45,6 +52,19 @@ class AppConfig {
   /// One of `'dev'` / `'prod'`. Influences logging verbosity and the
   /// throttle policy in `ApiClient`.
   final String environment;
+
+  /// Optional absolute path on the device pointing at a pre-placed
+  /// sherpa-onnx model root — same layout as a `.dat`'s unpacked output
+  /// (i.e. `<path>/stt/encoder*.onnx`, `decoder*.onnx`, `joiner*.onnx`,
+  /// `tokens.*`, and optionally a `manifest.json` next to them).
+  ///
+  /// When set AND the directory looks like a usable sherpa layout, the
+  /// app initialises STT straight from this path and never unpacks a
+  /// `.dat`. If the path is null, empty, or doesn't have the expected
+  /// files, the unpacker pipeline runs as before.
+  ///
+  /// On-disk key: `"stt"`. Example value: `/storage/emulated/0/룡마/가상외국어회화/data/sherpa-models`.
+  final String? sttModelPath;
 
   bool get isDev => environment == 'dev';
 
@@ -74,6 +94,10 @@ class AppConfig {
         'reqTout': requestTimeout,
         'tSync': topicSyncInterval,
         'dev': environment,
+        // Only write the key when set, so devices without an override
+        // keep the smallest possible file.
+        if (sttModelPath != null && sttModelPath!.isNotEmpty)
+          'stt': sttModelPath,
       };
 
   AppConfig copyWith({
@@ -81,12 +105,14 @@ class AppConfig {
     int? requestTimeout,
     int? topicSyncInterval,
     String? environment,
+    String? sttModelPath,
   }) =>
       AppConfig(
         backendBaseUrl: backendBaseUrl ?? this.backendBaseUrl,
         requestTimeout: requestTimeout ?? this.requestTimeout,
         topicSyncInterval: topicSyncInterval ?? this.topicSyncInterval,
         environment: environment ?? this.environment,
+        sttModelPath: sttModelPath ?? this.sttModelPath,
       );
 }
 
