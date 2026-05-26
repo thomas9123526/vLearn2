@@ -44,11 +44,18 @@ export class AuthService {
 
   // ─── Sign-up (regular user) ─────────────────────────────
   async signUp(dto: SignUpDto): Promise<AuthResponseDto> {
-    const existing = await this.users.findOne({
-      where: { cid_username: dto.cidUsername },
-    });
-    if (existing)
+    // Check both unique fields up-front to give readable errors rather
+    // than letting the DB constraint bubble up as a 500.
+    const [byCidUsername, byCid] = await Promise.all([
+      this.users.findOne({ where: { cid_username: dto.cidUsername } }),
+      dto.cid
+        ? this.users.findOne({ where: { cid: dto.cid } })
+        : Promise.resolve(null),
+    ]);
+    if (byCidUsername)
       throw new ConflictException({ i18nKey: 'auth.cid_username_taken' });
+    if (byCid)
+      throw new ConflictException({ i18nKey: 'auth.cid_already_registered' });
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     const user = await this.users.save(

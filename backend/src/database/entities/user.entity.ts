@@ -22,7 +22,7 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 100 })
   name!: string;
 
-  @Column({ type: 'varchar', length: 10, nullable: true })
+  @Column({ type: 'varchar', length: 10, nullable: true, unique: true })
   cid!: string | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
