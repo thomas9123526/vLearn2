@@ -1,0 +1,14 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+build/
+/captures
+.externalNativeBuild
+.cxx
+/app/build/
+
+# Claude Code — transient/personal files and generated conversation logs
+.claude/scheduled_tasks.lock
+.claude/settings.local.json

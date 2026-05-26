@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <!-- Custom camera preview. -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/preview_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:scaleType="fillCenter" />
+
+    <!-- Highlighted scan window, brackets and scan-line animation. -->
+    <com.example.qrscanactivity.ScannerOverlayView
+        android:id="@+id/overlay_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Instruction prompt above the scan window. -->
+    <TextView
+        android:id="@+id/prompt_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="80dp"
+        android:background="@drawable/qrscan_bg_pill"
+        android:paddingLeft="20dp"
+        android:paddingTop="10dp"
+        android:paddingRight="20dp"
+        android:paddingBottom="10dp"
+        android:text="@string/qrscan_scan_prompt"
+        android:textColor="@android:color/white"
+        android:textSize="15sp" />
+
+    <!-- Close / cancel button. -->
+    <ImageButton
+        android:id="@+id/close_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="16dp"
+        android:background="@drawable/qrscan_bg_circle"
+        android:contentDescription="@string/qrscan_close"
+        android:scaleType="centerInside"
+        android:src="@drawable/qrscan_ic_close"
+        app:tint="@android:color/white" />
+
+    <!-- Decoded text, shown briefly once a code is recognised. -->
+    <TextView
+        android:id="@+id/result_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginLeft="32dp"
+        android:layout_marginRight="32dp"
+        android:layout_marginBottom="150dp"
+        android:background="@drawable/qrscan_bg_pill"
+        android:ellipsize="end"
+        android:maxLines="3"
+        android:paddingLeft="20dp"
+        android:paddingTop="12dp"
+        android:paddingRight="20dp"
+        android:paddingBottom="12dp"
+        android:textColor="@android:color/white"
+        android:textSize="15sp"
+        android:visibility="gone" />
+
+    <!-- Flashlight / torch toggle. -->
+    <ImageButton
+        android:id="@+id/torch_button"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="48dp"
+        android:background="@drawable/qrscan_bg_circle"
+        android:contentDescription="@string/qrscan_torch"
+        android:scaleType="centerInside"
+        android:src="@drawable/qrscan_ic_torch_off"
+        android:visibility="gone"
+        app:tint="@android:color/white" />
+
+</FrameLayout>
