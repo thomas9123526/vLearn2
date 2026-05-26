@@ -20,6 +20,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
+import 'package:rive/rive.dart' as rive;
 import 'core/config/app_config.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/router/app_router.dart';
@@ -53,6 +54,10 @@ Future<void> main() async {
   // Skipping this raises "Please initialize sherpa-onnx first" the moment a
   // speech service tries to instantiate the engine.
   sherpa_onnx.initBindings();
+  // rive 0.14 moved to a native renderer (rive_native). RiveNative.init()
+  // loads the platform library + initialises the font subsystem; without
+  // it RiveWidget renders nothing and Factory.rive throws.
+  await rive.RiveNative.init();
   // Request external storage permission before reading the config file so
   // that ConfigFileService can create the public 룡마/가상외국어회화 directory.
   if (Platform.isAndroid) await _requestAndroidStorage();

@@ -34,8 +34,10 @@ dependencies:
   freezed_annotation: ^2.4.2
   json_annotation: ^4.9.0
 
-  # Animation
-  rive: ^0.13.13
+  # Animation. 0.14 was a major rewrite — RiveAnimation widget removed,
+  # replaced by RiveWidget + a (Stateless)RiveWidgetController loaded
+  # from File.asset(...). See features/conversation/widgets/tutor_avatar.dart.
+  rive: ^0.14.7
 
   # i18n
   intl: ^0.20.2

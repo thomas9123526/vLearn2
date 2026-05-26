@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:rive/rive.dart' as rive;
 
 /// Persona avatar that prefers a Rive animation when its asset is present;
-/// falls back to a gradient circle with the first letter when not.
-/// The asset-exists check below means a backend `rive_asset` value that
-/// doesn't correspond to a bundled file is silently degraded rather than
-/// throwing a "asset does not exist" runtime error.
+/// falls back to a gradient circle with the first letter when not. The
+/// `RiveWidgetBuilder` reports load failure via `onFailed`, so a backend
+/// `rive_asset` value that doesn't correspond to a bundled file (or one
+/// the runtime can't parse) silently degrades to the letter fallback
+/// instead of throwing a "asset does not exist" runtime error.
 class PersonaAvatar extends StatelessWidget {
   const PersonaAvatar({
     required this.name,
@@ -24,20 +24,6 @@ class PersonaAvatar extends StatelessWidget {
   final String? riveAsset;
   final double size;
   final bool isSpeaking;
-
-  /// True only if the asset is bundled AND the `rive` runtime can parse it.
-  /// Checking that the bytes load is not enough — a `.riv` exported from a
-  /// newer Rive editor than our pinned package throws mid-parse, so we
-  /// attempt a real import and degrade to the letter fallback on failure.
-  static Future<bool> _assetUsable(String path) async {
-    try {
-      final bytes = await rootBundle.load(path);
-      rive.RiveFile.import(bytes);
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,13 +51,21 @@ class PersonaAvatar extends StatelessWidget {
           ],
         ),
         child: riveAsset != null
-            ? FutureBuilder<bool>(
-                future: _assetUsable(riveAsset!),
-                builder: (context, snapshot) {
-                  if (snapshot.data == true) {
-                    return ClipOval(child: rive.RiveAnimation.asset(riveAsset!));
+            ? rive.RiveWidgetBuilder(
+                fileLoader: rive.FileLoader.fromAsset(
+                  riveAsset!,
+                  riveFactory: rive.Factory.rive,
+                ),
+                builder: (context, state) {
+                  switch (state) {
+                    case rive.RiveLoaded(:final controller):
+                      return ClipOval(
+                        child: rive.RiveWidget(controller: controller),
+                      );
+                    case rive.RiveLoading():
+                    case rive.RiveFailed():
+                      return _letterFallback();
                   }
-                  return _letterFallback();
                 },
               )
             : _letterFallback(),
