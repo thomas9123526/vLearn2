@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Library AAR — no <application>, no permissions, no activities.
+  The namespace package (com.vlearn2.devid) is taken from
+  build.gradle's `namespace` field on AGP 8+, so it doesn't appear
+  here.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

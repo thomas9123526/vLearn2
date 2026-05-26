@@ -1,0 +1,16 @@
+# Gradle
+.gradle/
+build/
+
+# Android Studio
+.idea/
+*.iml
+local.properties
+
+# NDK build cache
+.cxx/
+
+# Generated wrapper jar — see README.md "Why no wrapper jar"
+gradle/wrapper/gradle-wrapper.jar
+gradlew
+gradlew.bat
