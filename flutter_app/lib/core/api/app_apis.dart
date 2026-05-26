@@ -273,6 +273,33 @@ class AchievementsApi {
   }
 }
 
+// ─── License ────────────────────────────────────────────────
+class LicenseApi {
+  LicenseApi(this._dio);
+  final Dio _dio;
+
+  /// POST /license/verify — validates a DER cert blob against the backend Leaf CA.
+  /// [licenseContent] is the base64-encoded cert bytes (as returned from QR scan).
+  /// [machineId] is the device fingerprint from the native machine-ID library.
+  /// [userId] is the logged-in user's UUID; when provided the backend persists
+  ///          the license to that user record.
+  Future<Map<String, dynamic>> verify({
+    required String licenseContent,
+    required String machineId,
+    String? userId,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/license/verify',
+      data: <String, Object?>{
+        'licenseContent': licenseContent,
+        'machineId': machineId,
+        'userId': userId,
+      }..removeWhere((_, v) => v == null),
+    );
+    return res.data!;
+  }
+}
+
 // ─── Providers ──────────────────────────────────────────────
 final usersApiProvider = Provider<UsersApi>((ref) => UsersApi(ref.watch(apiClientProvider)));
 final personasApiProvider = Provider<PersonasApi>((ref) => PersonasApi(ref.watch(apiClientProvider)));
@@ -282,3 +309,4 @@ final conversationsApiProvider = Provider<ConversationsApi>((ref) => Conversatio
 final progressApiProvider = Provider<ProgressApi>((ref) => ProgressApi(ref.watch(apiClientProvider)));
 final achievementsApiProvider = Provider<AchievementsApi>((ref) => AchievementsApi(ref.watch(apiClientProvider)));
 final newsApiProvider = Provider<NewsApi>((ref) => NewsApi(ref.watch(apiClientProvider)));
+final licenseApiProvider = Provider<LicenseApi>((ref) => LicenseApi(ref.watch(apiClientProvider)));
