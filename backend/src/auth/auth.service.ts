@@ -164,23 +164,49 @@ export class AuthService {
   }
 
   // ─── Suggest available cid_usernames ───────────────────
+  //
+  // Output candidates obey the same constraint enforced by
+  // SignUpDto.cidUsername (>=2 ASCII letters + >=2 digits, letters
+  // + digits only). The initials prefix has to carry the letter
+  // half of the budget, so we fall back to the first 2 ASCII
+  // letters of the display name when first-of-each-word does not
+  // produce enough of them.
   async suggestCidUsernames(
     dto: SuggestCidUsernameDto,
   ): Promise<{ suggestions: string[] }> {
-    const initials = dto.displayName
+    let initials = dto.displayName
       .trim()
       .split(/\s+/)
-      .map((w) => w[0].toLowerCase())
-      .join('');
+      .map((w) => w[0] ?? '')
+      .join('')
+      .replace(/[^a-zA-Z]/g, '')
+      .toLowerCase();
+
+    // Single-word names ("Alex" -> "a") and Unicode-heavy names
+    // ("안녕" -> "") fall through here. Pull the first two ASCII
+    // letters from the whole name as a fallback.
+    if (initials.length < 2) {
+      initials = dto.displayName
+        .toLowerCase()
+        .replace(/[^a-z]/g, '')
+        .slice(0, 2);
+    }
+    // If the name still has no usable ASCII letters, we can't
+    // generate constraint-conformant suggestions. Return empty;
+    // the operator will type their own cid_username.
+    if (initials.length < 2) {
+      return { suggestions: [] };
+    }
 
     const [yearStr, monthStr, dayStr] = dto.birthday.split('-');
     const yy = yearStr.slice(-2);          // '94'
     const m  = String(parseInt(monthStr)); // '3'  (no leading zero)
     const mm = monthStr;                   // '03'
-    const d  = String(parseInt(dayStr));   // '17' (no leading zero)
     const dd = dayStr;                     // '17'
 
     // Priority-ordered candidates; duplicates removed below.
+    // Every entry pairs `initials` (>=2 letters) with at least
+    // two digits, so the cidUsername regex always passes.
     const raw = [
       `${initials}${yy}${m}${dd}`,   // hlj94317
       `${initials}${m}${dd}`,        // hlj317
@@ -191,8 +217,19 @@ export class AuthService {
       `${initials}${dd}${mm}`,       // hlj1703
       `${initials}${yy}`,            // hlj94
     ];
+
+    // Belt-and-suspenders: keep only the entries that match the
+    // public constraint. A future tweak to the regex above won't
+    // silently start handing out invalid suggestions.
+    const cidRe = /^(?=(?:.*[a-zA-Z]){2,})(?=(?:.*\d){2,})[a-zA-Z0-9]+$/;
     const seen = new Set<string>();
-    const candidates = raw.filter((c) => c.length >= 2 && !seen.has(c) && seen.add(c));
+    const candidates = raw.filter(
+      (c) => cidRe.test(c) && !seen.has(c) && seen.add(c),
+    );
+
+    if (candidates.length === 0) {
+      return { suggestions: [] };
+    }
 
     const taken = await this.users
       .createQueryBuilder('u')

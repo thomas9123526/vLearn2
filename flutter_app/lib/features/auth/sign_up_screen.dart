@@ -15,6 +15,12 @@ class SignUpScreen extends ConsumerStatefulWidget {
   ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
 }
 
+// Mirrors the backend's SignUpDto.cidUsername @Matches regex:
+// letters + digits only, with >=2 letters and >=2 digits.
+final _cidUsernameRegex = RegExp(
+  r'^(?=(?:.*[a-zA-Z]){2,})(?=(?:.*\d){2,})[a-zA-Z0-9]+$',
+);
+
 class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _cidCtrl = TextEditingController();
@@ -228,7 +234,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   decoration: InputDecoration(
                     labelText: 'CID Username',
                     prefixIcon: const Icon(Icons.badge_outlined),
-                    helperText: 'At least 2 characters, used to sign in',
+                    helperText: 'Letters + digits only. At least 2 letters and 2 digits (e.g. kky1206).',
                     suffixIcon: _suggestingUsernames
                         ? const Padding(
                             padding: EdgeInsets.all(12),
@@ -247,9 +253,16 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   ),
                   keyboardType: TextInputType.text,
                   autofillHints: const [AutofillHints.newUsername],
+                  // Mirrors the @Matches regex on SignUpDto.cidUsername --
+                  // catching the typo here means the user gets the error
+                  // before the network round-trip.
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'CID username is required';
-                    if (v.trim().length < 2) return 'At least 2 characters';
+                    final s = v?.trim() ?? '';
+                    if (s.isEmpty) return 'CID username is required';
+                    if (s.length > 50) return 'At most 50 characters';
+                    if (!_cidUsernameRegex.hasMatch(s)) {
+                      return 'Use letters + digits only, with 2+ letters and 2+ digits';
+                    }
                     return null;
                   },
                 ),
