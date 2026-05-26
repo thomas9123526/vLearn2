@@ -3,6 +3,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -74,6 +75,19 @@ export class TokenPairDto {
 
   @ApiProperty({ description: 'Access-token expiry in seconds from now' })
   expiresIn!: number;
+}
+
+export class SuggestCidUsernameDto {
+  @ApiProperty({ example: 'Hong Li Jun', description: 'Display name to derive initials from' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  displayName!: string;
+
+  @ApiProperty({ example: '1994-03-17', description: 'Birthday in YYYY-MM-DD format' })
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'birthday must be YYYY-MM-DD' })
+  birthday!: string;
 }
 
 export class AuthResponseDto extends TokenPairDto {

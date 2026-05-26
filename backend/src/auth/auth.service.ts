@@ -21,6 +21,7 @@ import type {
   SignInDto,
   AuthResponseDto,
   TokenPairDto,
+  SuggestCidUsernameDto,
 } from './dto/auth.dto';
 
 const BCRYPT_ROUNDS = 10;
@@ -160,6 +161,48 @@ export class AuthService {
       throw new UnauthorizedException({ i18nKey: 'auth.cid_not_registered' });
     }
     return { cidUsername: user.cid_username };
+  }
+
+  // ─── Suggest available cid_usernames ───────────────────
+  async suggestCidUsernames(
+    dto: SuggestCidUsernameDto,
+  ): Promise<{ suggestions: string[] }> {
+    const initials = dto.displayName
+      .trim()
+      .split(/\s+/)
+      .map((w) => w[0].toLowerCase())
+      .join('');
+
+    const [yearStr, monthStr, dayStr] = dto.birthday.split('-');
+    const yy = yearStr.slice(-2);          // '94'
+    const m  = String(parseInt(monthStr)); // '3'  (no leading zero)
+    const mm = monthStr;                   // '03'
+    const d  = String(parseInt(dayStr));   // '17' (no leading zero)
+    const dd = dayStr;                     // '17'
+
+    // Priority-ordered candidates; duplicates removed below.
+    const raw = [
+      `${initials}${yy}${m}${dd}`,   // hlj94317
+      `${initials}${m}${dd}`,        // hlj317
+      `${initials}${yy}${mm}${dd}`,  // hlj940317
+      `${initials}${dd}${m}${yy}`,   // hlj17394
+      `${initials}${yy}${m}`,        // hlj943
+      `${initials}${m}${dd}${yy}`,   // hlj31794
+      `${initials}${dd}${mm}`,       // hlj1703
+      `${initials}${yy}`,            // hlj94
+    ];
+    const seen = new Set<string>();
+    const candidates = raw.filter((c) => c.length >= 2 && !seen.has(c) && seen.add(c));
+
+    const taken = await this.users
+      .createQueryBuilder('u')
+      .select('u.cid_username', 'cu')
+      .where('u.cid_username = ANY(:candidates)', { candidates })
+      .getRawMany<{ cu: string }>();
+
+    const takenSet = new Set(taken.map((r) => r.cu));
+    const available = candidates.filter((c) => !takenSet.has(c)).slice(0, 6);
+    return { suggestions: available };
   }
 
   // ─── Sign-out ───────────────────────────────────────────

@@ -300,6 +300,25 @@ class LicenseApi {
   }
 }
 
+// ─── Auth helpers ───────────────────────────────────────
+class AuthApi {
+  AuthApi(this._dio);
+  final Dio _dio;
+
+  /// Returns up to 6 available cid_username suggestions derived from
+  /// [displayName] initials and [birthday] (format: 'YYYY-MM-DD').
+  Future<List<String>> suggestCidUsernames({
+    required String displayName,
+    required String birthday,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/auth/suggest-cid-username',
+      data: {'displayName': displayName, 'birthday': birthday},
+    );
+    return (res.data!['suggestions'] as List<dynamic>).cast<String>();
+  }
+}
+
 // ─── Providers ──────────────────────────────────────────────
 final usersApiProvider = Provider<UsersApi>((ref) => UsersApi(ref.watch(apiClientProvider)));
 final personasApiProvider = Provider<PersonasApi>((ref) => PersonasApi(ref.watch(apiClientProvider)));
@@ -310,3 +329,4 @@ final progressApiProvider = Provider<ProgressApi>((ref) => ProgressApi(ref.watch
 final achievementsApiProvider = Provider<AchievementsApi>((ref) => AchievementsApi(ref.watch(apiClientProvider)));
 final newsApiProvider = Provider<NewsApi>((ref) => NewsApi(ref.watch(apiClientProvider)));
 final licenseApiProvider = Provider<LicenseApi>((ref) => LicenseApi(ref.watch(apiClientProvider)));
+final authApiProvider    = Provider<AuthApi>((ref) => AuthApi(ref.watch(apiClientProvider)));
