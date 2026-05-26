@@ -7,20 +7,27 @@ plugins {
 
 android {
     namespace 'com.vlearn2.devid'
-    compileSdk 34
+    // Mirrors flutter_app/android/app/build.gradle.kts
+    // (`flutter.compileSdkVersion` → 35 on the current Flutter SDK).
+    compileSdk 35
 
     defaultConfig {
-        // Matches the rest of the vLearn2 Flutter app — bump in
-        // lockstep if/when the app moves up.
-        minSdk 21
+        // Mirrors flutter_app/android/app/build.gradle.kts minSdk 24
+        // — the Flutter app's plugin floor. Keep in lockstep.
+        minSdk 24
+        // Matches the Flutter app's targetSdk (35). targetSdk is
+        // legal on a library module since AGP 8.x and AGP picks it
+        // up when this .aar is consumed.
+        targetSdk 35
 
         consumerProguardFiles 'consumer-rules.pro'
 
         ndk {
-            // ABIs the Flutter app currently ships. 32-bit ARM stays
-            // until we drop legacy Android phones; the two x86
-            // entries make emulator builds work out of the box.
-            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+            // Mirrors flutter_app/android/app/build.gradle.kts
+            // abiFilters. 32-bit slots were dropped per
+            // todoList/list/05_post_process_android — Google Play
+            // has required 64-bit since Aug 2019.
+            abiFilters 'arm64-v8a', 'x86_64'
         }
 
         externalNativeBuild {
