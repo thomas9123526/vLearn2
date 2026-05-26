@@ -12,6 +12,9 @@ export class UserProfileDto {
   @ApiProperty({ nullable: true }) email!: string | null;
   @ApiProperty() displayName!: string;
   @ApiProperty() avatarEmoji!: string;
+  /// Public URL to the user-uploaded photo, or null if they're still
+  /// using the emoji fallback. Path is `/uploads/avatars/<id>.<ext>`.
+  @ApiProperty({ nullable: true }) avatarUrl!: string | null;
   @ApiProperty() gender!: string;
   @ApiProperty() nativeLanguage!: string;
   @ApiProperty() uiLanguage!: string;

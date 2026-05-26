@@ -19,6 +19,23 @@ class UsersApi {
     );
     return res.data!;
   }
+
+  /// Multipart upload of the user's avatar photo. Returns the
+  /// updated profile (with avatarUrl populated).
+  Future<Map<String, dynamic>> uploadAvatar({
+    required String filePath,
+    String? filename,
+  }) async {
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath, filename: filename),
+    });
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/users/avatar',
+      data: form,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+    return res.data!;
+  }
 }
 
 // ─── Personas ───────────────────────────────────────────────
