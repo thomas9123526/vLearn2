@@ -22,7 +22,7 @@ BEGIN
     PUSHBUTTON      "Browse...",            IDC_LEAF_KEY_BROWSE, 352, 39, 54, 16
 
     LTEXT           "Machine ID:",         IDC_STATIC, 16, 62, 70, 10
-    EDITTEXT        IDC_MACHINE_ID_EDIT,    88, 60, 318, 14, ES_AUTOHSCROLL
+    EDITTEXT        IDC_MACHINE_ID_EDIT,    88, 60, 318, 14, ES_AUTOHSCROLL | ES_NUMBER
 
     LTEXT           "User name:",          IDC_STATIC, 16, 82, 70, 10
     EDITTEXT        IDC_USER_NAME_EDIT,     88, 80, 318, 14, ES_AUTOHSCROLL
