@@ -1,0 +1,7 @@
+{
+    "baseurl": "http://localhost:5101/api",
+    "reqTout": 30,
+    "tSync": 60,
+    "dev": "dev",
+    "model": "E:/Upload_HKC/sherpa_2023"
+}
