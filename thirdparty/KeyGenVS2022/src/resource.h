@@ -3,6 +3,13 @@
 // Win32 dialog + control IDs for MainWindow.rc.
 // Numbers are arbitrary -- only their uniqueness matters.
 
+// IDC_STATIC is the conventional sentinel for "this control needs
+// no runtime ID" (labels, group boxes). winres.h defines it on
+// some toolchains but not all, so set it ourselves to be portable.
+#ifndef IDC_STATIC
+#define IDC_STATIC                   -1
+#endif
+
 #define IDD_MAIN                     101
 
 #define IDC_LEAF_CERT_EDIT           1001
