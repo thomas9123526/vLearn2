@@ -250,6 +250,101 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
     }
   }
 
+  /// Android-only: ask QRScanActivity to walk the well-known folder
+  /// for `*.png` (the QR image KeyGenVS2022 emits next to every .lic),
+  /// decode each one, then try `/license/verify` on each decoded
+  /// payload. First valid wins -- exact same persistence path as
+  /// the .lic file scan.
+  Future<void> _scanQrPngs() async {
+    if (!Platform.isAndroid) return;
+    final machineId = ref.read(machineIdProvider).valueOrNull;
+    if (machineId == null) {
+      setState(() => _error = 'Machine ID not ready — please wait.');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+      _needsAllFilesAccess = false;
+    });
+
+    try {
+      final scanner = ref.read(licenseFileScannerProvider);
+      if (!await scanner.hasAllFilesAccess()) {
+        setState(() {
+          _loading = false;
+          _needsAllFilesAccess = true;
+          _error = 'Storage access required to read QR PNGs from the '
+              'license folder. Tap "Grant access" and retry.';
+        });
+        return;
+      }
+
+      // Same folder KeyGenVS2022 / KeyGenerator writes the .png next
+      // to the .lic. Fixed path matches the .lic scanner's primary
+      // location.
+      const dir = '/storage/emulated/0/룡마/가상외국어회화/license';
+      final decoded = await scanner.scanQrPngsInDir(dir);
+      if (decoded.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'No decodable QR PNG found under\n  $dir\n'
+              'Make sure the .png the KeyGenerator produced is there.';
+        });
+        return;
+      }
+
+      final userId = ref.read(authProvider).user?.id;
+      String? winningContent;
+      LicenseResult? winningResult;
+      Object? lastError;
+      for (final qrText in decoded) {
+        try {
+          final raw = await ref.read(licenseApiProvider).verify(
+                licenseContent: qrText,
+                machineId: machineId,
+                userId: userId,
+                platform: 'android',
+              );
+          final r = LicenseResult.fromJson(raw);
+          if (r.valid) {
+            winningContent = qrText;
+            winningResult = r;
+            break;
+          }
+        } catch (e) {
+          lastError = e;
+        }
+      }
+
+      if (winningContent == null || winningResult == null) {
+        setState(() {
+          _loading = false;
+          _error = 'Decoded ${decoded.length} QR PNG(s) but none verified.'
+              '${lastError != null ? '\nLast error: $lastError' : ''}';
+        });
+        return;
+      }
+
+      await ref.read(licenseStateProvider.notifier).setVerifiedContent(
+            base64Content: winningContent,
+            result: winningResult,
+            sourcePath: dir,
+          );
+    } on PlatformException catch (e) {
+      if (e.code == 'SCAN_FAILED') {
+        setState(() => _error = e.message ?? 'QR scan failed');
+      } else {
+        setState(() => _error = 'Platform error: ${e.message}');
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -342,12 +437,21 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
           // ── CTA ───────────────────────────────────────────────────────────
           if (_loading)
             const Center(child: CircularProgressIndicator())
-          else
+          else ...[
             FilledButton.icon(
               icon: const Icon(Icons.folder_open),
               label: Text(Platform.isAndroid ? 'Find License' : 'Load .lic file'),
               onPressed: _getLicense,
             ),
+            if (Platform.isAndroid) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Scan QR Code'),
+                onPressed: _scanQrPngs,
+              ),
+            ],
+          ],
         ],
       ),
     );
