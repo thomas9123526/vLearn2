@@ -25,18 +25,30 @@ class AppConfig {
   /// JSON shape — short field names per the spec (`baseurl`, `reqTout`,
   /// `tSync`, `dev`). `dev` is a string, not a boolean. `model` (or
   /// `models` as a forgiving alias — both are accepted on read; we
-  /// always write `model`) is an optional absolute path that, when set,
-  /// lets the app use on-device speech models the admin pre-placed —
-  /// skipping the `.dat` unpack entirely. See [modelPath].
-  factory AppConfig.fromJson(Map<String, dynamic> j) {
+  /// always write `model`) is an optional path that, when set, lets the
+  /// app use on-device speech models the admin pre-placed — skipping the
+  /// `.dat` unpack entirely. See [modelPath].
+  ///
+  /// [configDir] is the directory that contains `app_config.json`. When
+  /// the `model` value is a *relative* path (e.g. `"data/sherpa_2023"`),
+  /// it is resolved against [configDir] so the admin never needs to hard-code
+  /// the storage root — the same config works whether the `룡마/가상외국어회화`
+  /// folder lives on internal storage, an SD card, or an OTG drive.
+  factory AppConfig.fromJson(Map<String, dynamic> j, {String? configDir}) {
     final rawModel = (j['model'] as String?) ?? (j['models'] as String?);
+    String? resolvedModel;
+    if (rawModel != null && rawModel.trim().isNotEmpty) {
+      final trimmed = rawModel.trim();
+      resolvedModel = (!p.isAbsolute(trimmed) && configDir != null)
+          ? p.join(configDir, trimmed)
+          : trimmed;
+    }
     return AppConfig(
       backendBaseUrl: (j['baseurl'] as String?) ?? defaults.backendBaseUrl,
       requestTimeout: (j['reqTout'] as num?)?.toInt() ?? defaults.requestTimeout,
       topicSyncInterval: (j['tSync'] as num?)?.toInt() ?? defaults.topicSyncInterval,
       environment: (j['dev'] as String?) ?? defaults.environment,
-      modelPath:
-          (rawModel == null || rawModel.trim().isEmpty) ? null : rawModel,
+      modelPath: resolvedModel,
     );
   }
 
@@ -56,7 +68,7 @@ class AppConfig {
   /// throttle policy in `ApiClient`.
   final String environment;
 
-  /// Optional absolute path on the device pointing at a pre-placed
+  /// Resolved absolute path on the device pointing at a pre-placed
   /// on-device speech model root — same layout as a `.dat`'s unpacked
   /// output. Expected to contain `stt/`, `tts/`, `vad/` subfolders
   /// (each with its model files) and a top-level `manifest.json`:
@@ -74,8 +86,10 @@ class AppConfig {
   /// If the path is null, empty, or doesn't have the expected files,
   /// the unpacker pipeline runs as before.
   ///
-  /// On-disk key: `"model"`. Example value:
-  /// `/storage/emulated/0/룡마/가상외국어회화/data/models`.
+  /// On-disk key: `"model"`. Accepts either an absolute path or a path
+  /// relative to the `룡마/가상외국어회화` directory (wherever it is
+  /// mounted — internal storage, SD card, OTG).
+  /// Example relative value: `"data/sherpa_2023"`.
   final String? modelPath;
 
   bool get isDev => environment == 'dev';
@@ -242,7 +256,7 @@ class ConfigFileService {
       final raw = await file.readAsString();
       final jsonStr = _decodeContent(raw.trim());
       final j = jsonDecode(jsonStr) as Map<String, dynamic>;
-      return AppConfig.fromJson(j);
+      return AppConfig.fromJson(j, configDir: file.parent.path);
     } catch (_) {
       await write(AppConfig.defaults, file: file);
       return AppConfig.defaults;

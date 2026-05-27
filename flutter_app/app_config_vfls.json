@@ -3,5 +3,5 @@
     "reqTout": 30,
     "tSync": 60,
     "dev": "dev",
-    "model": "E:/Upload_HKC/sherpa_2023"
+    "model": "data/sherpa_2023"
 }
