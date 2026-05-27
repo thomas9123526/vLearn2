@@ -21,6 +21,18 @@ interface UserRow {
   xp_total: number;
   current_level: number;
   streak_days: number;
+  // Last platform the user activated a license from. Null until they
+  // pass through /license/verify on a build that reports it.
+  license_platform:
+    | 'android'
+    | 'windows'
+    | 'ios'
+    | 'macos'
+    | 'linux'
+    | 'fuchsia'
+    | 'web'
+    | null;
+  license_valid_until: string | null;
   created_at: string;
 }
 
@@ -93,6 +105,7 @@ export default function UsersPage() {
               <th className="px-4 py-2 text-left font-medium">Email</th>
               <th className="px-4 py-2 text-left font-medium">Name</th>
               <th className="px-4 py-2 text-left font-medium">Status</th>
+              <th className="px-4 py-2 text-left font-medium">Platform</th>
               <th className="px-4 py-2 text-right font-medium">XP</th>
               <th className="px-4 py-2 text-right font-medium">Streak</th>
               <th className="px-4 py-2"></th>
@@ -108,6 +121,9 @@ export default function UsersPage() {
                   {u.suspended_reason && (
                     <span className="ml-2 text-xs text-muted-foreground">{u.suspended_reason}</span>
                   )}
+                </td>
+                <td className="px-4 py-2">
+                  <PlatformPill platform={u.license_platform} />
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">{u.xp_total}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{u.streak_days}</td>
@@ -145,7 +161,7 @@ export default function UsersPage() {
             ))}
             {(data?.items ?? []).length === 0 && !isLoading && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
                   No users.
                 </td>
               </tr>
@@ -316,6 +332,25 @@ function StatusPill({ status }: { status: UserRow['status'] }) {
   return (
     <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${classes}`}>
       {status}
+    </span>
+  );
+}
+
+function PlatformPill({ platform }: { platform: UserRow['license_platform'] }) {
+  if (!platform) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  const classes =
+    platform === 'android'
+      ? 'bg-emerald-100 text-emerald-800'
+      : platform === 'windows'
+        ? 'bg-sky-100 text-sky-800'
+        : platform === 'ios' || platform === 'macos'
+          ? 'bg-zinc-100 text-zinc-800'
+          : 'bg-amber-100 text-amber-800';
+  return (
+    <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium capitalize ${classes}`}>
+      {platform}
     </span>
   );
 }

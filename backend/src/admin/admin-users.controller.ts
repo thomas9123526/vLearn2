@@ -115,6 +115,8 @@ export class AdminUsersController {
         xp_total: i.xp_total,
         current_level: i.current_level,
         streak_days: i.streak_days,
+        license_platform: i.user.license_platform,
+        license_valid_until: i.user.license_valid_until,
         created_at: i.user.created_at,
       })),
       total,
