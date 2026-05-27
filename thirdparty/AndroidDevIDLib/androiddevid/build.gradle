@@ -27,7 +27,7 @@ android {
             // abiFilters. 32-bit slots were dropped per
             // todoList/list/05_post_process_android — Google Play
             // has required 64-bit since Aug 2019.
-            abiFilters 'arm64-v8a', 'x86_64'
+            abiFilters 'x86_64'
         }
 
         externalNativeBuild {
