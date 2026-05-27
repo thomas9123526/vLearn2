@@ -34,18 +34,14 @@ constexpr wchar_t kRegOutputDir[]  = L"paths.outputDir";
 constexpr wchar_t kRegUserName[]   = L"form.userName";
 constexpr wchar_t kRegDays[]       = L"form.days";
 
-// Validates that `machineId` looks like the 64-char hex hash that
-// AndroidDevID / WindowsDevID produce. Accepts upper or lower case;
-// rejects anything else -- a typo here would quietly issue a
-// license that can never be claimed.
+// Validates that `machineId` matches the 20-digit decimal format
+// that AndroidDevID / WindowsDevID now emit (16 content digits +
+// 4 checksum digits). A typo here would quietly issue a license
+// that can never be claimed, so we keep the check strict.
 bool isPlausibleMachineId(const std::string& s) {
-    if (s.size() != 64) return false;
+    if (s.size() != 20) return false;
     for (char c : s) {
-        const bool isHex =
-            (c >= '0' && c <= '9') ||
-            (c >= 'a' && c <= 'f') ||
-            (c >= 'A' && c <= 'F');
-        if (!isHex) return false;
+        if (c < '0' || c > '9') return false;
     }
     return true;
 }
@@ -349,8 +345,8 @@ void MainWindow::onGenerate() {
     }
     if (!isPlausibleMachineId(machineId)) {
         ::MessageBoxW(hwnd_,
-            L"Machine ID must be 64 hex characters "
-            L"(SHA-256 from AndroidDevID / WindowsDevID).",
+            L"Machine ID must be 20 decimal digits "
+            L"(16 content + 4 checksum, from AndroidDevID / WindowsDevID).",
             L"Bad machine ID", MB_ICONWARNING | MB_OK);
         return;
     }
