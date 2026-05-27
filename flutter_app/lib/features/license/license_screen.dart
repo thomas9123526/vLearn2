@@ -6,26 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/app_apis.dart';
+import '../../core/license/license_file_scanner.dart';
 import '../../core/license/license_state.dart';
 import '../../core/license/license_state_provider.dart';
 import '../../core/license/machine_id_service.dart';
 import '../../core/providers/auth_provider.dart';
-
-// ─── Platform channels ───────────────────────────────────────────────────────
-
-const _qrChannel = MethodChannel('com.vlearn2/qr_scan');
-
-/// Launches QRScanActivity and returns the decoded text, or null if cancelled.
-Future<String?> _scanQr() async {
-  try {
-    return await _qrChannel.invokeMethod<String>('scan', {
-      'prompt': 'Scan your license QR code',
-    });
-  } on PlatformException catch (e) {
-    debugPrint('[qr-scan] error: ${e.message}');
-    return null;
-  }
-}
 
 // ─── .lic file loading (Windows) ─────────────────────────────────────────────
 
@@ -113,6 +98,11 @@ class LicenseScreen extends ConsumerStatefulWidget {
 class _LicenseScreenState extends ConsumerState<LicenseScreen> {
   bool _loading = false;
   String? _error;
+  // True when the most recent scan attempt failed because the app
+  // does not have MANAGE_EXTERNAL_STORAGE. We surface a "Grant
+  // access" button next to the error so the user can deep-link
+  // straight to the Settings page instead of hunting for it.
+  bool _needsAllFilesAccess = false;
 
   Future<void> _getLicense() async {
     final machineId = ref.read(machineIdProvider).valueOrNull;
@@ -124,42 +114,11 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _needsAllFilesAccess = false;
     });
 
     try {
-      String? licenseContent;
-      String? sourcePath;
-
-      if (Platform.isAndroid) {
-        licenseContent = await _scanQr();
-        if (licenseContent == null) {
-          // User cancelled the scanner
-          setState(() => _loading = false);
-          return;
-        }
-      } else {
-        // Windows: read the most recently modified .lic file from the
-        // well-known dropbox folder and base64-encode it. KeyGenerator /
-        // KeyGenVS2022 writes raw DER bytes; the verify endpoint wants
-        // base64, so we encode here.
-        final loaded = await _loadNewestLicFromWellKnownDir();
-        if (loaded == null) {
-          setState(() {
-            _loading = false;
-            _error = 'No .lic file found. Place one in '
-                r'%USERPROFILE%\룡마\가상외국어회화\ '
-                r'(or its \lic\ subfolder) and tap Load .lic again.';
-          });
-          return;
-        }
-        licenseContent = loaded.base64Content;
-        sourcePath = loaded.sourcePath;
-      }
-
       final userId = ref.read(authProvider).user?.id;
-      // Send the platform tag along so the admin panel can show
-      // android-vs-windows on the user list. Trust-on-write — the
-      // backend uses it only for display, never auth.
       final platform = Platform.isAndroid
           ? 'android'
           : Platform.isWindows
@@ -171,25 +130,214 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
                       : Platform.isLinux
                           ? 'linux'
                           : null;
+
+      if (Platform.isAndroid) {
+        // 1) Make sure we have MANAGE_EXTERNAL_STORAGE. Without it the
+        //    Kotlin scanner can't even list the candidate folders.
+        final scanner = ref.read(licenseFileScannerProvider);
+        if (!await scanner.hasAllFilesAccess()) {
+          setState(() {
+            _loading = false;
+            _needsAllFilesAccess = true;
+            _error = 'Storage access required to find your .lic file. '
+                'Tap "Grant access", flip "Allow access to manage all '
+                'files" on for this app, then come back and retry.';
+          });
+          return;
+        }
+
+        // 2) Scan every mounted volume (internal + SD card) for
+        //    .lic files under 룡마/가상외국어회화/license/.
+        final files = await scanner.scan();
+        if (files.isEmpty) {
+          setState(() {
+            _loading = false;
+            _error = 'No .lic file found. Drop one into\n'
+                '  /storage/emulated/0/룡마/가상외국어회화/license/\n'
+                '(an inserted SD card is also scanned), then retry.';
+          });
+          return;
+        }
+
+        // 3) Try each file newest-first; first one that verifies wins.
+        ScannedLicFile? winningFile;
+        LicenseResult? winningResult;
+        Object? lastError;
+        for (final f in files) {
+          try {
+            final raw = await ref.read(licenseApiProvider).verify(
+                  licenseContent: f.base64Content,
+                  machineId: machineId,
+                  userId: userId,
+                  platform: platform,
+                );
+            final r = LicenseResult.fromJson(raw);
+            if (r.valid) {
+              winningFile = f;
+              winningResult = r;
+              break;
+            }
+          } catch (e) {
+            lastError = e;
+          }
+        }
+
+        if (winningFile == null || winningResult == null) {
+          setState(() {
+            _loading = false;
+            _error = 'Found ${files.length} .lic file(s) but none verified. '
+                'They may be expired, machine-bound to a different '
+                'device, or signed by a different Leaf CA.'
+                '${lastError != null ? '\nLast error: $lastError' : ''}';
+          });
+          return;
+        }
+
+        // Persist the winning file as the auto-verify cache.
+        await ref.read(licenseStateProvider.notifier).setVerifiedContent(
+              base64Content: winningFile.base64Content,
+              result: winningResult,
+              sourcePath: winningFile.path,
+            );
+        return;
+      }
+
+      // Windows: read the most recently modified .lic file from the
+      // well-known dropbox folder and base64-encode it. KeyGenerator /
+      // KeyGenVS2022 writes raw DER bytes; the verify endpoint wants
+      // base64, so we encode here.
+      final loaded = await _loadNewestLicFromWellKnownDir();
+      if (loaded == null) {
+        setState(() {
+          _loading = false;
+          _error = 'No .lic file found. Place one in '
+              r'%USERPROFILE%\룡마\가상외국어회화\ '
+              r'(or its \lic\ subfolder) and tap Load .lic again.';
+        });
+        return;
+      }
+
       final raw = await ref.read(licenseApiProvider).verify(
-            licenseContent: licenseContent,
+            licenseContent: loaded.base64Content,
             machineId: machineId,
             userId: userId,
             platform: platform,
           );
-
       final result = LicenseResult.fromJson(raw);
       // Persist the verified content into the global license state so
       // (a) other parts of the app see the new status without polling
       // and (b) the auto-verify-on-startup notifier replays this exact
       // payload on every future launch.
       await ref.read(licenseStateProvider.notifier).setVerifiedContent(
-            base64Content: licenseContent,
+            base64Content: loaded.base64Content,
             result: result,
-            sourcePath: sourcePath,
+            sourcePath: loaded.sourcePath,
           );
     } on PlatformException catch (e) {
-      setState(() => _error = 'Platform error: ${e.message}');
+      if (e.code == 'PERMISSION_DENIED') {
+        setState(() {
+          _needsAllFilesAccess = true;
+          _error = 'Storage access required. Tap "Grant access" to '
+              'enable it for this app, then retry.';
+        });
+      } else {
+        setState(() => _error = 'Platform error: ${e.message}');
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// Android-only: ask QRScanActivity to walk the well-known folder
+  /// for `*.png` (the QR image KeyGenVS2022 emits next to every .lic),
+  /// decode each one, then try `/license/verify` on each decoded
+  /// payload. First valid wins -- exact same persistence path as
+  /// the .lic file scan.
+  Future<void> _scanQrPngs() async {
+    if (!Platform.isAndroid) return;
+    final machineId = ref.read(machineIdProvider).valueOrNull;
+    if (machineId == null) {
+      setState(() => _error = 'Machine ID not ready — please wait.');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+      _needsAllFilesAccess = false;
+    });
+
+    try {
+      final scanner = ref.read(licenseFileScannerProvider);
+      if (!await scanner.hasAllFilesAccess()) {
+        setState(() {
+          _loading = false;
+          _needsAllFilesAccess = true;
+          _error = 'Storage access required to read QR PNGs from the '
+              'license folder. Tap "Grant access" and retry.';
+        });
+        return;
+      }
+
+      // Same folder KeyGenVS2022 / KeyGenerator writes the .png next
+      // to the .lic. Fixed path matches the .lic scanner's primary
+      // location.
+      const dir = '/storage/emulated/0/룡마/가상외국어회화/license';
+      final decoded = await scanner.scanQrPngsInDir(dir);
+      if (decoded.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'No decodable QR PNG found under\n  $dir\n'
+              'Make sure the .png the KeyGenerator produced is there.';
+        });
+        return;
+      }
+
+      final userId = ref.read(authProvider).user?.id;
+      String? winningContent;
+      LicenseResult? winningResult;
+      Object? lastError;
+      for (final qrText in decoded) {
+        try {
+          final raw = await ref.read(licenseApiProvider).verify(
+                licenseContent: qrText,
+                machineId: machineId,
+                userId: userId,
+                platform: 'android',
+              );
+          final r = LicenseResult.fromJson(raw);
+          if (r.valid) {
+            winningContent = qrText;
+            winningResult = r;
+            break;
+          }
+        } catch (e) {
+          lastError = e;
+        }
+      }
+
+      if (winningContent == null || winningResult == null) {
+        setState(() {
+          _loading = false;
+          _error = 'Decoded ${decoded.length} QR PNG(s) but none verified.'
+              '${lastError != null ? '\nLast error: $lastError' : ''}';
+        });
+        return;
+      }
+
+      await ref.read(licenseStateProvider.notifier).setVerifiedContent(
+            base64Content: winningContent,
+            result: winningResult,
+            sourcePath: dir,
+          );
+    } on PlatformException catch (e) {
+      if (e.code == 'SCAN_FAILED') {
+        setState(() => _error = e.message ?? 'QR scan failed');
+      } else {
+        setState(() => _error = 'Platform error: ${e.message}');
+      }
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -263,8 +411,23 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
               color: scheme.errorContainer,
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Text(_error!,
-                    style: TextStyle(color: scheme.onErrorContainer, fontSize: 13)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_error!,
+                        style: TextStyle(color: scheme.onErrorContainer, fontSize: 13)),
+                    if (_needsAllFilesAccess) ...[
+                      const SizedBox(height: 8),
+                      FilledButton.tonalIcon(
+                        icon: const Icon(Icons.settings_outlined),
+                        label: const Text('Grant access'),
+                        onPressed: () => ref
+                            .read(licenseFileScannerProvider)
+                            .openAllFilesAccessSettings(),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -274,12 +437,21 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
           // ── CTA ───────────────────────────────────────────────────────────
           if (_loading)
             const Center(child: CircularProgressIndicator())
-          else
+          else ...[
             FilledButton.icon(
-              icon: Icon(Platform.isAndroid ? Icons.qr_code_scanner : Icons.folder_open),
-              label: Text(Platform.isAndroid ? 'Scan License QR' : 'Load .lic file'),
+              icon: const Icon(Icons.folder_open),
+              label: Text(Platform.isAndroid ? 'Find License' : 'Load .lic file'),
               onPressed: _getLicense,
             ),
+            if (Platform.isAndroid) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Scan QR Code'),
+                onPressed: _scanQrPngs,
+              ),
+            ],
+          ],
         ],
       ),
     );

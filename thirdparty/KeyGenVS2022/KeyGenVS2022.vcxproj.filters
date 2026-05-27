@@ -61,6 +61,9 @@
     <ClInclude Include="src\WinStrings.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Base64.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="src\resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
