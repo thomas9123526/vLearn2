@@ -23,16 +23,13 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <ProjectGuid>{A7B8C9D0-E1F2-3456-789A-BCDEF0123456}</ProjectGuid>
     <RootNamespace>KeyGenVS2022</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
-
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
@@ -46,23 +43,19 @@
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings" />
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-
   <PropertyGroup Label="UserMacros">
     <QrCodeDir>$(ProjectDir)external\qrcodegen\cpp</QrCodeDir>
   </PropertyGroup>
-
   <PropertyGroup>
     <OutDir>$(ProjectDir)bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>KeyGenVS2022</TargetName>
   </PropertyGroup>
-
   <!-- Shared compile/link settings for both configs. -->
   <ItemDefinitionGroup>
     <ClCompile>
@@ -82,7 +75,6 @@
       <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
   </ItemDefinitionGroup>
-
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
@@ -103,7 +95,6 @@
       <Command>copy /Y "$(OPENSSL_ROOT_DIR)\bin\libcrypto-*.dll" "$(OutDir)" &gt;nul</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
-
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
@@ -121,7 +112,6 @@
       <Command>copy /Y "$(OPENSSL_ROOT_DIR)\debug\bin\libcrypto-*.dll" "$(OutDir)" &gt;nul</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
-
   <!-- Pre-build event: clone Nayuki QR-Code-generator on first build. -->
   <ItemDefinitionGroup>
     <PreBuildEvent>
@@ -134,7 +124,6 @@
 )</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-
   <!-- Source files. -->
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
@@ -145,7 +134,6 @@
     <ClCompile Include="src\LicenseLog.cpp" />
     <ClCompile Include="external\qrcodegen\cpp\qrcodegen.cpp" />
   </ItemGroup>
-
   <ItemGroup>
     <ClInclude Include="src\MainWindow.h" />
     <ClInclude Include="src\LeafCa.h" />
@@ -155,11 +143,9 @@
     <ClInclude Include="src\WinStrings.h" />
     <ClInclude Include="src\resource.h" />
   </ItemGroup>
-
   <ItemGroup>
     <ResourceCompile Include="src\MainWindow.rc" />
   </ItemGroup>
-
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>
