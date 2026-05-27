@@ -1,10 +1,13 @@
-import 'dart:io' show Platform;
+import 'dart:convert' show base64Encode;
+import 'dart:io' show Directory, File, FileSystemEntity, Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/app_apis.dart';
+import '../../core/license/license_state.dart';
+import '../../core/license/license_state_provider.dart';
 import '../../core/license/machine_id_service.dart';
 import '../../core/providers/auth_provider.dart';
 
@@ -24,34 +27,75 @@ Future<String?> _scanQr() async {
   }
 }
 
-// ─── State ───────────────────────────────────────────────────────────────────
+// ─── .lic file loading (Windows) ─────────────────────────────────────────────
 
-class LicenseResult {
-  const LicenseResult({
-    required this.valid,
-    this.expiresAt,
-    this.mode,
-    this.daysRemaining,
-    this.reason,
-  });
-
-  factory LicenseResult.fromJson(Map<String, dynamic> j) => LicenseResult(
-        valid: j['valid'] as bool,
-        expiresAt: j['expiresAt'] as String?,
-        mode: j['mode'] as String?,
-        daysRemaining: (j['daysRemaining'] as num?)?.toInt(),
-        reason: j['reason'] as String?,
-      );
-
-  final bool valid;
-  final String? expiresAt;
-  final String? mode;
-  final int? daysRemaining;
-  final String? reason;
+/// Where on Windows we look for the dropped-in `.lic` file. Both the
+/// folder itself and an optional `lic\` subfolder are scanned so the
+/// user can put the file in whichever they prefer.
+///
+/// Returns the candidate directories in priority order. Existence is
+/// not checked here — caller does it.
+List<Directory> _windowsLicDirs() {
+  final userProfile = Platform.environment['USERPROFILE'];
+  if (userProfile == null || userProfile.isEmpty) return const [];
+  return [
+    Directory('$userProfile\\룡마\\가상외국어회화\\lic'),
+    Directory('$userProfile\\룡마\\가상외국어회화'),
+  ];
 }
 
-/// Cached last-known license result. Survives hot-reloads; cleared on sign-out.
-final _licenseResultProvider = StateProvider<LicenseResult?>((ref) => null);
+/// Loaded .lic file plus where it came from. The path is shown to the
+/// user in the status line so they can confirm what was activated.
+class _LoadedLic {
+  const _LoadedLic({required this.base64Content, required this.sourcePath});
+  final String base64Content;
+  final String sourcePath;
+}
+
+/// Scans the candidate folders for `*.lic` files and returns the most
+/// recently modified one as base64-encoded DER (the same format
+/// `/license/verify` accepts for QR-scanned payloads). Returns null
+/// when nothing is found.
+Future<_LoadedLic?> _loadNewestLicFromWellKnownDir() async {
+  File? newest;
+  DateTime? newestMod;
+  for (final dir in _windowsLicDirs()) {
+    if (!dir.existsSync()) continue;
+    final List<FileSystemEntity> entries;
+    try {
+      entries = dir.listSync(followLinks: false);
+    } catch (_) {
+      continue;
+    }
+    for (final ent in entries) {
+      if (ent is! File) continue;
+      if (!ent.path.toLowerCase().endsWith('.lic')) continue;
+      DateTime mod;
+      try {
+        mod = ent.lastModifiedSync();
+      } catch (_) {
+        continue;
+      }
+      if (newestMod == null || mod.isAfter(newestMod)) {
+        newest = ent;
+        newestMod = mod;
+      }
+    }
+  }
+  if (newest == null) return null;
+  final bytes = await newest.readAsBytes();
+  return _LoadedLic(
+    base64Content: base64Encode(bytes),
+    sourcePath: newest.path,
+  );
+}
+
+// ─── State ───────────────────────────────────────────────────────────────────
+//
+// LicenseResult + the system-wide license snapshot live in
+// core/license/license_state.dart + license_state_provider.dart so the
+// auto-verify-on-startup notifier and this screen share one source of
+// truth.
 
 final machineIdProvider = FutureProvider<String>((ref) async {
   return ref.read(machineIdServiceProvider).get();
@@ -83,37 +127,67 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
     });
 
     try {
-      String? qrText;
+      String? licenseContent;
+      String? sourcePath;
 
       if (Platform.isAndroid) {
-        qrText = await _scanQr();
-        if (qrText == null) {
+        licenseContent = await _scanQr();
+        if (licenseContent == null) {
           // User cancelled the scanner
           setState(() => _loading = false);
           return;
         }
       } else {
-        // Windows: the QR code payload is the base64 cert, which KeyGenerator
-        // also writes as the content of the .lic file (base64-encoded DER).
-        // For now, prompt the user to paste the base64 content.
-        // TODO: file picker / folder watcher for %USERPROFILE%/룡마/가상외국어회화/lic/
-        setState(() {
-          _loading = false;
-          _error = 'Windows: place your .lic file in '
-              r'%USERPROFILE%\룡마\가상외국어회화\lic\ and tap Load .lic';
-        });
-        return;
+        // Windows: read the most recently modified .lic file from the
+        // well-known dropbox folder and base64-encode it. KeyGenerator /
+        // KeyGenVS2022 writes raw DER bytes; the verify endpoint wants
+        // base64, so we encode here.
+        final loaded = await _loadNewestLicFromWellKnownDir();
+        if (loaded == null) {
+          setState(() {
+            _loading = false;
+            _error = 'No .lic file found. Place one in '
+                r'%USERPROFILE%\룡마\가상외국어회화\ '
+                r'(or its \lic\ subfolder) and tap Load .lic again.';
+          });
+          return;
+        }
+        licenseContent = loaded.base64Content;
+        sourcePath = loaded.sourcePath;
       }
 
       final userId = ref.read(authProvider).user?.id;
+      // Send the platform tag along so the admin panel can show
+      // android-vs-windows on the user list. Trust-on-write — the
+      // backend uses it only for display, never auth.
+      final platform = Platform.isAndroid
+          ? 'android'
+          : Platform.isWindows
+              ? 'windows'
+              : Platform.isIOS
+                  ? 'ios'
+                  : Platform.isMacOS
+                      ? 'macos'
+                      : Platform.isLinux
+                          ? 'linux'
+                          : null;
       final raw = await ref.read(licenseApiProvider).verify(
-            licenseContent: qrText,
+            licenseContent: licenseContent,
             machineId: machineId,
             userId: userId,
+            platform: platform,
           );
 
       final result = LicenseResult.fromJson(raw);
-      ref.read(_licenseResultProvider.notifier).state = result;
+      // Persist the verified content into the global license state so
+      // (a) other parts of the app see the new status without polling
+      // and (b) the auto-verify-on-startup notifier replays this exact
+      // payload on every future launch.
+      await ref.read(licenseStateProvider.notifier).setVerifiedContent(
+            base64Content: licenseContent,
+            result: result,
+            sourcePath: sourcePath,
+          );
     } on PlatformException catch (e) {
       setState(() => _error = 'Platform error: ${e.message}');
     } catch (e) {
@@ -127,7 +201,9 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final machineId = ref.watch(machineIdProvider);
-    final licenseResult = ref.watch(_licenseResultProvider);
+    final licenseSnapshot = ref.watch(licenseStateProvider);
+    final licenseResult = licenseSnapshot.result;
+    final loadedFromPath = licenseSnapshot.lastSourcePath;
 
     return Scaffold(
       appBar: AppBar(title: const Text('License')),
@@ -169,6 +245,17 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
           Text('License status', style: _sectionLabel(context)),
           const SizedBox(height: 8),
           _StatusCard(result: licenseResult),
+
+          if (loadedFromPath != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Loaded from: $loadedFromPath',
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
 
           if (_error != null) ...[
             const SizedBox(height: 12),

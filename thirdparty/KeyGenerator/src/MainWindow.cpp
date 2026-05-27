@@ -24,18 +24,14 @@ constexpr auto kKeyOutputDir = "paths/outputDir";
 constexpr auto kKeyUserName  = "form/userName";
 constexpr auto kKeyDays      = "form/days";
 
-// Validates that `machineId` looks like the 64-char hex hash that
-// AndroidDevID / WindowsDevID produce. We accept upper or lower
-// case but reject anything that isn't hex -- a typo here would
-// quietly issue a license that can never be claimed.
+// Validates that `machineId` matches the 20-digit decimal format
+// that AndroidDevID / WindowsDevID now emit (16 content digits +
+// 4 checksum digits). A typo here would quietly issue a license
+// that can never be claimed, so we keep the check strict.
 bool isPlausibleMachineId(const QString& s) {
-    if (s.size() != 64) return false;
+    if (s.size() != 20) return false;
     for (QChar c : s) {
-        if (!((c >= QLatin1Char('0') && c <= QLatin1Char('9')) ||
-              (c >= QLatin1Char('a') && c <= QLatin1Char('f')) ||
-              (c >= QLatin1Char('A') && c <= QLatin1Char('F')))) {
-            return false;
-        }
+        if (c < QLatin1Char('0') || c > QLatin1Char('9')) return false;
     }
     return true;
 }
@@ -132,8 +128,9 @@ void MainWindow::onGenerate() {
     }
     if (!isPlausibleMachineId(machineId)) {
         QMessageBox::warning(this, tr("Bad machine ID"),
-                             tr("Machine ID must be 64 hex characters "
-                                "(SHA-256 from AndroidDevID / WindowsDevID)."));
+                             tr("Machine ID must be 20 decimal digits "
+                                "(16 content + 4 checksum, from "
+                                "AndroidDevID / WindowsDevID)."));
         return;
     }
     if (userName.isEmpty()) {
