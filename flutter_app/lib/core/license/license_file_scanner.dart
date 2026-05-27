@@ -27,6 +27,7 @@ class ScannedLicFile {
 /// across every mounted storage volume (internal + SD card / USB OTG).
 class LicenseFileScannerService {
   static const _channel = MethodChannel('com.vlearn2/license_scan');
+  static const _qrChannel = MethodChannel('com.vlearn2/qr_scan');
 
   /// True when the app already has MANAGE_EXTERNAL_STORAGE (or the
   /// pre-API-30 equivalent). On non-Android platforms this returns
@@ -72,6 +73,23 @@ class LicenseFileScannerService {
               modifiedMs: (m['modified'] as num).toInt(),
             ))
         .toList(growable: false);
+  }
+
+  /// Asks the bundled QRScanActivity (in qrscan-release.aar) to walk
+  /// the given directory, decode every `.png` it finds as a QR code,
+  /// and return the decoded text of each, newest file first. Returns
+  /// an empty list if no PNG decoded.
+  ///
+  /// Throws PlatformException with code `SCAN_FAILED` when the
+  /// activity reports an error (missing directory, no PNGs, denied
+  /// storage permission, etc.).
+  Future<List<String>> scanQrPngsInDir(String dir) async {
+    final raw = await _qrChannel.invokeMethod<List<Object?>>(
+      'scanPngDir',
+      {'dir': dir},
+    );
+    if (raw == null) return const [];
+    return raw.whereType<String>().toList(growable: false);
   }
 }
 
