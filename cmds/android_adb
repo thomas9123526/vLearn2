@@ -1,0 +1,3 @@
+adb -s emulator-5554 install path\to\app.apk
+
+adb -s emulator-5554 install .\build\app\outputs\flutter-apk\app-debug.apk
