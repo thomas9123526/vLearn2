@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/app_apis.dart';
+import '../../core/license/license_state.dart';
+import '../../core/license/license_state_provider.dart';
 import '../../core/license/machine_id_service.dart';
 import '../../core/providers/auth_provider.dart';
 
@@ -89,33 +91,11 @@ Future<_LoadedLic?> _loadNewestLicFromWellKnownDir() async {
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
-
-class LicenseResult {
-  const LicenseResult({
-    required this.valid,
-    this.expiresAt,
-    this.mode,
-    this.daysRemaining,
-    this.reason,
-  });
-
-  factory LicenseResult.fromJson(Map<String, dynamic> j) => LicenseResult(
-        valid: j['valid'] as bool,
-        expiresAt: j['expiresAt'] as String?,
-        mode: j['mode'] as String?,
-        daysRemaining: (j['daysRemaining'] as num?)?.toInt(),
-        reason: j['reason'] as String?,
-      );
-
-  final bool valid;
-  final String? expiresAt;
-  final String? mode;
-  final int? daysRemaining;
-  final String? reason;
-}
-
-/// Cached last-known license result. Survives hot-reloads; cleared on sign-out.
-final _licenseResultProvider = StateProvider<LicenseResult?>((ref) => null);
+//
+// LicenseResult + the system-wide license snapshot live in
+// core/license/license_state.dart + license_state_provider.dart so the
+// auto-verify-on-startup notifier and this screen share one source of
+// truth.
 
 final machineIdProvider = FutureProvider<String>((ref) async {
   return ref.read(machineIdServiceProvider).get();
@@ -133,10 +113,6 @@ class LicenseScreen extends ConsumerStatefulWidget {
 class _LicenseScreenState extends ConsumerState<LicenseScreen> {
   bool _loading = false;
   String? _error;
-  // Path of the .lic file that was just loaded on Windows. Shown
-  // under the status card so the user can confirm which file the
-  // app actually picked up from the well-known folder.
-  String? _loadedFromPath;
 
   Future<void> _getLicense() async {
     final machineId = ref.read(machineIdProvider).valueOrNull;
@@ -148,7 +124,6 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
     setState(() {
       _loading = true;
       _error = null;
-      _loadedFromPath = null;
     });
 
     try {
@@ -204,13 +179,15 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
           );
 
       final result = LicenseResult.fromJson(raw);
-      ref.read(_licenseResultProvider.notifier).state = result;
-      if (mounted && sourcePath != null) {
-        // Show which file actually got activated so the user can
-        // tell whether the right .lic was picked up (handy when
-        // they have multiple in the folder).
-        setState(() => _loadedFromPath = sourcePath);
-      }
+      // Persist the verified content into the global license state so
+      // (a) other parts of the app see the new status without polling
+      // and (b) the auto-verify-on-startup notifier replays this exact
+      // payload on every future launch.
+      await ref.read(licenseStateProvider.notifier).setVerifiedContent(
+            base64Content: licenseContent,
+            result: result,
+            sourcePath: sourcePath,
+          );
     } on PlatformException catch (e) {
       setState(() => _error = 'Platform error: ${e.message}');
     } catch (e) {
@@ -224,7 +201,9 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final machineId = ref.watch(machineIdProvider);
-    final licenseResult = ref.watch(_licenseResultProvider);
+    final licenseSnapshot = ref.watch(licenseStateProvider);
+    final licenseResult = licenseSnapshot.result;
+    final loadedFromPath = licenseSnapshot.lastSourcePath;
 
     return Scaffold(
       appBar: AppBar(title: const Text('License')),
@@ -267,10 +246,10 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
           const SizedBox(height: 8),
           _StatusCard(result: licenseResult),
 
-          if (_loadedFromPath != null) ...[
+          if (loadedFromPath != null) ...[
             const SizedBox(height: 6),
             Text(
-              'Loaded from: $_loadedFromPath',
+              'Loaded from: $loadedFromPath',
               style: TextStyle(
                 fontSize: 11,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
