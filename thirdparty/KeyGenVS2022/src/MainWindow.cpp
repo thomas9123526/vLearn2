@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "Base64.h"
 #include "CertIssuer.h"
 #include "LeafCa.h"
 #include "LicenseLog.h"
@@ -418,7 +419,14 @@ void MainWindow::onGenerate() {
         appendStatus("Wrote " + winstr::narrow(licPath));
     }
 
-    if (!QrWriter::writePng(result.certDer, pngPath, &err)) {
+    // QR payload = base64-encoded DER (matches the Qt KeyGenerator's
+    // contract and what the backend's /license/verify endpoint
+    // expects). Raw bytes would also encode, but byte-mode QR pushed
+    // the version high enough that ZXing struggled to decode the
+    // resulting still PNG; base64 ASCII keeps the QR readable.
+    const std::string b64 = b64::encode(result.certDer);
+    const std::vector<unsigned char> qrPayload(b64.begin(), b64.end());
+    if (!QrWriter::writePng(qrPayload, pngPath, &err)) {
         appendStatus("ERROR writing QR PNG: " + err);
     } else {
         appendStatus("Wrote " + winstr::narrow(pngPath));
