@@ -45,6 +45,13 @@ export class UserEntity {
   @Column({ type: 'text', nullable: true })
   license_serial!: string | null;
 
+  /// Platform tag reported by the client at /license/verify time.
+  /// Values are the canonical Flutter ones: 'android', 'windows',
+  /// 'ios', 'macos', 'linux', 'fuchsia', 'web'. Trust-on-write —
+  /// for the admin Users list, not for security decisions.
+  @Column({ type: 'text', nullable: true })
+  license_platform!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at!: Date;
 

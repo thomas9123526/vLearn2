@@ -106,10 +106,25 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
       }
 
       final userId = ref.read(authProvider).user?.id;
+      // Send the platform tag along so the admin panel can show
+      // android-vs-windows on the user list. Trust-on-write — the
+      // backend uses it only for display, never auth.
+      final platform = Platform.isAndroid
+          ? 'android'
+          : Platform.isWindows
+              ? 'windows'
+              : Platform.isIOS
+                  ? 'ios'
+                  : Platform.isMacOS
+                      ? 'macos'
+                      : Platform.isLinux
+                          ? 'linux'
+                          : null;
       final raw = await ref.read(licenseApiProvider).verify(
             licenseContent: qrText,
             machineId: machineId,
             userId: userId,
+            platform: platform,
           );
 
       final result = LicenseResult.fromJson(raw);

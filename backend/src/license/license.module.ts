@@ -20,7 +20,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -49,6 +49,22 @@ class VerifyLicenseDto {
   @IsOptional()
   @IsString()
   userId?: string;
+
+  /**
+   * Platform the device is on, as reported by the client. The values
+   * mirror Flutter's `defaultTargetPlatform`. Persisted on the user
+   * row and `verify_log` so the admin panel can show what kind of
+   * device each user activated from. Trust-on-write — not used for
+   * any auth/authz decision.
+   */
+  @ApiProperty({
+    required: false,
+    enum: ['android', 'windows', 'ios', 'macos', 'linux', 'fuchsia', 'web'],
+    description: 'Client-reported platform tag (mirrors Flutter defaultTargetPlatform).',
+  })
+  @IsOptional()
+  @IsIn(['android', 'windows', 'ios', 'macos', 'linux', 'fuchsia', 'web'])
+  platform?: string;
 }
 
 class VerifyLicenseResponseDto {
@@ -220,7 +236,7 @@ class LicenseService implements OnModuleInit {
 
     const serial = cert.serialNumber;
 
-    // 7. Update vl_users license columns
+    // 7. Update users license columns
     if (dto.userId) {
       try {
         await this.usersRepo
@@ -230,6 +246,10 @@ class LicenseService implements OnModuleInit {
             license_valid_until: notAfter,
             license_machine_id: dto.machineId,
             license_serial: serial,
+            // Only overwrite the platform tag when the client sent
+            // one; leaves the previous value intact for older clients
+            // that haven't been updated yet.
+            ...(dto.platform ? { license_platform: dto.platform } : {}),
           } as object)
           .where('id = :id', { id: dto.userId })
           .execute();
@@ -239,7 +259,7 @@ class LicenseService implements OnModuleInit {
     }
 
     // 8. Log to vLearnLicense.verify_log
-    await this.logVerify(serial, dto.machineId, dto.userId ?? null, 'valid');
+    await this.logVerify(serial, dto.machineId, dto.userId ?? null, 'valid', dto.platform ?? null);
 
     const daysRemaining = Math.max(0, Math.ceil((notAfter.getTime() - Date.now()) / DAY_MS));
 
@@ -254,7 +274,7 @@ class LicenseService implements OnModuleInit {
   ): Promise<VerifyLicenseResponseDto> {
     let serial = 'unknown';
     try { serial = new X509Certificate(certDer).serialNumber; } catch { /* ok */ }
-    await this.logVerify(serial, dto.machineId, dto.userId ?? null, result);
+    await this.logVerify(serial, dto.machineId, dto.userId ?? null, result, dto.platform ?? null);
     return { valid: false, reason };
   }
 
@@ -263,15 +283,35 @@ class LicenseService implements OnModuleInit {
     machineId: string,
     userId: string | null,
     result: string,
+    platform: string | null,
   ): Promise<void> {
     if (!this.licensePool) return;
     try {
+      // verify_log.platform is optional in the schema (added in
+      // datamanage/sql/add_verify_log_platform.sql). If the column
+      // is missing we fall back to the four-column insert so older
+      // databases keep working.
       await this.licensePool.query(
-        `INSERT INTO verify_log (serial, machine_id, user_id, result) VALUES ($1, $2, $3, $4)`,
-        [serial, machineId, userId, result],
+        `INSERT INTO verify_log (serial, machine_id, user_id, result, platform)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [serial, machineId, userId, result, platform],
       );
     } catch (e: unknown) {
-      this.log.warn(`verify_log insert failed: ${(e as Error).message}`);
+      const msg = (e as Error).message ?? '';
+      if (msg.includes('column "platform"')) {
+        try {
+          await this.licensePool.query(
+            `INSERT INTO verify_log (serial, machine_id, user_id, result)
+             VALUES ($1, $2, $3, $4)`,
+            [serial, machineId, userId, result],
+          );
+          return;
+        } catch (e2: unknown) {
+          this.log.warn(`verify_log fallback insert failed: ${(e2 as Error).message}`);
+          return;
+        }
+      }
+      this.log.warn(`verify_log insert failed: ${msg}`);
     }
   }
 }
