@@ -9,12 +9,9 @@
       <UniqueIdentifier>{93995380-89BD-4B04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hpp;hh</Extensions>
     </Filter>
-    <Filter Include="Forms">
-      <UniqueIdentifier>{99349809-55BA-4B9D-BF79-8FDBB0286EB3}</UniqueIdentifier>
-      <Extensions>ui</Extensions>
-    </Filter>
-    <Filter Include="Generated">
-      <UniqueIdentifier>{7C1F4DCB-2B68-4B65-A1E2-3F4F0B6E7C92}</UniqueIdentifier>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4C08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc</Extensions>
     </Filter>
     <Filter Include="External">
       <UniqueIdentifier>{B2D8E9F1-3A4C-4D5F-8B7A-1C2D3E4F5A6B}</UniqueIdentifier>
@@ -40,15 +37,15 @@
     <ClCompile Include="src\LicenseLog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="generated\moc_MainWindow.cpp">
-      <Filter>Generated</Filter>
-    </ClCompile>
     <ClCompile Include="external\qrcodegen\cpp\qrcodegen.cpp">
       <Filter>External</Filter>
     </ClCompile>
   </ItemGroup>
 
   <ItemGroup>
+    <ClInclude Include="src\MainWindow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="src\LeafCa.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -61,14 +58,17 @@
     <ClInclude Include="src\LicenseLog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\WinStrings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 
   <ItemGroup>
-    <CustomBuild Include="src\MainWindow.h">
-      <Filter>Header Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="src\MainWindow.ui">
-      <Filter>Forms</Filter>
-    </CustomBuild>
+    <ResourceCompile Include="src\MainWindow.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

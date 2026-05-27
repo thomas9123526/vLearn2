@@ -1,138 +1,111 @@
 #include "LicenseLog.h"
 
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QSqlDatabase>
-#include <QSqlError>
-#include <QSqlQuery>
-#include <QTextStream>
-#include <QUrl>
-#include <QUuid>
+#include <cstdio>
+#include <ctime>
+#include <filesystem>
+#include <fstream>
+#include <string>
+#include <vector>
+
+#include "WinStrings.h"
 
 namespace {
 
 // Quotes a CSV field per RFC 4180: wrap in quotes, double-up any
 // internal quotes. Applied to every text field so a stray comma or
 // quote in a username does not break the CSV.
-QString csvQuote(const QString& s) {
-    QString out = s;
-    out.replace(QLatin1Char('"'), QLatin1String("\"\""));
-    return QStringLiteral("\"%1\"").arg(out);
+std::string csvQuote(const std::string& s) {
+    std::string out = "\"";
+    for (char c : s) {
+        if (c == '"') out += '"';
+        out += c;
+    }
+    out += '"';
+    return out;
+}
+
+std::string isoUtcMs(std::time_t t) {
+    std::tm tm{};
+    gmtime_s(&tm, &t);
+    char buf[40];
+    std::snprintf(buf, sizeof(buf),
+        "%04d-%02d-%02dT%02d:%02d:%02d.000Z",
+        tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+        tm.tm_hour, tm.tm_min, tm.tm_sec);
+    return buf;
+}
+
+// Base64 encoder. Used for the cert_der_base64 column so the
+// binary DER cert survives transport as plain text CSV.
+std::string base64(const std::vector<unsigned char>& bytes) {
+    static const char tbl[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string out;
+    out.reserve(((bytes.size() + 2) / 3) * 4);
+    size_t i = 0;
+    while (i + 3 <= bytes.size()) {
+        const unsigned v = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
+        out.push_back(tbl[(v >> 18) & 0x3F]);
+        out.push_back(tbl[(v >> 12) & 0x3F]);
+        out.push_back(tbl[(v >> 6)  & 0x3F]);
+        out.push_back(tbl[v & 0x3F]);
+        i += 3;
+    }
+    const size_t left = bytes.size() - i;
+    if (left == 1) {
+        const unsigned v = bytes[i] << 16;
+        out.push_back(tbl[(v >> 18) & 0x3F]);
+        out.push_back(tbl[(v >> 12) & 0x3F]);
+        out.push_back('=');
+        out.push_back('=');
+    } else if (left == 2) {
+        const unsigned v = (bytes[i] << 16) | (bytes[i + 1] << 8);
+        out.push_back(tbl[(v >> 18) & 0x3F]);
+        out.push_back(tbl[(v >> 12) & 0x3F]);
+        out.push_back(tbl[(v >> 6)  & 0x3F]);
+        out.push_back('=');
+    }
+    return out;
 }
 
 }  // namespace
 
-LicenseLog::LicenseLog(const QString& outputDir)
-    : csvPath_(QDir(outputDir).filePath(QStringLiteral("generate_log.csv"))) {}
-
-bool LicenseLog::append(const Entry& entry, QString* err) {
-    QString csvErr;
-    const bool csvOk = appendToCsv(entry, &csvErr);
-    if (!csvOk) {
-        if (err) *err = csvErr;
-        return false;
-    }
-
-    // Postgres is best-effort -- if it fails we keep the CSV success.
-    // The operator can re-import the CSV later.
-    QString pgErr;
-    if (!appendToPg(entry, &pgErr) && !pgErr.isEmpty() && err) {
-        *err = QStringLiteral("CSV written, PG insert failed: %1").arg(pgErr);
-    }
-    return true;
+LicenseLog::LicenseLog(const std::wstring& outputDir) {
+    std::filesystem::path p(outputDir);
+    p /= L"generate_log.csv";
+    csvPath_ = p.wstring();
 }
 
-bool LicenseLog::appendToCsv(const Entry& entry, QString* err) {
-    QFileInfo info(csvPath_);
-    QDir().mkpath(info.absolutePath());
-    const bool needHeader = !info.exists();
+bool LicenseLog::append(const Entry& entry, std::string* err) {
+    std::error_code ec;
+    std::filesystem::path csv(csvPath_);
+    std::filesystem::create_directories(csv.parent_path(), ec);
 
-    QFile f(csvPath_);
-    if (!f.open(QIODevice::Append | QIODevice::Text)) {
-        if (err) *err = QStringLiteral("Cannot open %1: %2")
-                            .arg(csvPath_, f.errorString());
+    const bool needHeader = !std::filesystem::exists(csv, ec);
+
+    // std::ofstream in append mode -- text mode is fine, the CSV is
+    // pure ASCII once everything is quoted.
+    std::ofstream out(csvPath_, std::ios::app | std::ios::binary);
+    if (!out) {
+        if (err) *err = "Cannot open " + winstr::narrow(csvPath_);
         return false;
     }
-    QTextStream out(&f);
-    out.setCodec("UTF-8");
 
     if (needHeader) {
         out << "generated_at,serial_hex,machine_id,user_name,mode,days,"
                "not_before,not_after,cert_der_base64,operator\n";
     }
-    out << csvQuote(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)) << ','
-        << csvQuote(entry.serialHex) << ','
-        << csvQuote(entry.machineId) << ','
-        << csvQuote(entry.userName) << ','
-        << csvQuote(entry.mode) << ','
-        << entry.days << ','
-        << csvQuote(entry.notBefore.toUTC().toString(Qt::ISODateWithMs)) << ','
-        << csvQuote(entry.notAfter.toUTC().toString(Qt::ISODateWithMs)) << ','
-        << csvQuote(QString::fromLatin1(entry.certDer.toBase64())) << ','
-        << csvQuote(entry.operatorTag) << '\n';
-    return true;
-}
 
-bool LicenseLog::appendToPg(const Entry& entry, QString* err) {
-    // Environment-gated -- silent no-op on offline workstations.
-    const QByteArray rawUrl = qgetenv("LICENSE_DB_URL");
-    if (rawUrl.isEmpty()) {
-        return true;
-    }
-
-    const QUrl url = QUrl::fromUserInfo(QString::fromUtf8(rawUrl));
-    if (!url.isValid()) {
-        if (err) *err = QStringLiteral("LICENSE_DB_URL is not a valid URL");
-        return false;
-    }
-
-    // Each call uses its own anonymous connection so the function
-    // is reentrant and we don't leak driver state between issuances.
-    const QString connectionName =
-        QStringLiteral("kgen-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
-    {
-        QSqlDatabase db = QSqlDatabase::addDatabase(
-            QStringLiteral("QPSQL"), connectionName);
-        db.setHostName(url.host());
-        db.setPort(url.port(5432));
-        db.setUserName(url.userName());
-        db.setPassword(url.password());
-        // path() includes the leading '/', strip it for the DB name.
-        QString dbName = url.path();
-        if (dbName.startsWith(QLatin1Char('/'))) dbName.remove(0, 1);
-        db.setDatabaseName(dbName);
-
-        if (!db.open()) {
-            if (err) *err = db.lastError().text();
-            QSqlDatabase::removeDatabase(connectionName);
-            return false;
-        }
-
-        QSqlQuery q(db);
-        q.prepare(QStringLiteral(
-            "INSERT INTO generate_log "
-            "(serial, machine_id, user_name, mode, days, "
-            " not_before, not_after, operator, cert_der) "
-            "VALUES (:serial, :machine_id, :user_name, :mode, :days, "
-            " :not_before, :not_after, :operator, :cert_der)"));
-        q.bindValue(":serial",     entry.serialHex);
-        q.bindValue(":machine_id", entry.machineId);
-        q.bindValue(":user_name",  entry.userName);
-        q.bindValue(":mode",       entry.mode);
-        q.bindValue(":days",       entry.days);
-        q.bindValue(":not_before", entry.notBefore.toUTC());
-        q.bindValue(":not_after",  entry.notAfter.toUTC());
-        q.bindValue(":operator",   entry.operatorTag);
-        q.bindValue(":cert_der",   entry.certDer);
-        if (!q.exec()) {
-            if (err) *err = q.lastError().text();
-            db.close();
-            QSqlDatabase::removeDatabase(connectionName);
-            return false;
-        }
-        db.close();
-    }
-    QSqlDatabase::removeDatabase(connectionName);
+    const std::time_t now = std::time(nullptr);
+    out << csvQuote(isoUtcMs(now))                << ','
+        << csvQuote(entry.serialHex)              << ','
+        << csvQuote(entry.machineId)              << ','
+        << csvQuote(entry.userName)               << ','
+        << csvQuote(entry.mode)                   << ','
+        << entry.days                             << ','
+        << csvQuote(isoUtcMs(entry.notBefore))    << ','
+        << csvQuote(isoUtcMs(entry.notAfter))     << ','
+        << csvQuote(base64(entry.certDer))        << ','
+        << csvQuote(entry.operatorTag)            << '\n';
     return true;
 }

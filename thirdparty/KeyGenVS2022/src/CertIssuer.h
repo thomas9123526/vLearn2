@@ -1,8 +1,8 @@
 #pragma once
 
-#include <QByteArray>
-#include <QDateTime>
-#include <QString>
+#include <ctime>
+#include <string>
+#include <vector>
 
 class LeafCa;
 
@@ -24,18 +24,18 @@ class LeafCa;
 class CertIssuer {
 public:
     struct Result {
-        QString serialHex;   // 16-char hex of the 64-bit random serial
-        QByteArray certDer;  // DER-encoded leaf certificate
-        QDateTime notBefore;
-        QDateTime notAfter;
+        std::string                serialHex;  // 16-char hex of the 64-bit random serial
+        std::vector<unsigned char> certDer;    // DER-encoded leaf certificate
+        std::time_t                notBefore;  // UTC seconds since epoch
+        std::time_t                notAfter;
     };
 
-    // Returns true on success; on failure writes a human-readable
-    // OpenSSL error into `err`.
+    // Returns true on success; on failure writes a UTF-8 error
+    // message into `err`.
     bool issue(const LeafCa& ca,
-               const QString& machineId,
-               const QString& userName,
+               const std::string& machineId,
+               const std::string& userName,
                int days,
                Result* result,
-               QString* err);
+               std::string* err);
 };

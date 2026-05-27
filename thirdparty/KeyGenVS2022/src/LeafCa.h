@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QString>
+#include <string>
 
 // Forward-declare to keep the OpenSSL headers (and their macro
 // pollution) out of the public surface. The fields are owned via
@@ -19,14 +19,16 @@ public:
     LeafCa& operator=(const LeafCa&) = delete;
 
     // Loads cert from `certPath` and key from `keyPath` (both PEM).
-    // Returns true on success; on failure writes the OpenSSL error
+    // Returns true on success; on failure writes a UTF-8 error
     // message into `err` and leaves the object empty.
-    bool load(const QString& certPath, const QString& keyPath, QString* err);
+    bool load(const std::wstring& certPath,
+              const std::wstring& keyPath,
+              std::string* err);
 
     // Subject CommonName -- displayed in the UI after a successful
     // load so the operator can sanity-check which Leaf CA they
     // selected. Empty string before load() or if the CN is absent.
-    QString subjectCn() const;
+    std::string subjectCn() const;
 
     X509*    cert() const { return cert_; }
     EVP_PKEY* key()  const { return key_; }

@@ -2,10 +2,9 @@
 
 #include "LeafCa.h"
 
+#include <cstdio>
 #include <ctime>
-
-#include <QByteArray>
-#include <QDateTime>
+#include <string>
 
 #include <openssl/asn1.h>
 #include <openssl/bn.h>
@@ -19,23 +18,23 @@
 
 namespace {
 
-QString lastOpenSslError() {
-    QString out;
+std::string lastOpenSslError() {
+    std::string out;
     unsigned long code = 0;
     char buf[256];
     while ((code = ERR_get_error()) != 0) {
         ERR_error_string_n(code, buf, sizeof(buf));
-        if (!out.isEmpty()) out += QStringLiteral("; ");
-        out += QString::fromLatin1(buf);
+        if (!out.empty()) out += "; ";
+        out += buf;
     }
-    if (out.isEmpty()) out = QStringLiteral("unknown OpenSSL error");
+    if (out.empty()) out = "unknown OpenSSL error";
     return out;
 }
 
 // Generates a throwaway P-256 EC keypair. The leaf cert needs *a*
 // public key per X.509, but we don't ship the matching private
 // key -- the license cert is verify-only by design.
-EVP_PKEY* generateEcKey(QString* err) {
+EVP_PKEY* generateEcKey(std::string* err) {
     EVP_PKEY* pkey = EVP_PKEY_new();
     EC_KEY* ec = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
     if (!pkey || !ec) {
@@ -61,11 +60,10 @@ EVP_PKEY* generateEcKey(QString* err) {
 // so we go via X509_EXTENSION_create_by_OBJ + an ASN1_OCTET_STRING
 // payload that itself wraps a UTF8String.
 bool addUtf8Extension(X509* cert, const char* oid,
-                       const QByteArray& value, QString* err) {
+                      const std::string& value, std::string* err) {
     ASN1_OBJECT* obj = OBJ_txt2obj(oid, 1);
     if (!obj) {
-        if (err) *err = QStringLiteral("OBJ_txt2obj(%1): %2")
-                            .arg(QLatin1String(oid), lastOpenSslError());
+        if (err) *err = std::string("OBJ_txt2obj(") + oid + "): " + lastOpenSslError();
         return false;
     }
 
@@ -73,7 +71,7 @@ bool addUtf8Extension(X509* cert, const char* oid,
     // OCTET STRING (the X.509 extnValue is always an OCTET STRING).
     ASN1_UTF8STRING* utf8 = ASN1_UTF8STRING_new();
     if (!utf8 ||
-        !ASN1_STRING_set(utf8, value.constData(), value.size())) {
+        !ASN1_STRING_set(utf8, value.data(), static_cast<int>(value.size()))) {
         if (utf8) ASN1_UTF8STRING_free(utf8);
         ASN1_OBJECT_free(obj);
         if (err) *err = lastOpenSslError();
@@ -115,9 +113,7 @@ bool addUtf8Extension(X509* cert, const char* oid,
     return true;
 }
 
-bool addKeyUsageDigitalSignature(X509* cert, QString* err) {
-    // KeyUsage is a standard extension -- v3_conf handles the
-    // bitstring encoding for us.
+bool addKeyUsageDigitalSignature(X509* cert, std::string* err) {
     X509V3_CTX ctx;
     X509V3_set_ctx_nodb(&ctx);
     X509V3_set_ctx(&ctx, /*issuer=*/cert, /*subject=*/cert,
@@ -138,13 +134,13 @@ bool addKeyUsageDigitalSignature(X509* cert, QString* err) {
     return true;
 }
 
-QString bytesToHex(const unsigned char* p, int n) {
+std::string bytesToHex(const unsigned char* p, int n) {
     static const char hex[] = "0123456789ABCDEF";
-    QString out;
-    out.reserve(n * 2);
+    std::string out;
+    out.reserve(static_cast<size_t>(n) * 2);
     for (int i = 0; i < n; ++i) {
-        out.append(QLatin1Char(hex[(p[i] >> 4) & 0xF]));
-        out.append(QLatin1Char(hex[p[i] & 0xF]));
+        out.push_back(hex[(p[i] >> 4) & 0xF]);
+        out.push_back(hex[p[i] & 0xF]);
     }
     return out;
 }
@@ -152,17 +148,17 @@ QString bytesToHex(const unsigned char* p, int n) {
 }  // namespace
 
 bool CertIssuer::issue(const LeafCa& ca,
-                       const QString& machineId,
-                       const QString& userName,
+                       const std::string& machineId,
+                       const std::string& userName,
                        int days,
                        Result* result,
-                       QString* err) {
+                       std::string* err) {
     if (!ca.cert() || !ca.key()) {
-        if (err) *err = QStringLiteral("Leaf CA not loaded");
+        if (err) *err = "Leaf CA not loaded";
         return false;
     }
     if (days <= 0) {
-        if (err) *err = QStringLiteral("days must be > 0");
+        if (err) *err = "days must be > 0";
         return false;
     }
 
@@ -211,11 +207,10 @@ bool CertIssuer::issue(const LeafCa& ca,
         if (err) *err = lastOpenSslError();
         return false;
     }
-    const QByteArray cn = userName.toUtf8();
     const char* orgValue = "vLearn2";
     if (!X509_NAME_add_entry_by_txt(subject, "CN", MBSTRING_UTF8,
-            reinterpret_cast<const unsigned char*>(cn.constData()),
-            cn.size(), -1, 0) ||
+            reinterpret_cast<const unsigned char*>(userName.data()),
+            static_cast<int>(userName.size()), -1, 0) ||
         !X509_NAME_add_entry_by_txt(subject, "O", MBSTRING_UTF8,
             reinterpret_cast<const unsigned char*>(orgValue),
             -1, -1, 0)) {
@@ -247,12 +242,12 @@ bool CertIssuer::issue(const LeafCa& ca,
     }
 
     // ---- Extensions ----
-    const QString mode = days >= 36500 ? QStringLiteral("permanent")
-                                       : QStringLiteral("period");
-    if (!addUtf8Extension(leaf, "1.3.6.1.4.1.99999.1", machineId.toUtf8(), err) ||
-        !addUtf8Extension(leaf, "1.3.6.1.4.1.99999.2", mode.toUtf8(),       err) ||
-        !addUtf8Extension(leaf, "1.3.6.1.4.1.99999.3",
-                          QByteArray::number(days), err)) {
+    const std::string mode = days >= 36500 ? "permanent" : "period";
+    char daysBuf[16];
+    std::snprintf(daysBuf, sizeof(daysBuf), "%d", days);
+    if (!addUtf8Extension(leaf, "1.3.6.1.4.1.99999.1", machineId, err) ||
+        !addUtf8Extension(leaf, "1.3.6.1.4.1.99999.2", mode,       err) ||
+        !addUtf8Extension(leaf, "1.3.6.1.4.1.99999.3", daysBuf,    err)) {
         X509_free(leaf); EVP_PKEY_free(leafKey);
         return false;
     }
@@ -279,9 +274,9 @@ bool CertIssuer::issue(const LeafCa& ca,
 
     if (result) {
         result->serialHex = bytesToHex(serialBytes, sizeof(serialBytes));
-        result->certDer = QByteArray(reinterpret_cast<const char*>(der), derLen);
-        result->notBefore = QDateTime::fromSecsSinceEpoch(now, Qt::UTC);
-        result->notAfter  = result->notBefore.addSecs(static_cast<qint64>(days) * 86400LL);
+        result->certDer.assign(der, der + derLen);
+        result->notBefore = now;
+        result->notAfter  = now + static_cast<time_t>(days) * 86400;
     }
 
     OPENSSL_free(der);
