@@ -11,8 +11,8 @@ import java.io.File
 
 /**
  * Scans every mounted storage volume (internal + any inserted SD card /
- * USB OTG) for `룡마/가상외국어회화/license/*.lic` (and the parent
- * folder without the `license/` subdir, matching the Windows
+ * USB OTG) for `.lic` files under `룡마/가상외국어회화/license` (and the
+ * parent folder without the `license` subdir, matching the Windows
  * convention). Returns the list of found files sorted newest first so
  * the Flutter side can verify them in priority order.
  *
