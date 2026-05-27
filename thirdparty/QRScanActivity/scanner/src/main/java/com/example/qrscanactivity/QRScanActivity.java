@@ -3,6 +3,8 @@ package com.example.qrscanactivity;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -32,7 +34,14 @@ import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.DecodeHintType;
+import com.google.zxing.MultiFormatReader;
+import com.google.zxing.NotFoundException;
+import com.google.zxing.RGBLuminanceSource;
 import com.google.zxing.Result;
+import com.google.zxing.common.HybridBinarizer;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -42,6 +51,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -101,6 +117,25 @@ public class QRScanActivity extends AppCompatActivity {
      */
     public static final String MODE_FILE_LICENSE = "file_license";
 
+    /**
+     * Input extra (String): absolute directory path containing one or
+     * more `.png` files that hold QR codes. When this extra is present
+     * (and non-empty) the activity skips the camera entirely, decodes
+     * every PNG in that directory, and returns the decoded text in
+     * {@link #EXTRA_SCAN_RESULTS} (and the first one in
+     * {@link #EXTRA_SCAN_RESULT} for back-compat). Requires the same
+     * MANAGE_EXTERNAL_STORAGE / READ_EXTERNAL_STORAGE access as
+     * {@link #MODE_FILE_LICENSE}.
+     */
+    public static final String EXTRA_QR_PNG = "EXTRA_QR_PNG";
+
+    /**
+     * Output extra (String[]) on RESULT_OK in PNG-directory mode:
+     * every QR-code text decoded from the scanned `.png` files, in
+     * newest-file-first order.
+     */
+    public static final String EXTRA_SCAN_RESULTS = "SCAN_RESULTS";
+
     /** Output extra (String) on RESULT_OK in {@link #MODE_TEST_LICENSE} mode. */
     public static final String EXTRA_LICENSE = "LICENSE";
 
@@ -152,10 +187,23 @@ public class QRScanActivity extends AppCompatActivity {
                 }
             });
 
+    /**
+     * Set by {@link #handleQrPngMode()} so the storage-permission
+     * callback knows whether the caller is in file-license mode or
+     * qr-png-directory mode. Without this flag the existing legacy
+     * launcher would always call {@link #readLicenseFileAndFinish()}.
+     */
+    private boolean pendingQrPngScan;
+
     private final ActivityResultLauncher<String> storagePermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
                 if (granted) {
-                    readLicenseFileAndFinish();
+                    if (pendingQrPngScan) {
+                        pendingQrPngScan = false;
+                        scanQrPngsAndFinish();
+                    } else {
+                        readLicenseFileAndFinish();
+                    }
                 } else {
                     returnError("Storage permission denied");
                 }
@@ -173,6 +221,15 @@ public class QRScanActivity extends AppCompatActivity {
         }
         if (MODE_FILE_LICENSE.equals(mode)) {
             handleFileLicenseMode();
+            return;
+        }
+
+        // PNG-directory scan: triggered by presence of EXTRA_QR_PNG.
+        // No mode token needed -- the extra alone disambiguates from
+        // the camera flow.
+        String qrPngDir = getIntent().getStringExtra(EXTRA_QR_PNG);
+        if (qrPngDir != null && !qrPngDir.trim().isEmpty()) {
+            handleQrPngMode();
             return;
         }
 
@@ -440,5 +497,140 @@ public class QRScanActivity extends AppCompatActivity {
         data.putExtra(EXTRA_ERROR_MESSAGE, message);
         setResult(RESULT_CANCELED, data);
         finish();
+    }
+
+    // ===== PNG-directory QR scanning =========================================
+
+    /**
+     * Gate the PNG-directory scan behind the same storage-permission
+     * flow as MODE_FILE_LICENSE: MANAGE_EXTERNAL_STORAGE on API 30+,
+     * runtime READ_EXTERNAL_STORAGE on older OSes.
+     */
+    private void handleQrPngMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                returnError("Grant 'All files access' to this app in system "
+                        + "Settings (Apps -> QR Scanner -> Permissions), then retry.");
+                return;
+            }
+            scanQrPngsAndFinish();
+        } else {
+            if (ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.READ_EXTERNAL_STORAGE)
+                    == PackageManager.PERMISSION_GRANTED) {
+                scanQrPngsAndFinish();
+            } else {
+                pendingQrPngScan = true;
+                storagePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE);
+            }
+        }
+    }
+
+    /**
+     * Walk the caller-supplied directory, decode every .png file as a
+     * QR code, return all successful decodes via EXTRA_SCAN_RESULTS
+     * (newest file first), and finish RESULT_OK. If nothing decodes,
+     * finish RESULT_CANCELED with EXTRA_ERROR_MESSAGE.
+     */
+    private void scanQrPngsAndFinish() {
+        String dirPath = getIntent().getStringExtra(EXTRA_QR_PNG);
+        if (dirPath == null || dirPath.trim().isEmpty()) {
+            returnError("EXTRA_QR_PNG directory path is empty.");
+            return;
+        }
+        File dir = new File(dirPath);
+        if (!dir.exists())      { returnError("Directory does not exist: " + dirPath); return; }
+        if (!dir.isDirectory()) { returnError("Not a directory: " + dirPath); return; }
+
+        File[] pngsRaw;
+        try {
+            pngsRaw = dir.listFiles((f) -> f.isFile()
+                    && f.getName().toLowerCase().endsWith(".png"));
+        } catch (SecurityException e) {
+            returnError("Permission denied listing " + dirPath + ": " + e.getMessage());
+            return;
+        }
+        if (pngsRaw == null || pngsRaw.length == 0) {
+            returnError("No .png files found in " + dirPath);
+            return;
+        }
+
+        // Newest-first so the caller can verify the most recent license
+        // QR before retrying older ones.
+        File[] pngs = pngsRaw.clone();
+        Arrays.sort(pngs, new Comparator<File>() {
+            @Override public int compare(File a, File b) {
+                return Long.compare(b.lastModified(), a.lastModified());
+            }
+        });
+
+        List<String> decoded = new ArrayList<>();
+        List<String> failures = new ArrayList<>();
+        for (File png : pngs) {
+            String text = decodeQrPngFile(png);
+            if (text != null) {
+                decoded.add(text);
+            } else {
+                failures.add(png.getName());
+            }
+        }
+        if (decoded.isEmpty()) {
+            returnError("Found " + pngs.length + " PNG file(s) but none "
+                    + "contained a decodable QR code.");
+            return;
+        }
+
+        Intent data = new Intent();
+        data.putExtra(EXTRA_SCAN_RESULT, decoded.get(0));
+        data.putExtra(EXTRA_SCAN_RESULT_FORMAT, "QR_CODE");
+        data.putExtra(EXTRA_SCAN_RESULTS,
+                decoded.toArray(new String[0]));
+        setResult(RESULT_OK, data);
+        finish();
+    }
+
+    /**
+     * Decode a single PNG as a QR code. Returns the decoded text on
+     * success, or null if the file isn't a valid image / contains no
+     * QR / is unreadable. ZXing's HybridBinarizer + RGBLuminanceSource
+     * is the standard "decode a still image" recipe.
+     */
+    private static String decodeQrPngFile(@NonNull File file) {
+        Bitmap bitmap;
+        try {
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
+        } catch (Exception e) {
+            return null;
+        }
+        if (bitmap == null) {
+            return null;
+        }
+        try {
+            int width = bitmap.getWidth();
+            int height = bitmap.getHeight();
+            int[] pixels = new int[width * height];
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
+
+            RGBLuminanceSource source = new RGBLuminanceSource(width, height, pixels);
+            BinaryBitmap binary = new BinaryBitmap(new HybridBinarizer(source));
+
+            Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
+            hints.put(DecodeHintType.POSSIBLE_FORMATS,
+                    Arrays.asList(BarcodeFormat.QR_CODE));
+            // TRY_HARDER trades CPU for a higher decode rate on rough
+            // or low-contrast images. The set is tiny so it's cheap.
+            hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
+
+            try {
+                Result r = new MultiFormatReader().decode(binary, hints);
+                return r.getText();
+            } catch (NotFoundException nf) {
+                return null;
+            }
+        } finally {
+            bitmap.recycle();
+        }
     }
 }
