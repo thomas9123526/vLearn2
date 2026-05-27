@@ -19,6 +19,7 @@ import { AiModule } from './ai/ai.module';
 import { GuardModule } from './guard/guard.module';
 import { AdminModule } from './admin/admin.module';
 import { AppConfigModule } from './app-config/app-config.module';
+import { LicenseModule } from './license/license.module';
 import { NewsModule } from './news/news.module';
 
 @Module({
@@ -52,6 +53,7 @@ import { NewsModule } from './news/news.module';
     GuardModule,
     AdminModule,
     AppConfigModule,
+    LicenseModule,
     NewsModule,
   ],
   controllers: [HealthController],

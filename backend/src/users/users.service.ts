@@ -32,6 +32,18 @@ export class UsersService {
     return this.toProfile(await this.findById(id));
   }
 
+  async setAvatar(
+    userId: string,
+    storageKey: string,
+    publicUrl: string,
+  ): Promise<UserProfileDto> {
+    const user = await this.findById(userId);
+    user.info.avatar_storage_key = storageKey;
+    user.info.avatar_url = publicUrl;
+    await this.userInfos.save(user.info);
+    return this.toProfile(user);
+  }
+
   async updateProfile(
     id: string,
     dto: UpdateProfileDto,
@@ -82,6 +94,7 @@ export class UsersService {
       email: u.info.email,
       displayName: u.name,
       avatarEmoji: u.info.avatar_emoji,
+      avatarUrl: u.info.avatar_url,
       gender: u.gender,
       nativeLanguage: u.info.native_language,
       uiLanguage: u.info.ui_language,

@@ -7,6 +7,7 @@ class UserProfile {
     this.email,
     required this.displayName,
     required this.avatarEmoji,
+    this.avatarUrl,
     required this.gender,
     required this.uiLanguage,
     required this.currentLevel,
@@ -24,6 +25,7 @@ class UserProfile {
         email: j['email'] as String?,
         displayName: j['displayName'] as String,
         avatarEmoji: j['avatarEmoji'] as String? ?? '🐣',
+        avatarUrl: j['avatarUrl'] as String?,
         gender: j['gender'] as String? ?? 'unspecified',
         uiLanguage: j['uiLanguage'] as String? ?? 'en',
         currentLevel: (j['currentLevel'] as num).toInt(),
@@ -40,6 +42,9 @@ class UserProfile {
   final String? email;
   final String displayName;
   final String avatarEmoji;
+  /// Server-side path, joined with the API base URL on render.
+  /// e.g. `/uploads/avatars/<id>.jpg`. Null = use [avatarEmoji].
+  final String? avatarUrl;
   final String gender;
   final String uiLanguage;
   final int currentLevel;

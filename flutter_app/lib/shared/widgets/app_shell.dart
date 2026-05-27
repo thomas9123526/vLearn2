@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/config/layout_config_provider.dart';
+import '../../core/network/offline_banner.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/router/app_router.dart';
 
@@ -59,6 +60,17 @@ class AppShell extends ConsumerWidget {
 
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
 
+    // Wrap the active route's body in a column so the offline banner
+    // can slide in above it without pushing chrome (sidebar, bottom
+    // nav) around. Both layouts share the same wrapper to keep the
+    // banner consistent.
+    final bodyWithBanner = Column(
+      children: [
+        const OfflineBanner(),
+        Expanded(child: child),
+      ],
+    );
+
     if (isDesktop) {
       return Scaffold(
         body: Row(
@@ -68,14 +80,14 @@ class AppShell extends ConsumerWidget {
               activeIndex: activeIndex,
               onTap: (i) => context.go(visibleTabs[i].route),
             ),
-            Expanded(child: child),
+            Expanded(child: bodyWithBanner),
           ],
         ),
       );
     }
 
     return Scaffold(
-      body: child,
+      body: bodyWithBanner,
       bottomNavigationBar: NavigationBar(
         selectedIndex: activeIndex,
         onDestinationSelected: (i) => context.go(visibleTabs[i].route),

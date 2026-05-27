@@ -1218,7 +1218,7 @@ function SettingsScreen({ theme, persona, difficulty, feedback, nav, layout, twe
         <SectionHead theme={theme} kicker={t('Other')} title={t('Preferences')} />
         <Card theme={theme} padding={0}>
           {(() => {
-            const langLabels = { en: 'English', zh: '中文', ko: '한국어' };
+            const langLabels = { en: 'English', zh: '中文', ko: '조선어' };
             const langOrder = ['en', 'zh', 'ko'];
             const curLang = tweaks.lang || 'en';
             const cycleLang = () => {

@@ -1,5 +1,8 @@
 'use client';
 
+// Per-post edit page (/news/[id]) does not exist yet — the row title
+// is rendered as a plain span instead of a <Link>. Restore the Link
+// (and remove this note) when the [id] route ships.
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pin, Archive, CheckCircle2 } from 'lucide-react';
@@ -82,9 +85,7 @@ export default function NewsListPage() {
             {(data?.items ?? []).map((post) => (
               <tr key={post.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-2">
-                  <Link href={`/news/${post.id}`} className="hover:underline">
-                    {post.title.en ?? post.slug}
-                  </Link>
+                  <span>{post.title.en ?? post.slug}</span>
                 </td>
                 <td className="px-4 py-2">
                   <StatusPill status={post.status} />

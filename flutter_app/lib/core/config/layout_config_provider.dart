@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
@@ -50,23 +52,30 @@ class LayoutConfigNotifier extends AsyncNotifier<LayoutConfig> {
       flags: Map.of(_bakedDefaults),
       fetchedAt: DateTime.now(),
     );
-    // Best-effort refresh — never throws
-    Future<void>(() async {
-      try {
-        final dio = ref.read(apiClientProvider);
-        final res = await dio.get<Map<String, dynamic>>('/app-config');
-        final flags = (res.data?['flags'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-        state = AsyncValue.data(LayoutConfig(
-          flags: {..._bakedDefaults, ...flags},
-          fetchedAt: DateTime.now(),
-        ));
-      } on DioException {
-        // Keep defaults
-      } on Object {
-        // Keep defaults
-      }
-    });
+    unawaited(_fetchFromServer());
     return defaults;
+  }
+
+  /// Pulls fresh flags from `/app-config` and updates state on success.
+  /// Best-effort -- swallows network errors so callers (e.g. Settings
+  /// re-opening after an admin toggled `license.enabled`) can call this
+  /// without try/catch.
+  Future<void> refresh() => _fetchFromServer();
+
+  Future<void> _fetchFromServer() async {
+    try {
+      final dio = ref.read(apiClientProvider);
+      final res = await dio.get<Map<String, dynamic>>('/app-config');
+      final flags = (res.data?['flags'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+      state = AsyncValue.data(LayoutConfig(
+        flags: {..._bakedDefaults, ...flags},
+        fetchedAt: DateTime.now(),
+      ));
+    } on DioException {
+      // Keep existing value (defaults or last good fetch).
+    } on Object {
+      // Keep existing value.
+    }
   }
 }
 

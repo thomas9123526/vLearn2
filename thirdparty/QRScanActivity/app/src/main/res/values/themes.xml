@@ -1,0 +1,11 @@
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="Theme.QRScanActivity" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/teal</item>
+        <item name="colorOnPrimary">@color/white</item>
+    </style>
+
+    <!-- Theme.QRScanActivity.Scanner lives in the :scanner library now. -->
+
+</resources>

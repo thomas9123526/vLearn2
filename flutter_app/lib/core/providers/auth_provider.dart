@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../api/auth_api.dart';
@@ -63,6 +65,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     bool rememberMe = true,
   }) async {
     state = AuthState.checking();
+    _logTarget('signin', cidUsername);
     late final Map<String, dynamic> tokens;
     try {
       tokens = await _ref.read(authApiProvider).signIn(
@@ -112,6 +115,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? uiLanguage,
   }) async {
     state = AuthState.checking();
+    _logTarget('signup', cidUsername);
     try {
       final tokens = await _ref.read(authApiProvider).signUp(
             cid: cid,
@@ -152,6 +156,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (state.status == AuthStatus.signedOut) return;
     await _ref.read(tokenStoreProvider).clear();
     state = AuthState.signedOut();
+  }
+
+  /// Prints the resolved Dio base URL + the path we're about to hit, so you
+  /// can verify which host the app is actually talking to. Visible under
+  /// Logcat tag `flutter` (and in the Dart console). Username included to
+  /// disambiguate multiple attempts; password is never logged.
+  void _logTarget(String action, String cidUsername) {
+    final Dio dio = _ref.read(apiClientProvider);
+    final base = dio.options.baseUrl;
+    final path = action == 'signin' ? '/auth/signin' : '/auth/signup';
+    debugPrint('[auth.$action] target=$base$path user=$cidUsername');
   }
 
   Future<void> _persistAndFetch(Map<String, dynamic> tokens) async {

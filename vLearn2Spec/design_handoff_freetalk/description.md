@@ -20,7 +20,7 @@ session it scores their speech and gives corrections.
 | Pick a scene, then speak | Users choose a scenario (interview, café, first date…) so practice feels real. |
 | Encouragement first | Confetti, count-ups, a coach's voice. Even mistakes are framed kindly. |
 | One product, two devices | Same design renders responsively on Android phone and a Windows desktop window. |
-| Multilingual UI | App chrome translates to EN / 中文 / 한국어. The *target* language is always English. |
+| Multilingual UI | App chrome translates to EN / 中文 / 조선어. The *target* language is always English. |
 | Tweakable identity | Theme (4 palettes) and tutor persona (4 characters) are live-switchable. |
 
 **Visual DNA**
@@ -645,7 +645,7 @@ The most varied page. Combines profile + identity + preferences.
 
 **Language list (very first thing on the page)**
 - Kicker `APP LANGUAGE`.
-- Vertical list card with 3 rows: EN, 中文, 한국어. Each row has a 36-dp accent
+- Vertical list card with 3 rows: EN, 中文, 조선어. Each row has a 36-dp accent
   monogram, the native script in display face, the romanization in mono, and
   a circular radio indicator on the right. Active row is tinted accentSoft.
 

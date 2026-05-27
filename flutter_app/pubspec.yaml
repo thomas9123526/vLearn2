@@ -34,8 +34,10 @@ dependencies:
   freezed_annotation: ^2.4.2
   json_annotation: ^4.9.0
 
-  # Animation
-  rive: ^0.13.13
+  # Animation. 0.14 was a major rewrite — RiveAnimation widget removed,
+  # replaced by RiveWidget + a (Stateless)RiveWidgetController loaded
+  # from File.asset(...). See features/conversation/widgets/tutor_avatar.dart.
+  rive: ^0.14.7
 
   # i18n
   intl: ^0.20.2
@@ -45,6 +47,17 @@ dependencies:
   cached_network_image: ^3.3.1
   flutter_svg: ^2.0.10+1
   fl_chart: ^0.68.0
+
+  # Network reachability — Wi-Fi/mobile detection on Android, NLM
+  # query on Windows. Used by NetworkStatusService and a Dio
+  # interceptor that short-circuits requests when offline so the user
+  # sees a single polite "no connection" banner instead of a long
+  # Dio timeout.
+  connectivity_plus: ^6.0.5
+
+  # Pick a profile photo from camera or gallery. Used by the Edit
+  # Profile dialog to upload an avatar to /users/avatar.
+  image_picker: ^1.1.2
 
   # Storage
   shared_preferences: ^2.2.3

@@ -59,6 +59,9 @@ String politeMessageFor(
   if (i18nKey == 'auth.post_signin_failed') {
     return 'Signed in, but we could not load your profile. Check that the app points at the right server and try again.';
   }
+  if (i18nKey == 'network.offline') {
+    return "You're offline. Connect to Wi-Fi or mobile data and try again.";
+  }
 
   if (error is ApiException && error.isNetwork) {
     return "Couldn't reach the server. Check your connection and try again.";
@@ -101,10 +104,22 @@ String politeMessageFor(
           ? "We couldn't find that. It may have been removed."
           : "Couldn't find what you were looking for.";
     }
-    if (status == 409 ||
-        _i18nMatches(error, 'auth.cid_username_taken') ||
+    // 409 conflicts split into two messages: the CID-already-registered
+    // case identifies the *national ID*, the username-taken case
+    // identifies the *login name*. Lumping both under "That username
+    // is already in use" used to send users hunting in the wrong
+    // field when the real collision was on CID.
+    if (_i18nMatches(error, 'auth.cid_already_registered')) {
+      return 'That CID number is already registered.';
+    }
+    if (_i18nMatches(error, 'auth.cid_username_taken') ||
         _i18nMatches(error, 'auth.email_taken')) {
       return 'That username is already in use.';
+    }
+    if (status == 409) {
+      // Generic 409 fallback when we don't have a specific i18n key
+      // to disambiguate (e.g. an unexpected unique-constraint hit).
+      return 'That value is already in use.';
     }
     if (status == 422 || status == 400) {
       return 'Something in that request looked off. Please check and try again.';

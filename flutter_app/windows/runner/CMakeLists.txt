@@ -38,3 +38,11 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# Copy WindowsDevID.dll next to the executable so LoadLibraryA finds it.
+add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_CURRENT_SOURCE_DIR}/libs/WindowsDevID.dll"
+    "$<TARGET_FILE_DIR:${BINARY_NAME}>/WindowsDevID.dll"
+  COMMENT "Copying WindowsDevID.dll to output directory"
+)

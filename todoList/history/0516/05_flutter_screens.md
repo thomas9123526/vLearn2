@@ -290,7 +290,7 @@ Colors reference `tokens.json` palettes. Strings reference `strings.json` keys.
 ### Layout (sections)
 1. **Profile** section: avatar chip + display name + email + "Edit profile" button
 2. **Tutor** section: horizontal persona carousel (Maya, Leo, Sofia, Theo cards with name, accent color)
-3. **App Language** section: language list (English, 한국어, 中文) with radio
+3. **App Language** section: language list (English, 조선어, 中文) with radio
 4. **Theme** section: 4 color swatches (Apricot, Sage, Iris, Obsidian) with label
 5. **Learning** section: Daily goal (5/10/15/20 min selector)
 6. **About** section: version, terms, privacy links

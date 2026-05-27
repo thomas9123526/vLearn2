@@ -21,9 +21,67 @@ import type {
   SignInDto,
   AuthResponseDto,
   TokenPairDto,
+  SuggestCidUsernameDto,
 } from './dto/auth.dto';
 
 const BCRYPT_ROUNDS = 10;
+
+// ─── Hangul (Korean) romanization for cid_username suggestions ────────────
+//
+// Simplified Revised Romanization, single-letter per Hangul syllable.
+// Each precomposed Hangul syllable U+AC00..U+D7A3 decomposes into
+//   syllable = 0xAC00 + cho * 21 * 28 + jung * 28 + jong
+// where `cho` is the initial-consonant (choseong) index 0..18 and
+// `jung` is the vowel (jungseong) index 0..20. For a silent ㅇ initial
+// (cho == 11) we fall back to the first letter of the vowel's
+// romanization so the syllable still contributes one ASCII letter.
+const HANGUL_CHOSEONG_INITIAL: readonly string[] = [
+  'g', 'k', 'n', 'd', 't',
+  'r', 'm', 'b', 'p', 's',
+  's', '',  'j', 'j', 'c',
+  'k', 't', 'p', 'h',
+];
+const HANGUL_JUNGSEONG_INITIAL: readonly string[] = [
+  'a', 'a', 'y', 'y', 'e',
+  'e', 'y', 'y', 'o', 'w',
+  'w', 'o', 'y', 'u', 'w',
+  'w', 'w', 'y', 'e', 'u',
+  'i',
+];
+
+function romanizeHangulSyllable(ch: string): string {
+  const code = ch.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return '';
+  const offset = code - 0xac00;
+  const cho = Math.floor(offset / (21 * 28));
+  const cons = HANGUL_CHOSEONG_INITIAL[cho];
+  if (cons) return cons;
+  // Silent ㅇ -> use the syllable's vowel.
+  const jung = Math.floor((offset % (21 * 28)) / 28);
+  return HANGUL_JUNGSEONG_INITIAL[jung] ?? '';
+}
+
+// Produces one or more ASCII letters for a single name "word".
+//   ASCII word ("Alex")  -> first letter, lowercased ("a")
+//   Hangul word ("신영명") -> one letter per syllable ("sym")
+//   Mixed ("Kim신")       -> 'k' (first ASCII letter; mixed words are rare)
+// Anything else (kanji, hanzi, Cyrillic, …) returns ''.
+function wordInitials(word: string): string {
+  if (!word) return '';
+  // Pure Hangul handling: every syllable contributes a letter.
+  // A word qualifies as "Hangul" when it contains at least one
+  // Hangul syllable and no leading ASCII letter.
+  const firstAscii = word.match(/[a-zA-Z]/);
+  if (!firstAscii && /[가-힣]/.test(word)) {
+    let out = '';
+    for (const ch of word) {
+      const r = romanizeHangulSyllable(ch);
+      if (r) out += r;
+    }
+    return out;
+  }
+  return firstAscii ? firstAscii[0].toLowerCase() : '';
+}
 
 @Injectable()
 export class AuthService {
@@ -44,11 +102,18 @@ export class AuthService {
 
   // ─── Sign-up (regular user) ─────────────────────────────
   async signUp(dto: SignUpDto): Promise<AuthResponseDto> {
-    const existing = await this.users.findOne({
-      where: { cid_username: dto.cidUsername },
-    });
-    if (existing)
+    // Check both unique fields up-front to give readable errors rather
+    // than letting the DB constraint bubble up as a 500.
+    const [byCidUsername, byCid] = await Promise.all([
+      this.users.findOne({ where: { cid_username: dto.cidUsername } }),
+      dto.cid
+        ? this.users.findOne({ where: { cid: dto.cid } })
+        : Promise.resolve(null),
+    ]);
+    if (byCidUsername)
       throw new ConflictException({ i18nKey: 'auth.cid_username_taken' });
+    if (byCid)
+      throw new ConflictException({ i18nKey: 'auth.cid_already_registered' });
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     const user = await this.users.save(
@@ -126,6 +191,110 @@ export class AuthService {
 
     await this.refreshTokens.delete({ id: stored.id });
     return this.issueTokens(user);
+  }
+
+  // ─── Lookup username by CID (pre-signin convenience) ────
+  /**
+   * Returns the cid_username registered against the given CID, so the
+   * sign-in screen can auto-fill the username field once the user has
+   * synced their CID. Public on purpose — the caller has no JWT yet —
+   * but **only** returns the username for active accounts. Suspended
+   * or deleted users get a 404 to avoid disclosing their state.
+   *
+   * Rate-limiting / brute-force protection is the responsibility of
+   * the ingress (nginx) and the global throttler module — this method
+   * does not implement either.
+   */
+  async lookupUsernameByCid(cid: string): Promise<{ cidUsername: string }> {
+    const trimmed = cid.trim();
+    if (!trimmed) {
+      throw new UnauthorizedException({ i18nKey: 'auth.cid_required' });
+    }
+    const user = await this.users.findOne({
+      where: { cid: trimmed },
+      select: ['id', 'cid_username'],
+    });
+    if (!user || !user.cid_username) {
+      throw new UnauthorizedException({ i18nKey: 'auth.cid_not_registered' });
+    }
+    return { cidUsername: user.cid_username };
+  }
+
+  // ─── Suggest available cid_usernames ───────────────────
+  //
+  // Output candidates obey the same constraint enforced by
+  // SignUpDto.cidUsername (>=2 ASCII letters + >=2 digits, letters
+  // + digits only). The initials prefix has to carry the letter
+  // half of the budget, so Korean syllables get romanized one
+  // letter each (신영명 -> sym) and ASCII words give one initial
+  // per word (Hong Li Jun -> hlj). Mixed names round-trip cleanly.
+  async suggestCidUsernames(
+    dto: SuggestCidUsernameDto,
+  ): Promise<{ suggestions: string[] }> {
+    let initials = dto.displayName
+      .trim()
+      .split(/\s+/)
+      .map((w) => wordInitials(w))
+      .join('');
+
+    // Single-letter result ("Alex" -> "a") falls through: pull
+    // the first two ASCII letters of the entire name as a fallback.
+    if (initials.length < 2) {
+      initials = dto.displayName
+        .toLowerCase()
+        .replace(/[^a-z]/g, '')
+        .slice(0, 2);
+    }
+    // If the name still has no usable letters (e.g. all-Chinese,
+    // all-Japanese name -- those aren't romanized here), bail with
+    // empty suggestions; the operator will type their own
+    // cid_username.
+    if (initials.length < 2) {
+      return { suggestions: [] };
+    }
+
+    const [yearStr, monthStr, dayStr] = dto.birthday.split('-');
+    const yy = yearStr.slice(-2);          // '94'
+    const m  = String(parseInt(monthStr)); // '3'  (no leading zero)
+    const mm = monthStr;                   // '03'
+    const dd = dayStr;                     // '17'
+
+    // Priority-ordered candidates; duplicates removed below.
+    // Every entry pairs `initials` (>=2 letters) with at least
+    // two digits, so the cidUsername regex always passes.
+    const raw = [
+      `${initials}${yy}${m}${dd}`,   // hlj94317
+      `${initials}${m}${dd}`,        // hlj317
+      `${initials}${yy}${mm}${dd}`,  // hlj940317
+      `${initials}${dd}${m}${yy}`,   // hlj17394
+      `${initials}${yy}${m}`,        // hlj943
+      `${initials}${m}${dd}${yy}`,   // hlj31794
+      `${initials}${dd}${mm}`,       // hlj1703
+      `${initials}${yy}`,            // hlj94
+    ];
+
+    // Belt-and-suspenders: keep only the entries that match the
+    // public constraint. A future tweak to the regex above won't
+    // silently start handing out invalid suggestions.
+    const cidRe = /^(?=(?:.*[a-zA-Z]){2,})(?=(?:.*\d){2,})[a-zA-Z0-9]+$/;
+    const seen = new Set<string>();
+    const candidates = raw.filter(
+      (c) => cidRe.test(c) && !seen.has(c) && seen.add(c),
+    );
+
+    if (candidates.length === 0) {
+      return { suggestions: [] };
+    }
+
+    const taken = await this.users
+      .createQueryBuilder('u')
+      .select('u.cid_username', 'cu')
+      .where('u.cid_username = ANY(:candidates)', { candidates })
+      .getRawMany<{ cu: string }>();
+
+    const takenSet = new Set(taken.map((r) => r.cu));
+    const available = candidates.filter((c) => !takenSet.has(c)).slice(0, 6);
+    return { suggestions: available };
   }
 
   // ─── Sign-out ───────────────────────────────────────────

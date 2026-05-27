@@ -5,11 +5,13 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiTags,
   ApiOkResponse,
   ApiCreatedResponse,
@@ -21,6 +23,7 @@ import {
   RefreshDto,
   AuthResponseDto,
   TokenPairDto,
+  SuggestCidUsernameDto,
 } from './dto/auth.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -48,6 +51,32 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   signIn(@Body() dto: SignInDto): Promise<AuthResponseDto> {
     return this.auth.signIn(dto);
+  }
+
+  @Public()
+  @Get('lookup-username')
+  @ApiOperation({
+    summary:
+      'Resolve a registered CID to its login username (pre-signin convenience)',
+  })
+  @ApiQuery({ name: 'cid', required: true })
+  @ApiOkResponse({ schema: { example: { cidUsername: 'kky1206' } } })
+  @HttpCode(HttpStatus.OK)
+  lookupUsername(
+    @Query('cid') cid: string,
+  ): Promise<{ cidUsername: string }> {
+    return this.auth.lookupUsernameByCid(cid ?? '');
+  }
+
+  @Public()
+  @Post('suggest-cid-username')
+  @ApiOperation({ summary: 'Suggest available cid_usernames from display name + birthday' })
+  @ApiOkResponse({ schema: { example: { suggestions: ['hlj94317', 'hlj317'] } } })
+  @HttpCode(HttpStatus.OK)
+  suggestCidUsername(
+    @Body() dto: SuggestCidUsernameDto,
+  ): Promise<{ suggestions: string[] }> {
+    return this.auth.suggestCidUsernames(dto);
   }
 
   @Public()

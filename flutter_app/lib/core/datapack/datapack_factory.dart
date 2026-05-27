@@ -18,6 +18,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:crypto/crypto.dart' as crypto;
 
 import 'datapack_cert.dart';
 import 'datapack_crypto.dart';
@@ -90,149 +91,313 @@ class DataUnpackFactory {
   }) async {
     dpLog('unpack: START $packPath');
     dpLog('unpack:   → output root $outRoot');
-    final pack = Uint8List.fromList(await File(packPath).readAsBytes());
-    dpLog('unpack:   read ${pack.length} bytes from disk');
 
-    // 1) Header.
-    final hdr = DataPackHeader.parse(pack);
-    dpLog('unpack:   [1/6] header OK — version ${hdr.version}, '
-        'compressed=${hdr.isCompressed}, encrypted=${hdr.isEncrypted}, '
-        'signed=${hdr.isSigned}');
+    // Up-front file-size log: invaluable when the user reports "the
+    // app died on this .dat" — tells us whether we're dealing with a
+    // tiny pack or a multi-GB one.
+    final file = File(packPath);
+    final packSize = await file.length();
+    dpLog('unpack:   → pack file is $packSize bytes '
+        '(${(packSize / (1024 * 1024)).toStringAsFixed(1)} MB)');
 
-    // 2) Manifest.
-    final manifestJson = String.fromCharCodes(Uint8List.sublistView(
-      pack, hdr.manifestOffset, hdr.manifestOffset + hdr.manifestLen,
-    ));
-    final manifest = DataPackManifest.parse(manifestJson);
-    dpLog('unpack:   [2/6] manifest OK — bundle "${manifest.bundleName}", '
-        '${manifest.files.length} file(s), '
-        'compression=${manifest.compression}, '
-        'encryption=${manifest.encryption}');
+    // Streamed: only the section / file blob currently being processed
+    // is held in memory. The previous implementation read the WHOLE
+    // pack into a Uint8List up-front, which OOM'd on Android for
+    // multi-hundred-MB `.dat`s (the user-visible "Out of Memory" on
+    // 2.dat).
+    final raf = await file.open();
+    try {
+      // 1) Header — first 64 bytes.
+      final headerBytes = await raf.read(64);
+      if (headerBytes.length < 64) {
+        throw const FormatException('.dat too small to hold header');
+      }
+      final hdr = DataPackHeader.parse(headerBytes);
+      dpLog('unpack:   [1/6] header OK — version ${hdr.version}, '
+          'compressed=${hdr.isCompressed}, encrypted=${hdr.isEncrypted}, '
+          'signed=${hdr.isSigned}');
+      dpLog('unpack:        sections — '
+          'manifest @${hdr.manifestOffset}(${hdr.manifestLen}B), '
+          'data @${hdr.dataOffset}(${hdr.dataLen}B), '
+          'cert @${hdr.certOffset}(${hdr.certLen}B), '
+          'sig @${hdr.sigOffset}(${hdr.sigLen}B)');
 
-    // 3) Cert + chain validation. Anything without a cert + sig is
-    //    refused — debug Stage-3 packs only work in dev tools.
-    if (!hdr.isSigned) {
-      throw const FormatException('.ddp is unsigned (refused in production)');
-    }
-    final adminCert = parseDerCert(Uint8List.sublistView(
-      pack, hdr.certOffset, hdr.certOffset + hdr.certLen,
-    ));
-    if (!verifyCertSignedBy(adminCert, _rootCa)) {
-      throw const FormatException(
-          '.ddp admin cert does not chain to the pinned root CA');
-    }
-    dpLog('unpack:   [3/6] cert chain OK — admin cert chains to pinned root');
+      // Sanity check: every declared section must fit inside the file.
+      // A corrupt or mis-packed header otherwise sends `raf.read(huge)`
+      // off to allocate a multi-GB buffer and OOM the process.
+      void checkRange(String name, int offset, int len) {
+        if (offset < 0 || len < 0 || offset + len > packSize) {
+          throw FormatException(
+              'header $name out of bounds: offset=$offset len=$len, '
+              'pack=$packSize');
+        }
+      }
+      checkRange('manifest', hdr.manifestOffset, hdr.manifestLen);
+      checkRange('data',     hdr.dataOffset,     hdr.dataLen);
+      checkRange('cert',     hdr.certOffset,     hdr.certLen);
+      checkRange('sig',      hdr.sigOffset,      hdr.sigLen);
 
-    // 4) Verify the pack signature. Mirror of the trick in
-    //    packer.cpp: re-zero sig_len/sig_offset before hashing.
-    final digest = _digestOverPack(pack, hdr);
-    final sigBytes = Uint8List.sublistView(
-      pack, hdr.sigOffset, hdr.sigOffset + hdr.sigLen,
-    );
-    final sigOk = verifyEcdsaP256(
-      pubKey: adminCert.publicKeyPoint,
-      messageDigest: digest,
-      signatureDer: Uint8List.fromList(sigBytes),
-    );
-    if (!sigOk) {
-      throw const FormatException(
-          '.ddp signature does not verify against admin cert pubkey');
-    }
-    dpLog('unpack:   [4/6] signature OK — ECDSA verifies against admin cert');
+      // 2) Manifest section (always small — JSON text).
+      await raf.setPosition(hdr.manifestOffset);
+      final manifestBytes = await raf.read(hdr.manifestLen);
+      if (manifestBytes.length < hdr.manifestLen) {
+        throw const FormatException('.dat truncated — manifest section short');
+      }
+      final manifest =
+          DataPackManifest.parse(String.fromCharCodes(manifestBytes));
+      dpLog('unpack:   [2/6] manifest OK — bundle "${manifest.bundleName}", '
+          '${manifest.files.length} file(s), '
+          'compression=${manifest.compression}, '
+          'encryption=${manifest.encryption}');
+      // List the file sizes so we can spot a single huge blob that
+      // would still OOM the per-file decoder (decrypt+inflate work on
+      // whole buffers; only multi-section reads are streamed).
+      for (final mf in manifest.files) {
+        dpLog('unpack:        file "${mf.relPath}"  stored=${mf.storedSize}B  '
+            'plain=${mf.size}B');
+      }
 
-    // 5) Derive AES key if the pack is encrypted.
-    Uint8List? aesKey;
-    if (hdr.isEncrypted) {
-      if (manifest.ephemeralPubHex.length != 66) {
+      // 3) Cert + chain validation. Anything without a cert + sig is
+      //    refused — debug Stage-3 packs only work in dev tools.
+      if (!hdr.isSigned) {
         throw const FormatException(
-            'manifest.ephemeral_pub_hex must be 66 chars for P-256');
+            '.ddp is unsigned (refused in production)');
       }
-      final ephBytes = _hexToBytes(manifest.ephemeralPubHex);
-      final ephPoint = decompressP256Point(ephBytes);
-      final shared = ecdhSharedSecret(_adminPriv, ephPoint);
-      aesKey = hkdfSha256(
-        ikm: shared,
-        salt: Uint8List.fromList(kHkdfSalt.codeUnits),
-        info: Uint8List.fromList(kHkdfInfo.codeUnits),
+      await raf.setPosition(hdr.certOffset);
+      final certBytes = await raf.read(hdr.certLen);
+      if (certBytes.length < hdr.certLen) {
+        throw const FormatException('.dat truncated — cert section short');
+      }
+      final adminCert = parseDerCert(certBytes);
+      if (!verifyCertSignedBy(adminCert, _rootCa)) {
+        throw const FormatException(
+            '.ddp admin cert does not chain to the pinned root CA');
+      }
+      dpLog('unpack:   [3/6] cert chain OK — admin cert chains to pinned root');
+
+      // 4) Verify the pack signature. Hash is computed over
+      //      header_with_sig_zeroed ‖ manifest ‖ data ‖ cert
+      //    — same byte sequence packer.cpp signed. We use
+      //    `package:crypto`'s streaming SHA-256 fed by
+      //    `File.openRead(start, end)`, so the only large piece (the
+      //    data section) flows through a Stream<List<int>> instead of
+      //    landing in a Uint8List of its own. Progress is logged so a
+      //    multi-hundred-MB hash doesn't look like a hang.
+      dpLog('unpack:        hashing for signature '
+          '(${(hdr.dataLen / (1024 * 1024)).toStringAsFixed(1)} MB data '
+          'section)…');
+      final digest = await _streamedDigest(
+          file, hdr, manifestBytes, certBytes);
+      await raf.setPosition(hdr.sigOffset);
+      final sigBytes = await raf.read(hdr.sigLen);
+      if (sigBytes.length < hdr.sigLen) {
+        throw const FormatException('.dat truncated — signature section short');
+      }
+      final sigOk = verifyEcdsaP256(
+        pubKey: adminCert.publicKeyPoint,
+        messageDigest: digest,
+        signatureDer: sigBytes,
       );
-      dpLog('unpack:   [5/6] AES-256 key derived via ECDH + HKDF');
-    } else {
-      dpLog('unpack:   [5/6] pack not encrypted — no key derivation');
+      if (!sigOk) {
+        throw const FormatException(
+            '.ddp signature does not verify against admin cert pubkey');
+      }
+      dpLog('unpack:   [4/6] signature OK — ECDSA verifies against admin cert');
+
+      // 5) Derive AES key if the pack is encrypted.
+      Uint8List? aesKey;
+      if (hdr.isEncrypted) {
+        if (manifest.ephemeralPubHex.length != 66) {
+          throw const FormatException(
+              'manifest.ephemeral_pub_hex must be 66 chars for P-256');
+        }
+        final ephBytes = _hexToBytes(manifest.ephemeralPubHex);
+        final ephPoint = decompressP256Point(ephBytes);
+        final shared = ecdhSharedSecret(_adminPriv, ephPoint);
+        aesKey = hkdfSha256(
+          ikm: shared,
+          salt: Uint8List.fromList(kHkdfSalt.codeUnits),
+          info: Uint8List.fromList(kHkdfInfo.codeUnits),
+        );
+        dpLog('unpack:   [5/6] AES-256 key derived via ECDH + HKDF');
+      } else {
+        dpLog('unpack:   [5/6] pack not encrypted — no key derivation');
+      }
+
+      // 6) Walk the manifest one blob at a time.
+      //
+      //    Two paths:
+      //      a) PASSTHROUGH (compress=none AND encrypt=none): the blob
+      //         is the file verbatim, so stream-copy it from the .dat
+      //         straight to disk in 64 KB chunks, hashing as we go.
+      //         Peak RAM ≈ one chunk — a 1 GB file is fine.
+      //      b) Transformed: load the blob → decrypt → inflate → hash
+      //         → write. Peak RAM ≈ one file's encrypted + decrypted +
+      //         decompressed bytes (the existing path).
+      //
+      //    A pack made with `pack_mode: {compress:"none", encrypt:"none"}`
+      //    in DataManage's config.json hits path (a) and can therefore
+      //    contain arbitrarily large files without OOM-ing the device.
+      final passthrough = aesKey == null && !hdr.isCompressed;
+      dpLog('unpack:   [6/6] decoding ${manifest.files.length} file(s) '
+          '(${passthrough ? "passthrough: stream-copy" : "transformed: "
+              "${hdr.isEncrypted ? "decrypt+" : ""}"
+              "${hdr.isCompressed ? "inflate" : ""}"})…');
+      final outDir = Directory(outRoot);
+      if (!await outDir.exists()) await outDir.create(recursive: true);
+
+      final results = <UnpackedFile>[];
+      final total = manifest.files.length;
+      var index = 0;
+      for (final mf in manifest.files) {
+        ++index;
+        final outPath = _safeJoin(outRoot, mf.outFolder, mf.relPath);
+        await Directory(_dirOf(outPath)).create(recursive: true);
+
+        if (passthrough) {
+          // ── path (a): stream-copy + stream-hash, bounded memory ──
+          if (mf.storedSize != mf.size) {
+            throw FormatException(
+                'passthrough but storedSize ${mf.storedSize} != size '
+                '${mf.size} for ${mf.relPath} — pack/unpack disagree on '
+                'whether transforms are applied');
+          }
+          final hashSink = _DigestSink();
+          final hashInput = crypto.sha256.startChunkedConversion(hashSink);
+          final outFile = File(outPath);
+          final outSink = outFile.openWrite();
+          try {
+            await for (final chunk in file.openRead(
+                hdr.dataOffset + mf.offset,
+                hdr.dataOffset + mf.offset + mf.storedSize)) {
+              hashInput.add(chunk);
+              outSink.add(chunk);
+            }
+            hashInput.close();
+          } finally {
+            await outSink.flush();
+            await outSink.close();
+          }
+          final actualHash = _toHex(Uint8List.fromList(hashSink.digest!.bytes));
+          if (actualHash != mf.sha256Hex) {
+            try { await outFile.delete(); } catch (_) {/* ignore */}
+            dpLog('unpack:   [$index/$total] FAIL ${mf.relPath} — '
+                'SHA-256 mismatch (stream-copy)');
+            throw FormatException(
+                'SHA-256 mismatch for ${mf.relPath}: '
+                'expected ${mf.sha256Hex}, got $actualHash');
+          }
+          results.add(UnpackedFile(outPath, mf.size));
+          dpLog('unpack:   [$index/$total] ${mf.relPath}  '
+              '(stream-copy ${mf.size}B → sha256 OK)  →  $outPath');
+          onFileProgress?.call(index, total);
+          continue;
+        }
+
+        // ── path (b): whole-buffer decrypt / inflate ──
+        final steps = <String>[];
+        await raf.setPosition(hdr.dataOffset + mf.offset);
+        Uint8List bytes = await raf.read(mf.storedSize);
+        if (bytes.length < mf.storedSize) {
+          throw FormatException(
+              '.dat truncated — short read on ${mf.relPath} '
+              '(${bytes.length} of ${mf.storedSize}B)');
+        }
+        steps.add('read ${mf.storedSize}B');
+
+        if (aesKey != null) {
+          bytes = aesGcmDecrypt(key: aesKey, blob: bytes);
+          steps.add('decrypt');
+        }
+        if (hdr.isCompressed) {
+          // archive's ZLibDecoder handles RFC 1950 zlib streams
+          // (which is what encrypt.cpp::deflateZlib produces).
+          bytes = Uint8List.fromList(const ZLibDecoder().decodeBytes(bytes));
+          steps.add('inflate→${bytes.length}B');
+        }
+
+        if (bytes.length != mf.size) {
+          dpLog('unpack:   [$index/$total] FAIL ${mf.relPath} — '
+              'decoded ${bytes.length}B != manifest ${mf.size}B');
+          throw FormatException(
+              'decoded size ${bytes.length} != manifest size ${mf.size} '
+              'for ${mf.relPath}');
+        }
+        final actualHash = _toHex(sha256Bytes(bytes));
+        if (actualHash != mf.sha256Hex) {
+          dpLog('unpack:   [$index/$total] FAIL ${mf.relPath} — '
+              'SHA-256 mismatch');
+          throw FormatException(
+              'SHA-256 mismatch for ${mf.relPath}: '
+              'expected ${mf.sha256Hex}, got $actualHash');
+        }
+        steps.add('sha256 OK');
+
+        await File(outPath).writeAsBytes(bytes, flush: true);
+        results.add(UnpackedFile(outPath, bytes.length));
+        dpLog('unpack:   [$index/$total] ${mf.relPath}  '
+            '(${steps.join(" → ")})  →  $outPath');
+        onFileProgress?.call(index, total);
+      }
+      dpLog('unpack: DONE "${manifest.bundleName}" — $total file(s) written '
+          'under $outRoot');
+      return UnpackResult(manifest.bundleName, results);
+    } finally {
+      await raf.close();
     }
-
-    // 6) Walk the manifest, decode + write each file.
-    dpLog('unpack:   [6/6] decoding ${manifest.files.length} file(s)…');
-    final outDir = Directory(outRoot);
-    if (!await outDir.exists()) await outDir.create(recursive: true);
-
-    final results = <UnpackedFile>[];
-    final total = manifest.files.length;
-    var index = 0;
-    for (final mf in manifest.files) {
-      ++index;
-      final steps = <String>[];
-
-      Uint8List bytes = Uint8List.sublistView(
-        pack, hdr.dataOffset + mf.offset,
-              hdr.dataOffset + mf.offset + mf.storedSize,
-      );
-      steps.add('read ${mf.storedSize}B');
-
-      if (aesKey != null) {
-        bytes = aesGcmDecrypt(key: aesKey, blob: bytes);
-        steps.add('decrypt');
-      }
-      if (hdr.isCompressed) {
-        // archive's ZLibDecoder handles RFC 1950 zlib streams
-        // (which is what encrypt.cpp::deflateZlib produces).
-        bytes = Uint8List.fromList(const ZLibDecoder().decodeBytes(bytes));
-        steps.add('inflate→${bytes.length}B');
-      }
-
-      if (bytes.length != mf.size) {
-        dpLog('unpack:   [$index/$total] FAIL ${mf.relPath} — '
-            'decoded ${bytes.length}B != manifest ${mf.size}B');
-        throw FormatException(
-            'decoded size ${bytes.length} != manifest size ${mf.size} '
-            'for ${mf.relPath}');
-      }
-      final actualHash = _toHex(sha256Bytes(bytes));
-      if (actualHash != mf.sha256Hex) {
-        dpLog('unpack:   [$index/$total] FAIL ${mf.relPath} — '
-            'SHA-256 mismatch');
-        throw FormatException(
-            'SHA-256 mismatch for ${mf.relPath}: '
-            'expected ${mf.sha256Hex}, got $actualHash');
-      }
-      steps.add('sha256 OK');
-
-      final outPath = _safeJoin(outRoot, mf.outFolder, mf.relPath);
-      await Directory(_dirOf(outPath)).create(recursive: true);
-      await File(outPath).writeAsBytes(bytes, flush: true);
-      results.add(UnpackedFile(outPath, bytes.length));
-      dpLog('unpack:   [$index/$total] ${mf.relPath}  '
-          '(${steps.join(" → ")})  →  $outPath');
-      onFileProgress?.call(index, total);
-    }
-    dpLog('unpack: DONE "${manifest.bundleName}" — $total file(s) written '
-        'under $outRoot');
-    return UnpackResult(manifest.bundleName, results);
   }
 
-  // Build the hash input that the C++ signer hashed:
-  //   header_with_sig_zeroed ‖ manifest ‖ data ‖ cert
-  Uint8List _digestOverPack(Uint8List pack, DataPackHeader hdr) {
-    final hdrBytes = hdr.toBytesForSigVerification();
-    final builder = BytesBuilder(copy: false)
-      ..add(hdrBytes)
-      ..add(Uint8List.sublistView(
-        pack, hdr.manifestOffset, hdr.manifestOffset + hdr.manifestLen))
-      ..add(Uint8List.sublistView(
-        pack, hdr.dataOffset, hdr.dataOffset + hdr.dataLen))
-      ..add(Uint8List.sublistView(
-        pack, hdr.certOffset, hdr.certOffset + hdr.certLen));
-    return sha256Bytes(builder.toBytes());
+  /// Streaming SHA-256 over the signed prefix
+  ///   header_with_sig_zeroed ‖ manifest ‖ data ‖ cert
+  /// — the same byte sequence packer.cpp signed. Manifest and cert
+  /// are already in memory; the data section (the only large piece)
+  /// is consumed straight from `File.openRead(start, end)` as a
+  /// `Stream<List<int>>`, so nothing the size of the pack is ever
+  /// materialised. Uses `package:crypto`'s SHA-256 (faster than the
+  /// pointycastle path for large inputs) via the streaming
+  /// `startChunkedConversion` API.
+  Future<Uint8List> _streamedDigest(
+    File file,
+    DataPackHeader hdr,
+    Uint8List manifestBytes,
+    Uint8List certBytes,
+  ) async {
+    final sink = _DigestSink();
+    final input = crypto.sha256.startChunkedConversion(sink);
+    input.add(hdr.toBytesForSigVerification());
+    input.add(manifestBytes);
+    var hashed = 0;
+    var nextLog = 32 * 1024 * 1024; // log every 32 MB
+    await for (final chunk
+        in file.openRead(hdr.dataOffset, hdr.dataOffset + hdr.dataLen)) {
+      input.add(chunk);
+      hashed += chunk.length;
+      if (hashed >= nextLog) {
+        dpLog('unpack:        …hashed '
+            '${(hashed / (1024 * 1024)).toStringAsFixed(0)}/'
+            '${(hdr.dataLen / (1024 * 1024)).toStringAsFixed(0)} MB');
+        nextLog += 32 * 1024 * 1024;
+      }
+    }
+    if (hashed != hdr.dataLen) {
+      throw FormatException(
+          '.dat truncated while hashing — read $hashed of ${hdr.dataLen} '
+          'data bytes');
+    }
+    input.add(certBytes);
+    input.close();
+    return Uint8List.fromList(sink.digest!.bytes);
   }
+}
+
+/// One-shot sink that captures the single `Digest` emitted by
+/// `crypto.sha256.startChunkedConversion`.
+class _DigestSink implements Sink<crypto.Digest> {
+  crypto.Digest? digest;
+  @override
+  void add(crypto.Digest data) => digest = data;
+  @override
+  void close() {}
 }
 
 Uint8List _hexToBytes(String hex) {

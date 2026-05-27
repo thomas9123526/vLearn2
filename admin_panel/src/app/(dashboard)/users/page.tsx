@@ -162,6 +162,14 @@ export default function UsersPage() {
   );
 }
 
+// Default placed in both password inputs when the reset dialog opens.
+// The admin is expected to overwrite this with something they will
+// actually tell the user; keeping the same string for both fields means
+// they can hit Reset immediately to issue a known-good password without
+// retyping. Length is fine (10 > 6 min); make sure it ALSO satisfies the
+// SignUpDto regex if you ever pivot to letting users reuse it.
+const DEFAULT_RESET_PASSWORD = '1234567890';
+
 function ResetPasswordDialog({
   target,
   onClose,
@@ -169,8 +177,8 @@ function ResetPasswordDialog({
   target: UserRow | null;
   onClose: () => void;
 }) {
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [password, setPassword] = useState(DEFAULT_RESET_PASSWORD);
+  const [confirm, setConfirm] = useState(DEFAULT_RESET_PASSWORD);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
@@ -197,8 +205,8 @@ function ResetPasswordDialog({
       key={targetId ?? 'closed'}
       open={!!target}
       onClose={() => {
-        setPassword('');
-        setConfirm('');
+        setPassword(DEFAULT_RESET_PASSWORD);
+        setConfirm(DEFAULT_RESET_PASSWORD);
         setError(null);
         setDone(false);
         onClose();
@@ -214,8 +222,8 @@ function ResetPasswordDialog({
         done ? (
           <Button
             onClick={() => {
-              setPassword('');
-              setConfirm('');
+              setPassword(DEFAULT_RESET_PASSWORD);
+              setConfirm(DEFAULT_RESET_PASSWORD);
               setError(null);
               setDone(false);
               onClose();
@@ -228,8 +236,8 @@ function ResetPasswordDialog({
             <Button
               variant="outline"
               onClick={() => {
-                setPassword('');
-                setConfirm('');
+                setPassword(DEFAULT_RESET_PASSWORD);
+                setConfirm(DEFAULT_RESET_PASSWORD);
                 setError(null);
                 onClose();
               }}

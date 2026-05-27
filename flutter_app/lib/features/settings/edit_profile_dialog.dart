@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/app_apis.dart';
+import '../../core/config/app_config.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
 
@@ -37,6 +39,7 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
 
   String _gender = 'female';
   bool _saving = false;
+  bool _uploading = false;
   String? _error;
 
   static const _genders = [
@@ -66,6 +69,36 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
     _nameCtrl.dispose();
     _avatarCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndUpload(ImageSource source) async {
+    if (_uploading || _saving) return;
+    final picker = ImagePicker();
+    final XFile? picked = await picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1024,
+    );
+    if (picked == null) return;
+    setState(() {
+      _uploading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(usersApiProvider).uploadAvatar(
+            filePath: picked.path,
+            filename: picked.name,
+          );
+      await ref.read(authProvider.notifier).refreshProfile();
+    } on Exception catch (e, st) {
+      logRawError('edit_profile.avatar_upload', e, st);
+      if (!mounted) return;
+      setState(() {
+        _error = politeMessageFor(e, context: ErrorContext.action);
+      });
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
   }
 
   Future<void> _save() async {
@@ -158,7 +191,57 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
             ),
           ),
           const SizedBox(height: 20),
-          const _SectionLabel('Avatar'),
+          const _SectionLabel('Photo'),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              // Live preview. avatar_url > avatar_emoji.
+              _AvatarPreview(
+                user: user,
+                uploading: _uploading,
+                fallbackEmoji: _avatarCtrl.text,
+                scheme: scheme,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.photo_camera_outlined),
+                          label: const Text('Camera'),
+                          onPressed: (_saving || _uploading)
+                              ? null
+                              : () => _pickAndUpload(ImageSource.camera),
+                        ),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.photo_library_outlined),
+                          label: const Text('Gallery'),
+                          onPressed: (_saving || _uploading)
+                              ? null
+                              : () => _pickAndUpload(ImageSource.gallery),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Upload replaces the emoji avatar everywhere — admin panel, chat bubbles, settings.',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const _SectionLabel('Emoji fallback'),
           const SizedBox(height: 6),
           TextField(
             controller: _avatarCtrl,
@@ -202,13 +285,6 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
                   ),
                 ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Photo upload comes later — for now pick an emoji.',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
           ),
           const SizedBox(height: 20),
           const _SectionLabel('Gender'),
@@ -261,6 +337,74 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
         ],
       ),
     );
+  }
+}
+
+/// Round preview that mirrors what the rest of the app will render
+/// after upload. While [uploading] is true the spinner sits over
+/// whatever the current source is (uploaded photo > emoji).
+class _AvatarPreview extends ConsumerWidget {
+  const _AvatarPreview({
+    required this.user,
+    required this.uploading,
+    required this.fallbackEmoji,
+    required this.scheme,
+  });
+
+  final dynamic user; // UserProfile — kept dynamic to avoid widening imports
+  final bool uploading;
+  final String fallbackEmoji;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final url = user.avatarUrl as String?;
+    // avatar_url comes from the backend as `/uploads/avatars/<file>`.
+    // Prepend the Dio base URL so NetworkImage can resolve it.
+    final fullUrl = (url != null && url.isNotEmpty)
+        ? _resolveAvatarUrl(ref, url)
+        : null;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        CircleAvatar(
+          radius: 32,
+          backgroundColor: scheme.primaryContainer,
+          backgroundImage: fullUrl != null ? NetworkImage(fullUrl) : null,
+          child: fullUrl == null
+              ? Text(
+                  fallbackEmoji.isEmpty ? '🐣' : fallbackEmoji,
+                  style: const TextStyle(fontSize: 28),
+                )
+              : null,
+        ),
+        if (uploading)
+          const SizedBox(
+            width: 64,
+            height: 64,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+      ],
+    );
+  }
+
+  /// Joins the relative `/uploads/...` path with the configured backend
+  /// origin so NetworkImage gets a fully-qualified URL.
+  String _resolveAvatarUrl(WidgetRef ref, String relative) {
+    if (relative.startsWith('http')) return relative;
+    final base = AppConfig.defaults.backendBaseUrl;
+    // strip the /vfls or /api suffix from the API base — uploads sit
+    // at the server root, not behind the /api prefix.
+    final origin = _stripApiSuffix(base);
+    return '$origin$relative';
+  }
+
+  String _stripApiSuffix(String base) {
+    final marker = base.indexOf('/api');
+    final cut = marker > 0 ? base.substring(0, marker) : base;
+    final marker2 = cut.indexOf('/vfls');
+    return marker2 > 0 ? cut.substring(0, marker2) : cut;
   }
 }
 

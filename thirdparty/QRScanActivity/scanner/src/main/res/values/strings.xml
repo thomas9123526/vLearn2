@@ -1,0 +1,8 @@
+<resources>
+    <string name="qrscan_scan_prompt">Point the camera at a QR code</string>
+    <string name="qrscan_close">Close</string>
+    <string name="qrscan_torch">Toggle flashlight</string>
+    <string name="qrscan_error_camera_permission">Camera permission is required to scan QR codes.</string>
+    <string name="qrscan_error_camera_start">Unable to start the camera.</string>
+    <string name="qrscan_error_camera_bind">Unable to open the camera.</string>
+</resources>

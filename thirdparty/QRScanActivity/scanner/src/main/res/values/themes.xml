@@ -1,0 +1,11 @@
+<resources>
+
+    <!-- Theme used by QRScanActivity.  Self-contained: parents Material3
+         directly so a consuming app doesn't need a matching base theme. -->
+    <style name="Theme.QRScanActivity.Scanner" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+
+</resources>

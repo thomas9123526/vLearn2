@@ -1,0 +1,20 @@
+# Gradle
+.gradle/
+build/
+
+# Android Studio
+.idea/
+*.iml
+local.properties
+
+# NDK build cache
+.cxx/
+
+# Generated wrapper — see README.md "Why no wrapper jar".
+# The whole wrapper is seeded from flutter_app/android on first
+# build run (so both projects always share the same Gradle), and
+# nothing inside it is hand-edited here.
+gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.properties
+gradlew
+gradlew.bat

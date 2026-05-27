@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/app_config.dart';
 import '../providers/auth_provider.dart';
+import '../network/network_status.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/compression_interceptor.dart';
+import 'interceptors/network_interceptor.dart';
 import 'interceptors/request_log_interceptor.dart';
 
 
@@ -105,6 +107,9 @@ final apiClientProvider = Provider<Dio>((ref) {
     ),
   );
 
+  // Network short-circuit goes first so an offline state fails fast
+  // instead of waiting for the connectTimeout to elapse.
+  dio.interceptors.add(NetworkInterceptor(ref.watch(networkStatusServiceProvider)));
   dio.interceptors.add(CompressionInterceptor(ref));
   dio.interceptors.add(AuthInterceptor(
     tokenStore: tokenStore,
