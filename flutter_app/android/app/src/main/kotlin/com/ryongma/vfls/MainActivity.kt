@@ -46,6 +46,38 @@ class MainActivity : FlutterActivity() {
                     result.notImplemented()
                 }
             }
+
+        // ── License-file scan channel ────────────────────────────────────────
+        // Walks every mounted volume (internal + SD card) for
+        // 룡마/가상외국어회화/license/*.lic and returns the file bytes so the
+        // Flutter side can pick the first one that verifies.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.vlearn2/license_scan")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "hasAllFilesAccess" ->
+                        result.success(LicenseFileScanner.hasAllFilesAccess())
+                    "openAllFilesAccessSettings" -> {
+                        LicenseFileScanner.openAllFilesAccessSettings(this)
+                        result.success(null)
+                    }
+                    "scan" -> {
+                        if (!LicenseFileScanner.hasAllFilesAccess()) {
+                            result.error(
+                                "PERMISSION_DENIED",
+                                "MANAGE_EXTERNAL_STORAGE not granted",
+                                null,
+                            )
+                        } else {
+                            try {
+                                result.success(LicenseFileScanner.scanForLicenses(applicationContext))
+                            } catch (e: Exception) {
+                                result.error("SCAN_ERROR", e.message, null)
+                            }
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     @Deprecated("Deprecated in Java")
