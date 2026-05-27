@@ -34,24 +34,26 @@ std::string lastOpenSslError() {
 // Generates a throwaway P-256 EC keypair. The leaf cert needs *a*
 // public key per X.509, but we don't ship the matching private
 // key -- the license cert is verify-only by design.
+//
+// Uses the EVP_PKEY keygen API: portable across OpenSSL 1.1.1
+// and 3.x, and avoids the deprecated EC_KEY_* family that the
+// 3.0 headers warn on (C4996 here under MSVC).
 EVP_PKEY* generateEcKey(std::string* err) {
-    EVP_PKEY* pkey = EVP_PKEY_new();
-    EC_KEY* ec = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-    if (!pkey || !ec) {
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
+    if (!ctx) {
         if (err) *err = lastOpenSslError();
-        if (ec) EC_KEY_free(ec);
+        return nullptr;
+    }
+    EVP_PKEY* pkey = nullptr;
+    if (EVP_PKEY_keygen_init(ctx) <= 0 ||
+        EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, NID_X9_62_prime256v1) <= 0 ||
+        EVP_PKEY_keygen(ctx, &pkey) <= 0) {
+        if (err) *err = lastOpenSslError();
+        EVP_PKEY_CTX_free(ctx);
         if (pkey) EVP_PKEY_free(pkey);
         return nullptr;
     }
-    EC_KEY_set_asn1_flag(ec, OPENSSL_EC_NAMED_CURVE);
-    if (!EC_KEY_generate_key(ec) ||
-        !EVP_PKEY_assign_EC_KEY(pkey, ec)) {
-        if (err) *err = lastOpenSslError();
-        EC_KEY_free(ec);
-        EVP_PKEY_free(pkey);
-        return nullptr;
-    }
-    // EVP_PKEY_assign_EC_KEY transferred ownership of `ec`.
+    EVP_PKEY_CTX_free(ctx);
     return pkey;
 }
 
@@ -191,9 +193,12 @@ bool CertIssuer::issue(const LeafCa& ca,
     BN_free(bn);
 
     // ---- Validity ----
+    // X509_get_notBefore / _notAfter are deprecated in 3.0; the
+    // mutable getm_* macros are the 3.0-clean replacement (also
+    // present in 1.1.1 since 1.1.0).
     const time_t now = time(nullptr);
-    if (!X509_gmtime_adj(X509_get_notBefore(leaf), 0) ||
-        !X509_gmtime_adj(X509_get_notAfter(leaf),
+    if (!X509_gmtime_adj(X509_getm_notBefore(leaf), 0) ||
+        !X509_gmtime_adj(X509_getm_notAfter(leaf),
                          static_cast<long>(days) * 24L * 60L * 60L)) {
         X509_free(leaf); EVP_PKEY_free(leafKey);
         if (err) *err = lastOpenSslError();
