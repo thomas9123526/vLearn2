@@ -1,0 +1,7 @@
+{
+    "baseurl": "http://172.86.121.43/vfls",
+    "reqTout": 30,
+    "tSync": 60,
+    "dev": "dev",
+    "model": "/mnt/shared/Pictures/sherpa_2023"
+}
