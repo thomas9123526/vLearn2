@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Standalone VS 2022 project for the license key generator. Pure
-  Win32 UI (no Qt, no MFC) -- only requires the "Desktop development
+  Win32 UI (no Qt, no MFC); only requires the "Desktop development
   with C++" workload from the VS installer.
 
   Environment variables this project reads:
