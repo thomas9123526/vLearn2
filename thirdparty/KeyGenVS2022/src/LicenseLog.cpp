@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "Base64.h"
 #include "WinStrings.h"
 
 namespace {
@@ -35,38 +36,8 @@ std::string isoUtcMs(std::time_t t) {
     return buf;
 }
 
-// Base64 encoder. Used for the cert_der_base64 column so the
-// binary DER cert survives transport as plain text CSV.
-std::string base64(const std::vector<unsigned char>& bytes) {
-    static const char tbl[] =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    std::string out;
-    out.reserve(((bytes.size() + 2) / 3) * 4);
-    size_t i = 0;
-    while (i + 3 <= bytes.size()) {
-        const unsigned v = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
-        out.push_back(tbl[(v >> 18) & 0x3F]);
-        out.push_back(tbl[(v >> 12) & 0x3F]);
-        out.push_back(tbl[(v >> 6)  & 0x3F]);
-        out.push_back(tbl[v & 0x3F]);
-        i += 3;
-    }
-    const size_t left = bytes.size() - i;
-    if (left == 1) {
-        const unsigned v = bytes[i] << 16;
-        out.push_back(tbl[(v >> 18) & 0x3F]);
-        out.push_back(tbl[(v >> 12) & 0x3F]);
-        out.push_back('=');
-        out.push_back('=');
-    } else if (left == 2) {
-        const unsigned v = (bytes[i] << 16) | (bytes[i + 1] << 8);
-        out.push_back(tbl[(v >> 18) & 0x3F]);
-        out.push_back(tbl[(v >> 12) & 0x3F]);
-        out.push_back(tbl[(v >> 6)  & 0x3F]);
-        out.push_back('=');
-    }
-    return out;
-}
+// Base64 encoder lives in Base64.h so MainWindow (QR payload) and
+// this file (CSV cert_der_base64 column) share one implementation.
 
 }  // namespace
 
@@ -105,7 +76,7 @@ bool LicenseLog::append(const Entry& entry, std::string* err) {
         << entry.days                             << ','
         << csvQuote(isoUtcMs(entry.notBefore))    << ','
         << csvQuote(isoUtcMs(entry.notAfter))     << ','
-        << csvQuote(base64(entry.certDer))        << ','
+        << csvQuote(b64::encode(entry.certDer))    << ','
         << csvQuote(entry.operatorTag)            << '\n';
     return true;
 }
