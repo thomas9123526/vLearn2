@@ -283,10 +283,14 @@ class LicenseApi {
   /// [machineId] is the device fingerprint from the native machine-ID library.
   /// [userId] is the logged-in user's UUID; when provided the backend persists
   ///          the license to that user record.
+  /// [platform] is the canonical Flutter platform name ('android', 'windows',
+  ///          'ios', 'macos', 'linux', 'fuchsia', 'web') so the admin panel
+  ///          can show what device each user activated from.
   Future<Map<String, dynamic>> verify({
     required String licenseContent,
     required String machineId,
     String? userId,
+    String? platform,
   }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '/license/verify',
@@ -294,6 +298,7 @@ class LicenseApi {
         'licenseContent': licenseContent,
         'machineId': machineId,
         'userId': userId,
+        'platform': platform,
       }..removeWhere((_, v) => v == null),
     );
     return res.data!;

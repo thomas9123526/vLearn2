@@ -1,0 +1,12 @@
+# Visual Studio user state.
+.vs/
+*.user
+*.suo
+*.sln.docstates
+
+# Build outputs.
+bin/
+obj/
+
+# Cloned by the pre-build step on first build.
+external/

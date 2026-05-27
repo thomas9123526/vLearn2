@@ -21,6 +21,18 @@ interface UserRow {
   xp_total: number;
   current_level: number;
   streak_days: number;
+  // Last platform the user activated a license from. Null until they
+  // pass through /license/verify on a build that reports it.
+  license_platform:
+    | 'android'
+    | 'windows'
+    | 'ios'
+    | 'macos'
+    | 'linux'
+    | 'fuchsia'
+    | 'web'
+    | null;
+  license_valid_until: string | null;
   created_at: string;
 }
 
@@ -48,6 +60,19 @@ export default function UsersPage() {
       return api<UserListResp>(`/admin/users?${params.toString()}`);
     },
   });
+
+  // Whether the License feature is turned on system-wide. When off
+  // we drop the Platform / License columns from the table — the
+  // admin doesn't care about license state when there is no licensing.
+  const { data: licenseEnabled } = useQuery<boolean>({
+    queryKey: ['admin-config-license-enabled'],
+    queryFn: async () => {
+      const all = await api<Array<{ key: string; value: unknown }>>('/admin/config');
+      const row = all.find((e) => e.key === 'license.enabled');
+      return row?.value === true;
+    },
+  });
+  const showLicense = licenseEnabled ?? false;
 
   const suspend = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
@@ -93,6 +118,12 @@ export default function UsersPage() {
               <th className="px-4 py-2 text-left font-medium">Email</th>
               <th className="px-4 py-2 text-left font-medium">Name</th>
               <th className="px-4 py-2 text-left font-medium">Status</th>
+              {showLicense && (
+                <>
+                  <th className="px-4 py-2 text-left font-medium">Platform</th>
+                  <th className="px-4 py-2 text-left font-medium">License</th>
+                </>
+              )}
               <th className="px-4 py-2 text-right font-medium">XP</th>
               <th className="px-4 py-2 text-right font-medium">Streak</th>
               <th className="px-4 py-2"></th>
@@ -109,6 +140,16 @@ export default function UsersPage() {
                     <span className="ml-2 text-xs text-muted-foreground">{u.suspended_reason}</span>
                   )}
                 </td>
+                {showLicense && (
+                  <>
+                    <td className="px-4 py-2">
+                      <PlatformPill platform={u.license_platform} />
+                    </td>
+                    <td className="px-4 py-2">
+                      <LicensePill validUntil={u.license_valid_until} />
+                    </td>
+                  </>
+                )}
                 <td className="px-4 py-2 text-right tabular-nums">{u.xp_total}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{u.streak_days}</td>
                 <td className="px-4 py-2 text-right">
@@ -145,7 +186,7 @@ export default function UsersPage() {
             ))}
             {(data?.items ?? []).length === 0 && !isLoading && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                <td colSpan={showLicense ? 8 : 6} className="px-4 py-6 text-center text-muted-foreground">
                   No users.
                 </td>
               </tr>
@@ -316,6 +357,62 @@ function StatusPill({ status }: { status: UserRow['status'] }) {
   return (
     <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${classes}`}>
       {status}
+    </span>
+  );
+}
+
+function LicensePill({ validUntil }: { validUntil: string | null }) {
+  if (!validUntil) {
+    return <span className="text-xs text-muted-foreground">Not activated</span>;
+  }
+  const expiry = new Date(validUntil);
+  const now = new Date();
+  const daysMs = 86_400_000;
+  const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / daysMs);
+
+  if (daysLeft < 0) {
+    return (
+      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">
+        Expired
+      </span>
+    );
+  }
+  // 36500 days ~ 100 years. KeyGenerator emits exactly that for
+  // "permanent" mode, so the threshold of 10000 days is a safe
+  // "treat as forever" cutoff.
+  if (daysLeft > 10_000) {
+    return (
+      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-800">
+        Permanent
+      </span>
+    );
+  }
+  const tone =
+    daysLeft <= 7
+      ? 'bg-amber-100 text-amber-800'
+      : 'bg-green-100 text-green-800';
+  return (
+    <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${tone}`}>
+      Active · {daysLeft}d
+    </span>
+  );
+}
+
+function PlatformPill({ platform }: { platform: UserRow['license_platform'] }) {
+  if (!platform) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  const classes =
+    platform === 'android'
+      ? 'bg-emerald-100 text-emerald-800'
+      : platform === 'windows'
+        ? 'bg-sky-100 text-sky-800'
+        : platform === 'ios' || platform === 'macos'
+          ? 'bg-zinc-100 text-zinc-800'
+          : 'bg-amber-100 text-amber-800';
+  return (
+    <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium capitalize ${classes}`}>
+      {platform}
     </span>
   );
 }

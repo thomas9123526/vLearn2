@@ -13,7 +13,17 @@ class ErrorInterceptor extends Interceptor {
 
     if (body is Map<String, dynamic>) {
       i18nKey = body['i18nKey'] as String?;
-      message = body['message'] as String?;
+      // NestJS sends `message` as a String for HttpException throws and
+      // as a List<String> for class-validator failures (one entry per
+      // failed rule). Handle both -- treating the field unconditionally
+      // as String? used to throw a CastError that turned every
+      // validation 4xx into an opaque "type cast" Dio exception.
+      final raw = body['message'];
+      if (raw is String) {
+        message = raw;
+      } else if (raw is List) {
+        message = raw.map((m) => m?.toString() ?? '').where((s) => s.isNotEmpty).join('; ');
+      }
       extra = body;
     }
 

@@ -22,6 +22,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 import 'package:rive/rive.dart' as rive;
 import 'core/config/app_config.dart';
+import 'core/license/license_state_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -91,6 +92,13 @@ class VLearn2App extends ConsumerWidget {
     final fontGroup = ref.watch(fontGroupProvider);
     final locale = ref.watch(localeProvider);
     final router = ref.watch(routerProvider);
+
+    // Instantiate the license state provider at app start so the
+    // auto-verify-on-signedIn listener inside it is already wired
+    // before the user reaches the home screen. The value itself is
+    // unused here -- the License screen and admin-side data are the
+    // real consumers.
+    ref.watch(licenseStateProvider);
 
     return MaterialApp.router(
       title: 'Virtual Foreign Language',
