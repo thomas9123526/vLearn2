@@ -48,8 +48,13 @@ echo Project : %FLUTTER_APP_DIR%
 echo Output  : %OUT_DIR%
 echo.
 
+rem `--split-per-abi` alone tries to split across all three Flutter
+rem ABIs (armeabi-v7a + arm64-v8a + x86_64). That conflicts with the
+rem narrower `ndk { abiFilters }` pinned in app/build.gradle.kts, so
+rem we explicitly tell Flutter which target platforms to split on.
+rem Keep this list in lockstep with abiFilters there.
 pushd "%FLUTTER_APP_DIR%"
-call flutter build apk --%MODE% --split-per-abi
+call flutter build apk --%MODE% --split-per-abi --target-platform android-arm64,android-x64
 if errorlevel 1 (
     echo.
     echo ERROR: flutter build apk failed. See the error above.
