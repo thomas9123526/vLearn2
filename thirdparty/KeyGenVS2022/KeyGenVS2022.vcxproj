@@ -141,6 +141,7 @@
     <ClInclude Include="src\QrWriter.h" />
     <ClInclude Include="src\LicenseLog.h" />
     <ClInclude Include="src\WinStrings.h" />
+    <ClInclude Include="src\Base64.h" />
     <ClInclude Include="src\resource.h" />
   </ItemGroup>
   <ItemGroup>
