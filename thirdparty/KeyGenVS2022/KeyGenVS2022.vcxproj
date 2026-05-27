@@ -98,6 +98,10 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
+    <PostBuildEvent>
+      <Message>Copying OpenSSL runtime DLLs next to KeyGenVS2022.exe</Message>
+      <Command>copy /Y "$(OPENSSL_ROOT_DIR)\bin\libcrypto-*.dll" "$(OutDir)" &gt;nul</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
 
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -112,6 +116,10 @@
       <AdditionalDependencies>libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Message>Copying OpenSSL debug runtime DLLs next to KeyGenVS2022.exe</Message>
+      <Command>copy /Y "$(OPENSSL_ROOT_DIR)\debug\bin\libcrypto-*.dll" "$(OutDir)" &gt;nul</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
 
   <!-- Pre-build event: clone Nayuki QR-Code-generator on first build. -->
