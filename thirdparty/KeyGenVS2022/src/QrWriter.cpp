@@ -1,12 +1,21 @@
 #include "QrWriter.h"
 
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
+
+// IStream lives in objidl.h, which WIN32_LEAN_AND_MEAN omits.
+// Several gdiplus headers (GdiplusBitmap.h, GdiplusMetafile.h)
+// declare functions taking IStream*, so without this include the
+// gdiplus.h pull below explodes with C2065 'IStream' undeclared
+// and a cascade of parse errors.
+#include <objidl.h>
 
 // GDI+ is the standard Windows PNG/JPEG/GIF encoder library. It
 // ships with the platform so the only thing we link is gdiplus.lib.
-// gdiplus.h needs std::min / std::max in the global namespace --
-// the compile-time defines elsewhere keep NOMINMAX off for this TU.
+// gdiplus.h needs std::min / std::max in the global namespace
+// because NOMINMAX is set project-wide.
 #include <algorithm>
 using std::min;
 using std::max;

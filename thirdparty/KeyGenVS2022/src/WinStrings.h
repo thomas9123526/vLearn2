@@ -3,7 +3,9 @@
 #include <string>
 #include <vector>
 
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 
 // Tiny UTF-8 / UTF-16 conversion helpers. The whole app talks
