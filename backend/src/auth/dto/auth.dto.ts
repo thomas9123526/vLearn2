@@ -3,6 +3,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -17,12 +18,23 @@ export class SignUpDto {
   cid!: string;
 
   @ApiProperty({
-    example: 'alex_kr',
-    description: 'Login username (max 12 chars)',
+    example: 'kky1206',
+    description:
+      'Login username. Letters + digits only, with at least 2 letters and ' +
+      'at least 2 digits (e.g. kky1206, ks10, ksg19970890).',
   })
   @IsString()
-  @MinLength(2)
+  // 2 letters + 2 digits = 4-char minimum. Upper bound stays at 50.
+  @MinLength(4)
   @MaxLength(50)
+  // Lookaheads enforce >=2 letters and >=2 digits; the trailing class
+  // restricts the body to ASCII letters + digits only (no underscores,
+  // no Unicode -- the cid_username has to round-trip through URLs and
+  // analytics keys cleanly).
+  @Matches(/^(?=(?:.*[a-zA-Z]){2,})(?=(?:.*\d){2,})[a-zA-Z0-9]+$/, {
+    message:
+      'cidUsername must be letters + digits only, with at least 2 letters and at least 2 digits (e.g. kky1206)',
+  })
   cidUsername!: string;
 
   // Single constraint per product spec: length >= 6. No upper/lower/digit/
@@ -48,7 +60,7 @@ export class SignUpDto {
 
 export class SignInDto {
   @ApiProperty({
-    example: 'alex_kr',
+    example: 'kky1206',
     description: 'Login username (cid_username)',
   })
   @IsString()
@@ -74,6 +86,19 @@ export class TokenPairDto {
 
   @ApiProperty({ description: 'Access-token expiry in seconds from now' })
   expiresIn!: number;
+}
+
+export class SuggestCidUsernameDto {
+  @ApiProperty({ example: 'Hong Li Jun', description: 'Display name to derive initials from' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  displayName!: string;
+
+  @ApiProperty({ example: '1994-03-17', description: 'Birthday in YYYY-MM-DD format' })
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'birthday must be YYYY-MM-DD' })
+  birthday!: string;
 }
 
 export class AuthResponseDto extends TokenPairDto {

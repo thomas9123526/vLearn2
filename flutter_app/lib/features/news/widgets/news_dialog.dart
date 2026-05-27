@@ -44,6 +44,23 @@ class _NewsDialogState extends ConsumerState<_NewsDialog> {
   late String? _activeSlug = widget.initialSlug;
 
   @override
+  void initState() {
+    super.initState();
+    // newsListProvider is a FutureProvider that would otherwise cache
+    // whatever it fetched at first build — so a post published after
+    // the app loaded never appears here, even though the bell badge
+    // sees it (the unread-count poller refreshes every 60s).
+    // Force a fresh fetch every time the dialog opens, and prod the
+    // unread counter at the same time so the header subtitle is
+    // in sync with the list body.
+    Future.microtask(() {
+      if (!mounted) return;
+      ref.invalidate(newsListProvider);
+      ref.read(unreadNewsCountProvider.notifier).refresh();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isWide = MediaQuery.sizeOf(context).width >= 720;

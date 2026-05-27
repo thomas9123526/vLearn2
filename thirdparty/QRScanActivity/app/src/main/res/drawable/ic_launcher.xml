@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="192dp"
+    android:height="192dp"
+    android:viewportWidth="192"
+    android:viewportHeight="192">
+
+    <!-- Rounded teal background. -->
+    <path
+        android:fillColor="#00BFA5"
+        android:pathData="M36,0 L156,0 Q192,0 192,36 L192,156 Q192,192 156,192 L36,192 Q0,192 0,156 L0,36 Q0,0 36,0 Z" />
+
+    <!-- White corner brackets — matching the in-app scanner frame. -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="13"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M40,78 L40,40 L78,40 M114,40 L152,40 L152,78 M152,114 L152,152 L114,152 M78,152 L40,152 L40,114" />
+
+    <!-- Central QR-style modules. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M68,68 h20 v20 h-20 z M104,68 h20 v20 h-20 z M68,104 h20 v20 h-20 z M104,104 h20 v20 h-20 z M86,86 h20 v20 h-20 z" />
+
+</vector>

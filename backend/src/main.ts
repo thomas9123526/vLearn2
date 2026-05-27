@@ -32,7 +32,12 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   // ─── Security headers ──────────────────────────────────────
-  app.use(helmet());
+  // CSP's `upgrade-insecure-requests` directive (Helmet default) forces the
+  // browser to refetch every subresource over HTTPS. Without a TLS cert on
+  // this VPS, that breaks Swagger UI and any other in-app asset over plain
+  // HTTP. Turn CSP off in development; re-enable it once HTTPS is in place.
+  const isProd = (config.get<string>('NODE_ENV') ?? 'development') === 'production';
+  app.use(helmet({ contentSecurityPolicy: isProd ? undefined : false }));
 
   // ─── CORS ──────────────────────────────────────────────────
   const corsOrigins = (config.get<string>('CORS_ORIGINS') ?? '')

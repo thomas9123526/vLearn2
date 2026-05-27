@@ -19,16 +19,26 @@ class AppConfig {
     required this.requestTimeout,
     required this.topicSyncInterval,
     required this.environment,
+    this.modelPath,
   });
 
   /// JSON shape — short field names per the spec (`baseurl`, `reqTout`,
-  /// `tSync`, `dev`). `dev` is a string, not a boolean.
-  factory AppConfig.fromJson(Map<String, dynamic> j) => AppConfig(
-        backendBaseUrl: (j['baseurl'] as String?) ?? defaults.backendBaseUrl,
-        requestTimeout: (j['reqTout'] as num?)?.toInt() ?? defaults.requestTimeout,
-        topicSyncInterval: (j['tSync'] as num?)?.toInt() ?? defaults.topicSyncInterval,
-        environment: (j['dev'] as String?) ?? defaults.environment,
-      );
+  /// `tSync`, `dev`). `dev` is a string, not a boolean. `model` (or
+  /// `models` as a forgiving alias — both are accepted on read; we
+  /// always write `model`) is an optional absolute path that, when set,
+  /// lets the app use on-device speech models the admin pre-placed —
+  /// skipping the `.dat` unpack entirely. See [modelPath].
+  factory AppConfig.fromJson(Map<String, dynamic> j) {
+    final rawModel = (j['model'] as String?) ?? (j['models'] as String?);
+    return AppConfig(
+      backendBaseUrl: (j['baseurl'] as String?) ?? defaults.backendBaseUrl,
+      requestTimeout: (j['reqTout'] as num?)?.toInt() ?? defaults.requestTimeout,
+      topicSyncInterval: (j['tSync'] as num?)?.toInt() ?? defaults.topicSyncInterval,
+      environment: (j['dev'] as String?) ?? defaults.environment,
+      modelPath:
+          (rawModel == null || rawModel.trim().isEmpty) ? null : rawModel,
+    );
+  }
 
   static void logx(String tag, Object message) {
     debugPrint('[$tag] $message');
@@ -45,6 +55,28 @@ class AppConfig {
   /// One of `'dev'` / `'prod'`. Influences logging verbosity and the
   /// throttle policy in `ApiClient`.
   final String environment;
+
+  /// Optional absolute path on the device pointing at a pre-placed
+  /// on-device speech model root — same layout as a `.dat`'s unpacked
+  /// output. Expected to contain `stt/`, `tts/`, `vad/` subfolders
+  /// (each with its model files) and a top-level `manifest.json`:
+  ///
+  /// ```
+  /// <modelPath>/
+  ///   manifest.json
+  ///   stt/  encoder*.onnx  decoder*.onnx  joiner*.onnx  tokens.*
+  ///   tts/  ...
+  ///   vad/  ...
+  /// ```
+  ///
+  /// When set AND the directory looks like a usable layout, the app
+  /// initialises straight from this path and never unpacks a `.dat`.
+  /// If the path is null, empty, or doesn't have the expected files,
+  /// the unpacker pipeline runs as before.
+  ///
+  /// On-disk key: `"model"`. Example value:
+  /// `/storage/emulated/0/룡마/가상외국어회화/data/models`.
+  final String? modelPath;
 
   bool get isDev => environment == 'dev';
 
@@ -74,6 +106,9 @@ class AppConfig {
         'reqTout': requestTimeout,
         'tSync': topicSyncInterval,
         'dev': environment,
+        // Only write the key when set, so devices without an override
+        // keep the smallest possible file.
+        if (modelPath != null && modelPath!.isNotEmpty) 'model': modelPath,
       };
 
   AppConfig copyWith({
@@ -81,12 +116,14 @@ class AppConfig {
     int? requestTimeout,
     int? topicSyncInterval,
     String? environment,
+    String? modelPath,
   }) =>
       AppConfig(
         backendBaseUrl: backendBaseUrl ?? this.backendBaseUrl,
         requestTimeout: requestTimeout ?? this.requestTimeout,
         topicSyncInterval: topicSyncInterval ?? this.topicSyncInterval,
         environment: environment ?? this.environment,
+        modelPath: modelPath ?? this.modelPath,
       );
 }
 

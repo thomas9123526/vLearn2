@@ -22,10 +22,10 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 100 })
   name!: string;
 
-  @Column({ type: 'varchar', length: 10, nullable: true })
+  @Column({ type: 'varchar', length: 10, nullable: true, unique: true })
   cid!: string | null;
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true, unique: true })
   cid_username!: string | null;
 
   /// `'male' | 'female' | 'nonbinary' | 'unspecified'`. Surfaced in the
@@ -35,6 +35,15 @@ export class UserEntity {
 
   @OneToOne(() => UserInfoEntity, (i) => i.user, { eager: true, cascade: ['insert', 'update'] })
   info!: UserInfoEntity;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  license_valid_until!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  license_machine_id!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  license_serial!: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at!: Date;

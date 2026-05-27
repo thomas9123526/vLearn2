@@ -100,7 +100,7 @@ export default function NewNewsPostPage() {
             <Field label="English (required)" error={errors.title?.en?.message}>
               <Input {...register('title.en')} placeholder="Welcome to v1.1!" />
             </Field>
-            <Field label="한국어">
+            <Field label="조선어">
               <Input {...register('title.ko')} placeholder="v1.1에 오신 것을 환영합니다!" />
             </Field>
             <Field label="中文">
@@ -122,7 +122,7 @@ export default function NewNewsPostPage() {
                 placeholder="What's new, what to try, why it matters."
               />
             </Field>
-            <Field label="한국어">
+            <Field label="조선어">
               <textarea
                 {...register('body.ko')}
                 rows={6}
@@ -151,7 +151,7 @@ export default function NewNewsPostPage() {
             <Field label="English">
               <Input {...register('summary.en')} />
             </Field>
-            <Field label="한국어">
+            <Field label="조선어">
               <Input {...register('summary.ko')} />
             </Field>
             <Field label="中文">

@@ -65,7 +65,7 @@ export default function LeaderboardPage() {
           >
             <option value="">All</option>
             <option value="en">English</option>
-            <option value="ko">한국어</option>
+            <option value="ko">조선어</option>
             <option value="zh">中文</option>
           </select>
         </div>

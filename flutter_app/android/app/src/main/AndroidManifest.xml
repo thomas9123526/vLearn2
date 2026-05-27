@@ -3,6 +3,9 @@
          first mic-button tap via permission_handler, not at app launch. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Required by QRScanActivity (CameraX). Requested at runtime when the
+         user taps "Get License" for the first time. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <!-- External storage: legacy READ/WRITE covers Android ≤ 9 / ≤ 12;
          MANAGE_EXTERNAL_STORAGE (runtime Settings intent) covers Android 11+
          so the app can create the public 룡마/가상외국어회화 config folder. -->

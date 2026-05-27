@@ -241,7 +241,7 @@ function FreeTalkRoot() {
 
       <TweaksPanel title="Tweaks">
         <TweakSection label="Language" />
-        <TweakRadio   label="App language" value={tweaks.lang || 'en'} options={[{ value: 'en', label: 'EN' }, { value: 'zh', label: '中文' }, { value: 'ko', label: '한국어' }]} onChange={(v) => setTweak('lang', v)} />
+        <TweakRadio   label="App language" value={tweaks.lang || 'en'} options={[{ value: 'en', label: 'EN' }, { value: 'zh', label: '中文' }, { value: 'ko', label: '조선어' }]} onChange={(v) => setTweak('lang', v)} />
         <TweakSection label="Theme" />
         <TweakRadio   label="Palette"    value={tweaks.theme}      options={Object.entries(THEMES).map(([v, t]) => ({ value: v, label: t.name }))}      onChange={(v) => setTweak('theme', v)} />
         <TweakSection label="Tutor persona" />

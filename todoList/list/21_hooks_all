@@ -1,0 +1,12 @@
+I want know global conecpt for android and windows flutter project.
+Like user login information, network status, protocol with backend api for send and response.
+
+Provide me the docs/application/**/xx.md about my request above in folder structure by conecpt.
+
+For backend api,
+I want know about backend api part for above purpose.
+Also I want know what encrypt algorithm used in password hash and what algorithms can i use to extend the existing. I want hook conecpt on backend api , if existing and how they are composed.
+Provide me the docs/backendapi/**/xx.md about my request above in folder structure by conecpt.
+
+For admin panel too.
+Provide me the docs/admin/**/xx.md about my request above in folder structure by conecpt.

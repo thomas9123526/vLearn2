@@ -1,10 +1,10 @@
-// FreeTalk i18n — English / 中文 / 한국어
+// FreeTalk i18n — English / 中文 / 조선어
 // Keys are English source strings; missing translations fall back to EN.
 
 const LANG_META = {
   en: { code: 'en', label: 'English',  flag: 'EN' },
   zh: { code: 'zh', label: '中文',      flag: '中' },
-  ko: { code: 'ko', label: '한국어',     flag: '한' },
+  ko: { code: 'ko', label: '조선어',     flag: '한' },
 };
 
 const TRANSLATIONS = {

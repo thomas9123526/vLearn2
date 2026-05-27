@@ -39,7 +39,7 @@ FreeTalk is an English-speaking practice app for teen/young-adult learners. The 
 2. **Diverse scenarios** — Travel, Business, Daily life, Academic, Roleplay, Free chat — with a "Brief" intermediate screen that sets the scene before each conversation.
 3. **Post-session report** — pronunciation / grammar / fluency / vocabulary scores, inline corrections, and "pocket phrases" to save.
 
-Plus: **customizable learning course** (focus areas, conversation style, daily minutes, week-by-week plan), **progress tracking** (weekly minutes chart, skill breakdown, badges), **placement onboarding** (4-step), and **multilingual UI** (EN / 中文 / 한국어).
+Plus: **customizable learning course** (focus areas, conversation style, daily minutes, week-by-week plan), **progress tracking** (weekly minutes chart, skill breakdown, badges), **placement onboarding** (4-step), and **multilingual UI** (EN / 中文 / 조선어).
 
 ## Screen map / navigation graph
 

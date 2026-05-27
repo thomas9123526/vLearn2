@@ -1,0 +1,4 @@
+I want this application to check network status.
+And When the user sync or fetch information from backend api, it should check the network status first and go further when the network is available.
+If there's no network, then prompt the user  about the network status.
+

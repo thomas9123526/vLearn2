@@ -308,7 +308,7 @@ Every key here lands in `app_config` via seed. Default is `true` (visible) unles
 |-----|------|---------|----------|
 | `settings.profile_section` | bool | true | Avatar + display name |
 | `settings.tutor_carousel` | bool | true | Persona switcher |
-| `settings.language_selector` | bool | true | English/한국어/中文 |
+| `settings.language_selector` | bool | true | English/조선어/中文 |
 | `settings.theme_selector` | bool | true | Apricot/Sage/Iris/Obsidian swatches |
 | `settings.learning_section` | bool | true | Daily goal |
 | `settings.network_section` | bool | true | Compression toggle (see §11.2) |

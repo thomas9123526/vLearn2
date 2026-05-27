@@ -1,0 +1,38 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    // Different namespace from the library so the two R classes don't collide,
+    // but applicationId stays the same so the installed package name and the
+    // exported ACTION_SCAN intent-filter target are unchanged.
+    namespace 'com.example.qrscanactivity.demo'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.example.qrscanactivity"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // The QR scanner (custom camera + vendored ZXing source) lives in the
+    // sibling library module.  CameraX, appcompat and material are exposed
+    // transitively via :scanner so the demo doesn't have to re-declare them.
+    implementation project(':scanner')
+}

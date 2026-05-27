@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/app_apis.dart';
+import '../../core/config/layout_config_provider.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/personas_provider.dart';
@@ -12,16 +13,34 @@ import '../../core/theme/bubble_style.dart';
 import '../../core/theme/font_group.dart';
 import '../../features/conversation/widgets/chat_bubble.dart';
 import '../../core/models/models.dart';
+import '../license/license_screen.dart';
 import 'change_password_dialog.dart';
 import 'edit_profile_dialog.dart';
 
 final _settingsPersonasProvider = personasListProvider;
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // The license.enabled flag (and any other admin-toggled flag we
+    // gate Settings rows on) lives in layoutConfigProvider's cache.
+    // Re-fetch on every open so flipping "Enable License" in the
+    // admin panel propagates without an app restart.
+    Future.microtask(
+      () => ref.read(layoutConfigProvider.notifier).refresh(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
     final settings = ref.watch(appSettingsProvider);
     final fontGroup = ref.watch(fontGroupProvider);
@@ -99,6 +118,27 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(),
           const _SectionHeader(text: 'Storage'),
           const _ModelStorageTile(),
+          // License — only rendered when the admin has flipped
+          // `license.enabled` on. The flag rides on layoutConfigProvider
+          // (vl_app_config.is_visible_to_app = true).
+          if (ref.watch(layoutConfigProvider).maybeWhen(
+                data: (cfg) => cfg.get<bool>('license.enabled') ?? false,
+                orElse: () => false,
+              )) ...[
+            const Divider(),
+            const _SectionHeader(text: 'License'),
+            ListTile(
+              leading: const Icon(Icons.key_outlined),
+              title: const Text('License'),
+              subtitle: const Text('Machine ID and license status'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const LicenseScreen(),
+                ),
+              ),
+            ),
+          ],
           const Divider(),
           const _SectionHeader(text: 'Account'),
           ListTile(

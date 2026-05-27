@@ -1,0 +1,13 @@
+I want get document for this flutter application source.
+So can you make a full description for each dart file and how each dart file connected.
+Also make a description how the android and windows design is splitted with the code.
+Also I want know how can i put logic to get some value differently on windows and android platform.
+For example, when i put application license part, I should put function to getMachineID for application user but machineID will be different for windows and android. I want know how they can be handled.
+There can be more to say about how i manage for windows and android.
+
+So please make a full document for above my interest and save as docs/0525/app_source_description_part1.md and docs/0525/app_source_description_part1.docx.
+
+
+After done above task, please make a full document like above for backend api and admin panel as per files or classes or variables.
+for backend api, product docs/0525/backend_api_part1.md and docs/0525/backend_api_part1.docx
+for admin panel, product docs/0525/admin_part1.md and docs/0525/admin_part1.docx
