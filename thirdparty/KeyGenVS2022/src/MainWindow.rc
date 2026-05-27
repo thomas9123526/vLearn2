@@ -1,0 +1,44 @@
+// MainWindow.rc -- Win32 dialog template for the license generator.
+// Compiled by rc.exe into the .res that links into KeyGenVS2022.exe.
+
+#include <windows.h>
+#include "resource.h"
+
+IDD_MAIN DIALOGEX 0, 0, 420, 320
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "vLearn2 License Generator"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    // ---- Inputs group ----
+    GROUPBOX        "Inputs", IDC_STATIC, 8, 6, 404, 154
+
+    LTEXT           "Leaf CA cert (PEM):", IDC_STATIC, 16, 22, 70, 10
+    EDITTEXT        IDC_LEAF_CERT_EDIT,     88, 20, 260, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Browse...",            IDC_LEAF_CERT_BROWSE, 352, 19, 54, 16
+
+    LTEXT           "Leaf CA key (PEM):",  IDC_STATIC, 16, 42, 70, 10
+    EDITTEXT        IDC_LEAF_KEY_EDIT,      88, 40, 260, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Browse...",            IDC_LEAF_KEY_BROWSE, 352, 39, 54, 16
+
+    LTEXT           "Machine ID:",         IDC_STATIC, 16, 62, 70, 10
+    EDITTEXT        IDC_MACHINE_ID_EDIT,    88, 60, 318, 14, ES_AUTOHSCROLL
+
+    LTEXT           "User name:",          IDC_STATIC, 16, 82, 70, 10
+    EDITTEXT        IDC_USER_NAME_EDIT,     88, 80, 318, 14, ES_AUTOHSCROLL
+
+    LTEXT           "License days:",       IDC_STATIC, 16, 102, 70, 10
+    EDITTEXT        IDC_DAYS_EDIT,          88, 100, 50, 14, ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "(permanent = 36500)", IDC_STATIC, 144, 102, 100, 10
+
+    LTEXT           "Output dir:",         IDC_STATIC, 16, 122, 70, 10
+    EDITTEXT        IDC_OUTPUT_DIR_EDIT,    88, 120, 260, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Browse...",            IDC_OUTPUT_DIR_BROWSE, 352, 119, 54, 16
+
+    DEFPUSHBUTTON   "Generate",            IDC_GENERATE_BUTTON, 308, 138, 98, 18
+
+    // ---- Status group ----
+    GROUPBOX        "Status", IDC_STATIC, 8, 168, 404, 144
+    EDITTEXT        IDC_STATUS_EDIT, 16, 182, 388, 124,
+                    ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
+END

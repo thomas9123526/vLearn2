@@ -1,12 +1,11 @@
 @echo off
 rem ----------------------------------------------------------------
-rem  Build KeyGenVS2022.exe (Qt 5 + OpenSSL) via VS 2022 + MSBuild.
-rem  No CMake required -- this script just locates the toolchain
-rem  and shells out to msbuild on the .sln.
+rem  Build KeyGenVS2022.exe via VS 2022 + MSBuild. Pure Win32 UI --
+rem  no Qt, no MFC. Only the "Desktop development with C++"
+rem  workload is required from the VS installer.
 rem
 rem  Prerequisites (see thirdparty/KeyGenVS2022/README.md):
 rem    * Visual Studio 2022 with "Desktop development with C++".
-rem    * Qt 5.15 -- set QTDIR to <Qt>/5.15.x/msvc2019_64
 rem    * OpenSSL -- set OPENSSL_ROOT_DIR (vcpkg installed/x64-windows
 rem                 is the easiest source).
 rem    * Internet on first build (pre-build event clones Nayuki QR-
@@ -63,24 +62,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-rem -- Qt: prefer the env var, fall back to a couple of likely
-rem -- defaults so a fresh dev box still builds without manual setup.
-if not defined QTDIR (
-    if exist "C:\Qt\5.15.2\msvc2019_64\bin\moc.exe" (
-        set "QTDIR=C:\Qt\5.15.2\msvc2019_64"
-    ) else if exist "C:\Qt\5.15.0\msvc2019_64\bin\moc.exe" (
-        set "QTDIR=C:\Qt\5.15.0\msvc2019_64"
-    )
-)
-if not defined QTDIR (
-    echo.
-    echo ERROR: Qt 5 not found. Install Qt 5.15 with the MSVC 2019
-    echo        64-bit prebuilt and set QTDIR, e.g.:
-    echo            setx QTDIR "C:\Qt\5.15.2\msvc2019_64"
-    exit /b 1
-)
-echo QTDIR: !QTDIR!
-
 if not defined OPENSSL_ROOT_DIR (
     if exist "C:\vcpkg\installed\x64-windows\include\openssl\opensslv.h" (
         set "OPENSSL_ROOT_DIR=C:\vcpkg\installed\x64-windows"
@@ -115,12 +96,8 @@ for %%I in ("%EXE_PATH%") do set "EXE_SIZE=%%~zI"
 echo.
 echo === Success ===
 echo KeyGenVS2022.exe (%EXE_SIZE% bytes) is in place.
-echo Qt DLLs were deployed next to the exe by windeployqt.
 echo.
 echo Launch:
 echo     "%EXE_PATH%"
-echo.
-echo Optional: set LICENSE_DB_URL to also log to Postgres, e.g.
-echo     set LICENSE_DB_URL=postgres://user:pw@db.example.com:5432/vLearnLicense
 
 endlocal

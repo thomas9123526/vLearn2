@@ -1,201 +1,434 @@
 #include "MainWindow.h"
-#include "ui_MainWindow.h"
 
-#include <QDateTime>
-#include <QDir>
-#include <QFileDialog>
-#include <QFileInfo>
-#include <QMessageBox>
-#include <QSettings>
-#include <QStandardPaths>
+#include <commdlg.h>
+#include <shlobj.h>
+#include <strsafe.h>
+
+#include <chrono>
+#include <ctime>
+#include <filesystem>
+#include <string>
+#include <vector>
 
 #include "CertIssuer.h"
 #include "LeafCa.h"
 #include "LicenseLog.h"
 #include "QrWriter.h"
+#include "WinStrings.h"
+#include "resource.h"
+
+#pragma comment(lib, "comdlg32.lib")
+#pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "advapi32.lib")
 
 namespace {
 
-// QSettings keys. Stored under HKCU on Windows so each operator
-// has their own remembered paths.
-constexpr auto kKeyLeafCert  = "paths/leafCert";
-constexpr auto kKeyLeafKey   = "paths/leafKey";
-constexpr auto kKeyOutputDir = "paths/outputDir";
-constexpr auto kKeyUserName  = "form/userName";
-constexpr auto kKeyDays      = "form/days";
+// Registry: HKCU\Software\vLearn2\KeyGenVS2022. Mirrors what the
+// Qt version stored under HKCU via QSettings; each operator on the
+// box gets their own remembered field values.
+constexpr wchar_t kRegPath[]   = L"Software\\vLearn2\\KeyGenVS2022";
+constexpr wchar_t kRegLeafCert[]   = L"paths.leafCert";
+constexpr wchar_t kRegLeafKey[]    = L"paths.leafKey";
+constexpr wchar_t kRegOutputDir[]  = L"paths.outputDir";
+constexpr wchar_t kRegUserName[]   = L"form.userName";
+constexpr wchar_t kRegDays[]       = L"form.days";
 
 // Validates that `machineId` looks like the 64-char hex hash that
-// AndroidDevID / WindowsDevID produce. We accept upper or lower
-// case but reject anything that isn't hex -- a typo here would
-// quietly issue a license that can never be claimed.
-bool isPlausibleMachineId(const QString& s) {
+// AndroidDevID / WindowsDevID produce. Accepts upper or lower case;
+// rejects anything else -- a typo here would quietly issue a
+// license that can never be claimed.
+bool isPlausibleMachineId(const std::string& s) {
     if (s.size() != 64) return false;
-    for (QChar c : s) {
-        if (!((c >= QLatin1Char('0') && c <= QLatin1Char('9')) ||
-              (c >= QLatin1Char('a') && c <= QLatin1Char('f')) ||
-              (c >= QLatin1Char('A') && c <= QLatin1Char('F')))) {
-            return false;
-        }
+    for (char c : s) {
+        const bool isHex =
+            (c >= '0' && c <= '9') ||
+            (c >= 'a' && c <= 'f') ||
+            (c >= 'A' && c <= 'F');
+        if (!isHex) return false;
     }
     return true;
 }
 
+std::wstring regReadStr(const wchar_t* name, const std::wstring& def) {
+    HKEY key{};
+    if (::RegOpenKeyExW(HKEY_CURRENT_USER, kRegPath, 0, KEY_READ, &key) != ERROR_SUCCESS) {
+        return def;
+    }
+    DWORD type = 0, size = 0;
+    if (::RegQueryValueExW(key, name, nullptr, &type, nullptr, &size) != ERROR_SUCCESS
+            || type != REG_SZ || size == 0) {
+        ::RegCloseKey(key);
+        return def;
+    }
+    std::wstring out(size / sizeof(wchar_t), L'\0');
+    ::RegQueryValueExW(key, name, nullptr, nullptr,
+                       reinterpret_cast<LPBYTE>(out.data()), &size);
+    ::RegCloseKey(key);
+    // RegQueryValueEx may include the trailing NUL in the size.
+    if (!out.empty() && out.back() == L'\0') out.pop_back();
+    return out;
+}
+
+DWORD regReadDword(const wchar_t* name, DWORD def) {
+    HKEY key{};
+    if (::RegOpenKeyExW(HKEY_CURRENT_USER, kRegPath, 0, KEY_READ, &key) != ERROR_SUCCESS) {
+        return def;
+    }
+    DWORD type = 0, value = 0, size = sizeof(value);
+    const bool ok = ::RegQueryValueExW(key, name, nullptr, &type,
+                                       reinterpret_cast<LPBYTE>(&value),
+                                       &size) == ERROR_SUCCESS && type == REG_DWORD;
+    ::RegCloseKey(key);
+    return ok ? value : def;
+}
+
+void regWriteStr(const wchar_t* name, const std::wstring& v) {
+    HKEY key{};
+    if (::RegCreateKeyExW(HKEY_CURRENT_USER, kRegPath, 0, nullptr, 0,
+                          KEY_WRITE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
+        return;
+    }
+    const DWORD bytes = static_cast<DWORD>((v.size() + 1) * sizeof(wchar_t));
+    ::RegSetValueExW(key, name, 0, REG_SZ,
+                     reinterpret_cast<const BYTE*>(v.c_str()), bytes);
+    ::RegCloseKey(key);
+}
+
+void regWriteDword(const wchar_t* name, DWORD v) {
+    HKEY key{};
+    if (::RegCreateKeyExW(HKEY_CURRENT_USER, kRegPath, 0, nullptr, 0,
+                          KEY_WRITE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
+        return;
+    }
+    ::RegSetValueExW(key, name, 0, REG_DWORD,
+                     reinterpret_cast<const BYTE*>(&v), sizeof(v));
+    ::RegCloseKey(key);
+}
+
+std::wstring documentsDir() {
+    PWSTR path = nullptr;
+    if (FAILED(::SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &path))) {
+        return L"";
+    }
+    std::wstring out = path;
+    ::CoTaskMemFree(path);
+    return out;
+}
+
+// GetOpenFileName wrapper. Returns empty on cancel.
+std::wstring browseFile(HWND owner, const wchar_t* title,
+                        const wchar_t* filter, const std::wstring& initial) {
+    wchar_t buf[MAX_PATH] = {0};
+    StringCchCopyW(buf, MAX_PATH, initial.c_str());
+
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize  = sizeof(ofn);
+    ofn.hwndOwner    = owner;
+    ofn.lpstrFilter  = filter;
+    ofn.lpstrFile    = buf;
+    ofn.nMaxFile     = MAX_PATH;
+    ofn.lpstrTitle   = title;
+    ofn.Flags        = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_EXPLORER;
+    if (!::GetOpenFileNameW(&ofn)) return L"";
+    return buf;
+}
+
+// SHBrowseForFolder wrapper. Returns empty on cancel. We pass the
+// current path as a hint so the dialog opens at a useful spot.
+std::wstring browseFolder(HWND owner, const wchar_t* title,
+                          const std::wstring& initial) {
+    BROWSEINFOW bi{};
+    bi.hwndOwner = owner;
+    bi.lpszTitle = title;
+    bi.ulFlags   = BIF_RETURNONLYFSDIRS | BIF_USENEWUI;
+
+    std::wstring initialCopy = initial;
+    bi.lParam = reinterpret_cast<LPARAM>(initialCopy.c_str());
+    bi.lpfn   = [](HWND h, UINT msg, LPARAM, LPARAM data) -> int {
+        if (msg == BFFM_INITIALIZED && data) {
+            ::SendMessageW(h, BFFM_SETSELECTIONW, TRUE, data);
+        }
+        return 0;
+    };
+
+    PIDLIST_ABSOLUTE id = ::SHBrowseForFolderW(&bi);
+    if (!id) return L"";
+    wchar_t buf[MAX_PATH] = {0};
+    if (!::SHGetPathFromIDListW(id, buf)) {
+        ::CoTaskMemFree(id);
+        return L"";
+    }
+    ::CoTaskMemFree(id);
+    return buf;
+}
+
+// ISO 8601 with milliseconds, UTC. Used both for the status line
+// timestamps and for the CSV columns.
+std::string nowIsoUtcMs() {
+    using namespace std::chrono;
+    const auto now = system_clock::now();
+    const auto t   = system_clock::to_time_t(now);
+    const auto ms  = static_cast<int>(duration_cast<milliseconds>(
+                          now.time_since_epoch()).count() % 1000);
+    std::tm tm{};
+    gmtime_s(&tm, &t);
+    char buf[40];
+    StringCchPrintfA(buf, sizeof(buf),
+        "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",
+        tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+        tm.tm_hour, tm.tm_min, tm.tm_sec, ms);
+    return buf;
+}
+
 }  // namespace
 
-MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent), ui_(new Ui::MainWindow) {
-    ui_->setupUi(this);
+// ─── MainWindow ─────────────────────────────────────────────
 
-    connect(ui_->leafCertBrowse,  &QPushButton::clicked, this, &MainWindow::onBrowseLeafCert);
-    connect(ui_->leafKeyBrowse,   &QPushButton::clicked, this, &MainWindow::onBrowseLeafKey);
-    connect(ui_->outputDirBrowse, &QPushButton::clicked, this, &MainWindow::onBrowseOutputDir);
-    connect(ui_->generateButton,  &QPushButton::clicked, this, &MainWindow::onGenerate);
+MainWindow::MainWindow(HINSTANCE hInstance) : hInstance_(hInstance) {}
 
+int MainWindow::runModal() {
+    return static_cast<int>(::DialogBoxParamW(
+        hInstance_, MAKEINTRESOURCEW(IDD_MAIN), nullptr,
+        &MainWindow::staticProc,
+        reinterpret_cast<LPARAM>(this)));
+}
+
+INT_PTR CALLBACK MainWindow::staticProc(HWND hwnd, UINT msg,
+                                        WPARAM wp, LPARAM lp) {
+    MainWindow* self = nullptr;
+    if (msg == WM_INITDIALOG) {
+        self = reinterpret_cast<MainWindow*>(lp);
+        ::SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(self));
+        self->hwnd_ = hwnd;
+    } else {
+        self = reinterpret_cast<MainWindow*>(
+            ::GetWindowLongPtrW(hwnd, DWLP_USER));
+    }
+    if (!self) return FALSE;
+    return self->proc(hwnd, msg, wp, lp);
+}
+
+INT_PTR MainWindow::proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM /*lp*/) {
+    switch (msg) {
+        case WM_INITDIALOG:
+            onInit(hwnd);
+            return TRUE;
+        case WM_COMMAND:
+            switch (LOWORD(wp)) {
+                case IDC_LEAF_CERT_BROWSE:   onBrowseLeafCert();  return TRUE;
+                case IDC_LEAF_KEY_BROWSE:    onBrowseLeafKey();   return TRUE;
+                case IDC_OUTPUT_DIR_BROWSE:  onBrowseOutputDir(); return TRUE;
+                case IDC_GENERATE_BUTTON:    onGenerate();        return TRUE;
+                case IDCANCEL:
+                    persistFields();
+                    ::EndDialog(hwnd, 0);
+                    return TRUE;
+            }
+            break;
+        case WM_CLOSE:
+            persistFields();
+            ::EndDialog(hwnd, 0);
+            return TRUE;
+    }
+    return FALSE;
+}
+
+void MainWindow::onInit(HWND /*hwnd*/) {
     restoreFields();
 }
 
-MainWindow::~MainWindow() {
-    persistFields();
-}
-
 void MainWindow::restoreFields() {
-    QSettings s;
-    ui_->leafCertEdit->setText(s.value(kKeyLeafCert).toString());
-    ui_->leafKeyEdit->setText(s.value(kKeyLeafKey).toString());
+    setEditText(IDC_LEAF_CERT_EDIT, regReadStr(kRegLeafCert, L""));
+    setEditText(IDC_LEAF_KEY_EDIT,  regReadStr(kRegLeafKey,  L""));
 
     // Default output dir = <documents>/vLearn2/licenses on first run.
-    const QString defaultOut =
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) +
-        QStringLiteral("/vLearn2/licenses");
-    ui_->outputDirEdit->setText(s.value(kKeyOutputDir, defaultOut).toString());
+    std::wstring defaultOut = documentsDir();
+    if (!defaultOut.empty()) {
+        defaultOut += L"\\vLearn2\\licenses";
+    }
+    setEditText(IDC_OUTPUT_DIR_EDIT, regReadStr(kRegOutputDir, defaultOut));
 
-    ui_->userNameEdit->setText(s.value(kKeyUserName).toString());
-    ui_->daysSpinBox->setValue(s.value(kKeyDays, 100).toInt());
+    setEditText(IDC_USER_NAME_EDIT, regReadStr(kRegUserName, L""));
+
+    const DWORD days = regReadDword(kRegDays, 100);
+    wchar_t buf[16];
+    StringCchPrintfW(buf, 16, L"%u", days);
+    setEditText(IDC_DAYS_EDIT, buf);
 }
 
 void MainWindow::persistFields() const {
-    QSettings s;
-    s.setValue(kKeyLeafCert,  ui_->leafCertEdit->text());
-    s.setValue(kKeyLeafKey,   ui_->leafKeyEdit->text());
-    s.setValue(kKeyOutputDir, ui_->outputDirEdit->text());
-    s.setValue(kKeyUserName,  ui_->userNameEdit->text());
-    s.setValue(kKeyDays,      ui_->daysSpinBox->value());
+    regWriteStr(kRegLeafCert,  getEditText(IDC_LEAF_CERT_EDIT));
+    regWriteStr(kRegLeafKey,   getEditText(IDC_LEAF_KEY_EDIT));
+    regWriteStr(kRegOutputDir, getEditText(IDC_OUTPUT_DIR_EDIT));
+    regWriteStr(kRegUserName,  getEditText(IDC_USER_NAME_EDIT));
+
+    const std::wstring daysStr = getEditText(IDC_DAYS_EDIT);
+    DWORD days = 100;
+    try { days = static_cast<DWORD>(std::stoul(daysStr)); }
+    catch (...) {}
+    regWriteDword(kRegDays, days);
 }
 
-void MainWindow::appendStatus(const QString& line) {
-    const QString stamp = QDateTime::currentDateTime().toString(Qt::ISODate);
-    ui_->statusTextEdit->appendPlainText(QStringLiteral("[%1] %2").arg(stamp, line));
+void MainWindow::appendStatus(const std::string& utf8) {
+    const std::string line = "[" + nowIsoUtcMs() + "] " + utf8 + "\r\n";
+    const std::wstring wline = winstr::widen(line);
+
+    HWND edit = ::GetDlgItem(hwnd_, IDC_STATUS_EDIT);
+    if (!edit) return;
+    // Move caret to end, then replace selection with new text -- the
+    // idiomatic Win32 "append" since EDIT has no native append API.
+    const int len = ::GetWindowTextLengthW(edit);
+    ::SendMessageW(edit, EM_SETSEL, len, len);
+    ::SendMessageW(edit, EM_REPLACESEL, FALSE,
+                   reinterpret_cast<LPARAM>(wline.c_str()));
+}
+
+std::wstring MainWindow::getEditText(int controlId) const {
+    HWND ctl = ::GetDlgItem(hwnd_, controlId);
+    if (!ctl) return L"";
+    const int n = ::GetWindowTextLengthW(ctl);
+    if (n <= 0) return L"";
+    // n+1 to fit the null terminator GetWindowTextW writes; resize
+    // back down because the API may return a length shorter than the
+    // initial estimate when DBCS or null-bearing text is involved.
+    std::wstring out(static_cast<size_t>(n) + 1, L'\0');
+    const int actual = ::GetWindowTextW(ctl, out.data(), n + 1);
+    out.resize(static_cast<size_t>(actual > 0 ? actual : 0));
+    return out;
+}
+
+void MainWindow::setEditText(int controlId, const std::wstring& s) {
+    HWND ctl = ::GetDlgItem(hwnd_, controlId);
+    if (ctl) ::SetWindowTextW(ctl, s.c_str());
 }
 
 void MainWindow::onBrowseLeafCert() {
-    const QString path = QFileDialog::getOpenFileName(
-        this, tr("Leaf CA certificate"),
-        QFileInfo(ui_->leafCertEdit->text()).absolutePath(),
-        tr("PEM certificates (*.cer *.crt *.pem);;All files (*.*)"));
-    if (!path.isEmpty()) {
-        ui_->leafCertEdit->setText(QDir::toNativeSeparators(path));
-    }
+    const std::wstring current = getEditText(IDC_LEAF_CERT_EDIT);
+    const wchar_t* filter =
+        L"PEM certificates (*.cer;*.crt;*.pem)\0*.cer;*.crt;*.pem\0"
+        L"All files (*.*)\0*.*\0";
+    const std::wstring picked = browseFile(hwnd_, L"Leaf CA certificate",
+                                           filter, current);
+    if (!picked.empty()) setEditText(IDC_LEAF_CERT_EDIT, picked);
 }
 
 void MainWindow::onBrowseLeafKey() {
-    const QString path = QFileDialog::getOpenFileName(
-        this, tr("Leaf CA private key"),
-        QFileInfo(ui_->leafKeyEdit->text()).absolutePath(),
-        tr("PEM keys (*.key *.pem);;All files (*.*)"));
-    if (!path.isEmpty()) {
-        ui_->leafKeyEdit->setText(QDir::toNativeSeparators(path));
-    }
+    const std::wstring current = getEditText(IDC_LEAF_KEY_EDIT);
+    const wchar_t* filter =
+        L"PEM keys (*.key;*.pem)\0*.key;*.pem\0"
+        L"All files (*.*)\0*.*\0";
+    const std::wstring picked = browseFile(hwnd_, L"Leaf CA private key",
+                                           filter, current);
+    if (!picked.empty()) setEditText(IDC_LEAF_KEY_EDIT, picked);
 }
 
 void MainWindow::onBrowseOutputDir() {
-    const QString path = QFileDialog::getExistingDirectory(
-        this, tr("Output directory"), ui_->outputDirEdit->text());
-    if (!path.isEmpty()) {
-        ui_->outputDirEdit->setText(QDir::toNativeSeparators(path));
-    }
+    const std::wstring current = getEditText(IDC_OUTPUT_DIR_EDIT);
+    const std::wstring picked = browseFolder(hwnd_, L"Output directory", current);
+    if (!picked.empty()) setEditText(IDC_OUTPUT_DIR_EDIT, picked);
 }
 
 void MainWindow::onGenerate() {
     persistFields();
 
-    const QString leafCertPath = ui_->leafCertEdit->text().trimmed();
-    const QString leafKeyPath  = ui_->leafKeyEdit->text().trimmed();
-    const QString machineId    = ui_->machineIdEdit->text().trimmed();
-    const QString userName     = ui_->userNameEdit->text().trimmed();
-    const int days             = ui_->daysSpinBox->value();
-    const QString outputDir    = ui_->outputDirEdit->text().trimmed();
+    const std::wstring wLeafCert = getEditText(IDC_LEAF_CERT_EDIT);
+    const std::wstring wLeafKey  = getEditText(IDC_LEAF_KEY_EDIT);
+    const std::wstring wOutDir   = getEditText(IDC_OUTPUT_DIR_EDIT);
+    const std::string  machineId = winstr::trim(winstr::narrow(getEditText(IDC_MACHINE_ID_EDIT)));
+    const std::string  userName  = winstr::trim(winstr::narrow(getEditText(IDC_USER_NAME_EDIT)));
+    const std::wstring wDays     = getEditText(IDC_DAYS_EDIT);
 
-    if (leafCertPath.isEmpty() || leafKeyPath.isEmpty()) {
-        QMessageBox::warning(this, tr("Missing input"),
-                             tr("Pick a Leaf CA cert and key first."));
+    int days = 0;
+    try { days = std::stoi(wDays); } catch (...) { days = 0; }
+
+    if (wLeafCert.empty() || wLeafKey.empty()) {
+        ::MessageBoxW(hwnd_, L"Pick a Leaf CA cert and key first.",
+                      L"Missing input", MB_ICONWARNING | MB_OK);
         return;
     }
     if (!isPlausibleMachineId(machineId)) {
-        QMessageBox::warning(this, tr("Bad machine ID"),
-                             tr("Machine ID must be 64 hex characters "
-                                "(SHA-256 from AndroidDevID / WindowsDevID)."));
+        ::MessageBoxW(hwnd_,
+            L"Machine ID must be 64 hex characters "
+            L"(SHA-256 from AndroidDevID / WindowsDevID).",
+            L"Bad machine ID", MB_ICONWARNING | MB_OK);
         return;
     }
-    if (userName.isEmpty()) {
-        QMessageBox::warning(this, tr("Missing user"),
-                             tr("Enter the user name to bind the license to."));
+    if (userName.empty()) {
+        ::MessageBoxW(hwnd_, L"Enter the user name to bind the license to.",
+                      L"Missing user", MB_ICONWARNING | MB_OK);
+        return;
+    }
+    if (days <= 0) {
+        ::MessageBoxW(hwnd_, L"License days must be > 0.",
+                      L"Bad days", MB_ICONWARNING | MB_OK);
         return;
     }
 
-    QDir().mkpath(outputDir);
+    // Make sure output dir exists.
+    std::error_code ec;
+    std::filesystem::create_directories(wOutDir, ec);
 
-    // ---- Load Leaf CA ---------------------------------------------------
+    // ---- Load Leaf CA ----------------------------------------------
     LeafCa ca;
-    QString err;
-    if (!ca.load(leafCertPath, leafKeyPath, &err)) {
-        appendStatus(tr("ERROR loading Leaf CA: %1").arg(err));
-        QMessageBox::critical(this, tr("Leaf CA"), err);
+    std::string err;
+    if (!ca.load(wLeafCert, wLeafKey, &err)) {
+        appendStatus("ERROR loading Leaf CA: " + err);
+        ::MessageBoxW(hwnd_, winstr::widen(err).c_str(),
+                      L"Leaf CA", MB_ICONERROR | MB_OK);
         return;
     }
-    appendStatus(tr("Leaf CA loaded (subject=%1)").arg(ca.subjectCn()));
+    appendStatus("Leaf CA loaded (subject=" + ca.subjectCn() + ")");
 
-    // ---- Issue leaf cert ------------------------------------------------
+    // ---- Issue leaf cert -------------------------------------------
     CertIssuer issuer;
     CertIssuer::Result result;
     if (!issuer.issue(ca, machineId, userName, days, &result, &err)) {
-        appendStatus(tr("ERROR issuing leaf: %1").arg(err));
-        QMessageBox::critical(this, tr("Issue"), err);
+        appendStatus("ERROR issuing leaf: " + err);
+        ::MessageBoxW(hwnd_, winstr::widen(err).c_str(),
+                      L"Issue", MB_ICONERROR | MB_OK);
         return;
     }
-    const QString mode = days >= 36500 ? QStringLiteral("permanent")
-                                       : QStringLiteral("period");
-    appendStatus(tr("Issued serial=%1 days=%2 mode=%3 size=%4 bytes")
-                     .arg(result.serialHex)
-                     .arg(days)
-                     .arg(mode)
-                     .arg(result.certDer.size()));
+    const std::string mode = days >= 36500 ? "permanent" : "period";
+    {
+        char buf[160];
+        StringCchPrintfA(buf, sizeof(buf),
+            "Issued serial=%s days=%d mode=%s size=%zu bytes",
+            result.serialHex.c_str(), days, mode.c_str(),
+            result.certDer.size());
+        appendStatus(buf);
+    }
     if (result.certDer.size() > 1500) {
-        appendStatus(tr("WARN cert size %1 bytes exceeds the 1500-byte QR budget")
-                         .arg(result.certDer.size()));
+        char buf[120];
+        StringCchPrintfA(buf, sizeof(buf),
+            "WARN cert size %zu bytes exceeds the 1500-byte QR budget",
+            result.certDer.size());
+        appendStatus(buf);
     }
 
-    // ---- Write .lic + .png ---------------------------------------------
-    const QString licPath = QStringLiteral("%1/%2.lic").arg(outputDir, result.serialHex);
-    const QString pngPath = QStringLiteral("%1/%2.png").arg(outputDir, result.serialHex);
+    // ---- Write .lic + .png -----------------------------------------
+    const std::wstring wSerial = winstr::widen(result.serialHex);
+    const std::wstring licPath = std::wstring(wOutDir) + L"\\" + wSerial + L".lic";
+    const std::wstring pngPath = std::wstring(wOutDir) + L"\\" + wSerial + L".png";
 
-    QFile lic(licPath);
-    if (!lic.open(QIODevice::WriteOnly)) {
-        appendStatus(tr("ERROR writing %1: %2").arg(licPath, lic.errorString()));
-        return;
+    {
+        FILE* f = nullptr;
+        if (_wfopen_s(&f, licPath.c_str(), L"wb") != 0 || !f) {
+            appendStatus("ERROR writing .lic: " + winstr::narrow(licPath));
+            return;
+        }
+        fwrite(result.certDer.data(), 1, result.certDer.size(), f);
+        fclose(f);
+        appendStatus("Wrote " + winstr::narrow(licPath));
     }
-    lic.write(result.certDer);
-    lic.close();
-    appendStatus(tr("Wrote %1").arg(licPath));
 
-    // QR payload = base64 of the DER cert (so it survives transport
-    // through paste buffers / text channels).
-    if (!QrWriter::writePng(result.certDer.toBase64(), pngPath, &err)) {
-        appendStatus(tr("ERROR writing QR PNG: %1").arg(err));
+    if (!QrWriter::writePng(result.certDer, pngPath, &err)) {
+        appendStatus("ERROR writing QR PNG: " + err);
     } else {
-        appendStatus(tr("Wrote %1").arg(pngPath));
+        appendStatus("Wrote " + winstr::narrow(pngPath));
     }
 
-    // ---- Log -----------------------------------------------------------
+    // ---- Log -------------------------------------------------------
     LicenseLog::Entry entry;
     entry.serialHex   = result.serialHex;
     entry.machineId   = machineId;
@@ -205,13 +438,20 @@ void MainWindow::onGenerate() {
     entry.notBefore   = result.notBefore;
     entry.notAfter    = result.notAfter;
     entry.certDer     = result.certDer;
-    entry.operatorTag = qEnvironmentVariable("USERNAME",
-                                             qEnvironmentVariable("USER", "unknown"));
 
-    LicenseLog log(outputDir);
-    if (!log.append(entry, &err)) {
-        appendStatus(tr("WARN local log append failed: %1").arg(err));
+    // Operator tag: USERNAME env var, falling back to "unknown".
+    wchar_t userBuf[256] = {0};
+    DWORD userBufSize = 256;
+    if (::GetEnvironmentVariableW(L"USERNAME", userBuf, userBufSize) > 0) {
+        entry.operatorTag = winstr::narrow(userBuf);
     } else {
-        appendStatus(tr("Logged to %1").arg(log.csvPath()));
+        entry.operatorTag = "unknown";
+    }
+
+    LicenseLog log(wOutDir);
+    if (!log.append(entry, &err)) {
+        appendStatus("WARN local log append failed: " + err);
+    } else {
+        appendStatus("Logged to " + winstr::narrow(log.csvPath()));
     }
 }
