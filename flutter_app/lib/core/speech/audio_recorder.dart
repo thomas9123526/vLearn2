@@ -106,6 +106,12 @@ class AudioRecorderService {
           encoder: rc.AudioEncoder.pcm16bits,
           sampleRate: sampleRate,
           numChannels: 1,
+          androidConfig: const rc.AndroidRecordConfig(
+            // voiceRecognition is the standard AudioSource for STT apps and
+            // is the most likely source to work in Android emulators (LDPlayer
+            // etc.) that expose a virtual microphone device.
+            audioSource: rc.AndroidAudioSource.voiceRecognition,
+          ),
         ),
       );
       _startedAt = DateTime.now();
