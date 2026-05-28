@@ -124,6 +124,11 @@ class ModelRegistry {
   /// hash verification.
   bool _resolvedFromOverride = false;
 
+  /// Cached result of the last successful [snapshot] call. Re-used by
+  /// subsequent callers (e.g. SherpaOnnxSttService.initialize) so we
+  /// never re-hash large ONNX files more than once per app session.
+  ModelRegistrySnapshot? _cachedSnapshot;
+
   /// Resolves the on-disk root where the on-device speech models live.
   ///
   /// Resolution order:
@@ -301,7 +306,12 @@ class ModelRegistry {
   }
 
   /// One-shot resolve → load manifest → verify → snapshot.
+  ///
+  /// The result is cached after the first successful (ready) verification so
+  /// subsequent callers — e.g. SherpaOnnxSttService.initialize — never
+  /// re-hash large ONNX files more than once per app session.
   Future<ModelRegistrySnapshot> snapshot() async {
+    if (_cachedSnapshot?.isReady == true) return _cachedSnapshot!;
     final root = await resolveModelRoot();
     final manifest = await loadManifest();
     if (manifest == null) {
@@ -314,12 +324,14 @@ class ModelRegistry {
     final allOk = verifications.every(
       (v) => v.status == FileVerificationStatus.ok,
     );
-    return ModelRegistrySnapshot(
+    final result = ModelRegistrySnapshot(
       status: allOk ? ModelRegistryStatus.ready : ModelRegistryStatus.corrupt,
       modelRoot: root.path,
       manifest: manifest,
       verifications: verifications,
     );
+    if (result.isReady) _cachedSnapshot = result;
+    return result;
   }
 
   /// Resolves the absolute path to a file inside the model root.

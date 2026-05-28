@@ -178,7 +178,10 @@ class SherpaOnnxSttService extends SpeechToTextService {
       'peak=${peak.toStringAsFixed(3)} rms=${rmsRoot.toStringAsFixed(4)}',
     );
 
-    try {
+    // 60-second hard cap: on slow x86 emulators ONNX inference can be very
+    // sluggish. If we exceed the cap, surface a clear timeout message instead
+    // of leaving the UI stuck on "Thinking…" indefinitely.
+    Future<SttResult> doTranscribe() async {
       if (_online != null) {
         final stream = _online!.createStream();
         stream.acceptWaveform(samples: samples, sampleRate: sampleRate);
@@ -191,7 +194,7 @@ class SherpaOnnxSttService extends SpeechToTextService {
         debugPrint('[stt] engine.result (online) = "${text.trim()}"');
         return SttResult(
           text: text.trim(),
-          confidence: 1.0, // sherpa-onnx doesn't expose per-utterance scores
+          confidence: 1.0,
           audioDuration: Duration(milliseconds: (durationSeconds * 1000).round()),
         );
       } else if (_offline != null) {
@@ -210,7 +213,21 @@ class SherpaOnnxSttService extends SpeechToTextService {
         );
       }
       throw SttUnavailableException('No recognizer was constructed.');
+    }
+
+    try {
+      return await doTranscribe().timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          debugPrint('[stt] engine.transcribe timed out after 60s');
+          throw SttUnavailableException(
+            'Speech recognition timed out. The device may be too slow for '
+            'on-device inference — try a shorter recording.',
+          );
+        },
+      );
     } catch (e, st) {
+      if (e is SttUnavailableException) rethrow;
       debugPrint('[stt] engine.transcribe crashed: $e');
       _log.e('STT: transcribe failed', error: e, stackTrace: st);
       throw SttUnavailableException(
