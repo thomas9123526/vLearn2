@@ -31,21 +31,34 @@ android {
     }
 
     buildTypes {
-        // ABI strategy: we ship only 64-bit ABIs (32-bit dropped — Google
-        // Play has required 64-bit since Aug 2019).
+        // ABI strategy: ship only 64-bit ABIs (Google Play has required
+        // 64-bit since Aug 2019).
         //   debug   → arm64-v8a + x86_64  (real phone OR LDPlayer emulator)
         //   release → arm64-v8a only      (smallest distributable APK)
+        //
+        // The ndk.abiFilters gate below is skipped when Flutter is run
+        // with --split-per-abi (it passes -Psplit-per-abi=true): AGP
+        // rejects ndk.abiFilters AND splits.abi being set together,
+        // even when the ABI sets match. cmds\build_apk_per_abi.bat uses
+        // --split-per-abi → relies on --target-platform to scope ABIs.
+        // Plain `flutter run` / `flutter build apk` (no split) keeps
+        // the gate, so a stray invocation can't smuggle in 32-bit.
+        val splitPerAbi = (project.findProperty("split-per-abi") as? String) == "true"
         debug {
-            ndk {
-                abiFilters += listOf("arm64-v8a", "x86_64")
+            if (!splitPerAbi) {
+                ndk {
+                    abiFilters += listOf("arm64-v8a", "x86_64")
+                }
             }
         }
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
-            ndk {
-                abiFilters += "arm64-v8a"
+            if (!splitPerAbi) {
+                ndk {
+                    abiFilters += "arm64-v8a"
+                }
             }
         }
     }
