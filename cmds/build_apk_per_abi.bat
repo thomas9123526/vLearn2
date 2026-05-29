@@ -2,26 +2,31 @@
 rem ----------------------------------------------------------------
 rem  Build per-ABI APKs for the Flutter app.
 rem
-rem  Usage: cmds\build_apk_per_abi.bat ^<debug^|release^>
+rem  Usage: cmds\build_apk_per_abi.bat ^<debug^|release^> [abi]
+rem
+rem  abi (optional): x64 ^| arm64 ^| ^<omit for default^>
+rem    omit      → debug=both, release=arm64-only
+rem    x64       → x86_64 APK only       (good for LDPlayer)
+rem    arm64     → arm64-v8a APK only    (real Android phone)
+rem    Aliases: "x86_64" / "android-x64" → x64
+rem             "arm64-v8a" / "android-arm64" → arm64
 rem
 rem  Produces (under flutter_app\build\app\outputs\flutter-apk\):
-rem    app-arm64-v8a-^<mode^>.apk
-rem    app-x86_64-^<mode^>.apk
-rem  -- one APK per ABI listed in build.gradle.kts's abiFilters.
-rem  Splitting per-ABI roughly halves each APK vs the universal one
-rem  because each user only downloads the .so files for their CPU.
-rem
-rem  Run from anywhere; the script jumps to the flutter_app dir on
-rem  its own.
+rem    app-^<abi^>-^<mode^>.apk  — one APK per ABI in the target set.
+rem  --split-per-abi uses AGP's `splits.abi` mechanism which DOES
+rem  filter native libs from AAR dependencies (unlike a plain
+rem  `flutter build apk --target-platform`, which only constrains
+rem  Flutter's own engine and lets AAR-bundled .so slip through).
 rem ----------------------------------------------------------------
 
 setlocal enabledelayedexpansion
 
 set "MODE=%~1"
+set "ABI=%~2"
 
 if "%MODE%"=="" (
     echo ERROR: missing mode argument.
-    echo Usage: %~nx0 ^<debug^|release^>
+    echo Usage: %~nx0 ^<debug^|release^> [x64^|arm64]
     exit /b 1
 )
 
@@ -46,20 +51,36 @@ if not exist "%FLUTTER_APP_DIR%\pubspec.yaml" (
 echo === Building %MODE% APKs (split per ABI) ===
 echo Project : %FLUTTER_APP_DIR%
 echo Output  : %OUT_DIR%
+if not "%ABI%"=="" echo ABI     : %ABI% (only)
 echo.
 
 rem `--split-per-abi` alone tries to split across all three Flutter
-rem ABIs (armeabi-v7a + arm64-v8a + x86_64). That conflicts with the
-rem narrower `ndk { abiFilters }` pinned per-buildType in
-rem app/build.gradle.kts, so we explicitly tell Flutter which target
-rem platforms to split on for each mode:
-rem   debug   → android-arm64,android-x64  (phone + LDPlayer emulator)
-rem   release → android-arm64              (phone only)
-rem Keep this in lockstep with abiFilters in app/build.gradle.kts.
-if "%MODE%"=="debug" (
-    set "TARGETS=android-arm64,android-x64"
-) else (
+rem ABIs (armeabi-v7a + arm64-v8a + x86_64). We explicitly pass
+rem `--target-platform` so Flutter splits only the ABIs we want.
+rem When the [abi] argument is given, that single ABI wins; otherwise
+rem fall back to per-mode defaults that match the ndk { abiFilters }
+rem in app/build.gradle.kts (debug=arm64+x64, release=arm64).
+if /I "%ABI%"=="x64" (
+    set "TARGETS=android-x64"
+) else if /I "%ABI%"=="x86_64" (
+    set "TARGETS=android-x64"
+) else if /I "%ABI%"=="android-x64" (
+    set "TARGETS=android-x64"
+) else if /I "%ABI%"=="arm64" (
     set "TARGETS=android-arm64"
+) else if /I "%ABI%"=="arm64-v8a" (
+    set "TARGETS=android-arm64"
+) else if /I "%ABI%"=="android-arm64" (
+    set "TARGETS=android-arm64"
+) else if "%ABI%"=="" (
+    if "%MODE%"=="debug" (
+        set "TARGETS=android-arm64,android-x64"
+    ) else (
+        set "TARGETS=android-arm64"
+    )
+) else (
+    echo ERROR: invalid abi "%ABI%". Use x64, arm64, or omit.
+    exit /b 1
 )
 pushd "%FLUTTER_APP_DIR%"
 call flutter build apk --%MODE% --split-per-abi --target-platform %TARGETS%
