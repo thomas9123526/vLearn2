@@ -98,3 +98,7 @@ logs/
 tmp/
 temp/
 .cache/
+
+# tools/gradle/ — vendored Gradle distribution (large binary, not tracked).
+# Re-fetch with cmds\bootstrap_offline_gradle.bat if missing.
+tools/gradle/*.zip
