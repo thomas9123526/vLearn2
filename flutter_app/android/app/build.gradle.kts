@@ -19,6 +19,36 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    // Compress native libs inside the APK (download-size win) — RELEASE ONLY.
+    //
+    // AGP's modern default (useLegacyPackaging=false) STORES .so files
+    // uncompressed and page-aligned so they map straight out of the APK
+    // with no on-device extraction. That's fast/disk-cheap but makes the
+    // download big: our .so payload is ~58 MB and dominates the APK.
+    //
+    // Flipping to legacy packaging zips the .so entries (native code
+    // compresses ~50%) and has Android extract them to the app's lib dir
+    // at install time — i.e. exactly the "pack compressed / unpack at
+    // launch" scheme, but handled by the platform loader instead of
+    // custom code (no Flutter-loader patching, no startup-crash risk).
+    // Trade-off: install uses ~2x lib disk transiently and is a little
+    // slower.
+    //
+    // We only want this for RELEASE (the artifact we ship). For DEBUG,
+    // uncompressed libs make install/hot-restart faster during dev, so we
+    // leave the default. AGP's `packaging` block is global (not per
+    // buildType), so gate on the requested gradle tasks: any "*Release*"
+    // task (assembleRelease, bundleRelease, the per-ABI variants) turns it
+    // on; debug/other invocations leave it off.
+    val isReleaseBuild = gradle.startParameter.taskNames.any {
+        it.contains("Release", ignoreCase = true)
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = isReleaseBuild
+        }
+    }
+
     defaultConfig {
         applicationId = "com.ryongma.vfls"
         // Minimum supported platform: API 24 (Android 7.0) — also the
@@ -83,28 +113,15 @@ dependencies {
     implementation("androidx.camera:camera-view:$cameraXVersion")
 }
 
-// ─── Post-build hooks ─────────────────────────────────────────────────────
+// ─── Post-build resguard: intentionally NOT a gradle hook ──────────────────
 //
-// Per todoList/list/05_post_process_android: after the release APK is
-// assembled, run the external resguard batch that lives in the user's
-// tooling tree. Windows-only — both the path and the .bat are
-// Windows-specific. On Linux/Mac CI this task no-ops cleanly.
-tasks.register<Exec>("postBuildResguard") {
-    description = "Run the resguard repackaging batch on the built APK."
-    group = "build"
-    onlyIf {
-        System.getProperty("os.name").lowercase().contains("windows")
-    }
-    workingDir = file("C:/project/tool/resguard/tool_output")
-    commandLine("cmd", "/c", "build_apk.bat")
-    // Don't fail the whole gradle build if the resguard step errors —
-    // the APK is already produced; resguard is a follow-up packaging.
-    isIgnoreExitValue = true
-}
-
-// Fire after the standard release assemble. `findByName` is null-safe so
-// we don't crash on debug-only builds (the task is registered on every
-// configuration but only attaches when the corresponding assemble exists).
-afterEvaluate {
-    tasks.findByName("assembleRelease")?.finalizedBy("postBuildResguard")
-}
+// We used to finalizedBy("postBuildResguard") on assembleRelease to run the
+// external AndResGuard batch (C:/project/tool/resguard/tool_output). That
+// fired DURING assembleRelease — but `flutter build apk` copies the APK into
+// build/app/outputs/flutter-apk/ only AFTER gradle returns, so resguard ran
+// against a stale/absent APK (and isIgnoreExitValue hid the failure).
+//
+// Resguard is now driven from cmds\build_apk_per_abi.bat, which runs after
+// the APK is in flutter-apk/, so timing is correct and the APK + R8 map +
+// resource map are produced and copied to Z:\project as one consistent set.
+// See todoList/list/05_post_process_android for the original intent.

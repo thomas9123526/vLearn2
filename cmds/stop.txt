@@ -68,3 +68,7 @@ npx next dev -p 4101 -H 0.0.0.0
 
 flutter logs | Select-String "\[datapack\]"
 flutter run -d emulator-5554
+
+VLEARN2_ONLINE unset
+
+dart run build_runner build --delete-conflicting-outputs

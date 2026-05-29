@@ -33,7 +33,7 @@ if "%EMU_PORT%"=="" set "EMU_PORT=5555"
 
 if not exist "%ADB%" (
   echo [ERROR] adb not found at %ADB%
-  echo         Fix C:\tools\platform-tools (see memory: vm-environment).
+  echo         Fix C:\tools\platform-tools ^(see memory: vm-environment^).
   exit /b 1
 )
 

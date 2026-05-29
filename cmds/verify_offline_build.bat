@@ -102,10 +102,10 @@ if errorlevel 1 (
 REM ── 6. QRScanActivity (optional) ────────────────────────────────────────
 if /I "%SKIP_QRSCAN%"=="no-qrscan" (
     echo.
-    echo --- [6/6] QRScanActivity (skipped per "no-qrscan" arg) ---
+    echo --- [6/6] QRScanActivity ^(skipped per "no-qrscan" arg^) ---
 ) else (
     echo.
-    echo --- [6/6] QRScanActivity (gradlew :app:assembleDebug) ---
+    echo --- [6/6] QRScanActivity ^(gradlew :app:assembleDebug^) ---
     if not exist "%QRSCAN%\gradlew.bat" (
         echo [WARN] %QRSCAN%\gradlew.bat missing — skipping. Run gradle
         echo        wrapper in that project once if you build it regularly.
