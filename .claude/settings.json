@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "command": "Add-Content -Path 'c:/project/vLearn2/.claude/stop-hook.log' -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' stop') -Encoding utf8"
+          }
+        ]
+      }
+    ]
+  }
+}
