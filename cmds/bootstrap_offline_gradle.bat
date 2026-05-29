@@ -1,14 +1,19 @@
 @echo off
 REM ─────────────────────────────────────────────────────────────────────────
-REM  vLearn2 — Bootstrap the vendored Gradle distribution.
+REM  vLearn2 — Bootstrap the vendored Gradle distribution + offline init.
 REM
-REM  Downloads gradle-8.14-all.zip into tools\gradle\ if it's not already
-REM  present, then verifies the SHA-256. Required because the wrappers
-REM  reference a file:// URL — without the zip in tools\gradle\, every
-REM  Gradle invocation fails to provision a distribution.
+REM  Two things:
+REM    1. Downloads gradle-8.14-all.zip into tools\gradle\ if it's not
+REM       already there, then verifies the SHA-256. Required because the
+REM       wrappers point at a file:// URL.
+REM    2. Copies tools\gradle\init.d\offline.init.gradle into
+REM       %GRADLE_USER_HOME%\init.d\ so every Gradle build defaults to
+REM       --offline (toggle with VLEARN2_ONLINE=1). Includes the gradle
+REM       invocations Flutter makes internally.
 REM
-REM  Run on a machine with internet BEFORE moving the VM to the isolated
-REM  target. Idempotent — skips download if the file exists and matches.
+REM  Idempotent — skip-and-continue if any step is already done.
+REM  Run on a connected machine BEFORE transferring the VM if anything
+REM  in tools\gradle\ is missing.
 REM ─────────────────────────────────────────────────────────────────────────
 setlocal EnableExtensions
 
@@ -22,18 +27,20 @@ set "URL=https://services.gradle.org/distributions/gradle-%GRADLE_VERSION%-%GRAD
 
 if not exist "%DEST_DIR%" mkdir "%DEST_DIR%"
 
+REM ── 1. Vendored Gradle zip ──────────────────────────────────────────────
 if exist "%ZIP%" (
     echo --- Verifying existing %ZIP% ---
     call :verify_sha "%ZIP%" "%EXPECTED_SHA%"
     if errorlevel 1 (
         echo SHA-256 mismatch — re-downloading.
         del /f /q "%ZIP%"
-    ) else (
-        echo Already present and correct.
-        exit /b 0
+        goto :do_download
     )
+    echo Already present and correct.
+    goto :install_init
 )
 
+:do_download
 echo --- Downloading Gradle %GRADLE_VERSION% (%GRADLE_VARIANT%) ---
 echo Source: %URL%
 echo Dest:   %ZIP%
@@ -55,10 +62,39 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM ── 2. Install the offline init script into %GRADLE_USER_HOME%\init.d\ ──
+:install_init
+set "INIT_SRC=%ROOT%\tools\gradle\init.d\offline.init.gradle"
+set "GRADLE_HOME=%GRADLE_USER_HOME%"
+if "%GRADLE_HOME%"=="" set "GRADLE_HOME=%USERPROFILE%\.gradle"
+set "INIT_DEST=%GRADLE_HOME%\init.d\offline.init.gradle"
+
+if not exist "%INIT_SRC%" (
+    echo.
+    echo [WARN] %INIT_SRC% missing — skipping init script install.
+    goto :done
+)
+
+echo.
+echo --- Installing Gradle offline init script ---
+echo Source: %INIT_SRC%
+echo Dest:   %INIT_DEST%
+if not exist "%GRADLE_HOME%\init.d" mkdir "%GRADLE_HOME%\init.d"
+copy /Y "%INIT_SRC%" "%INIT_DEST%" >nul
+if errorlevel 1 (
+    echo [ERROR] Failed to copy init script to %INIT_DEST%.
+    exit /b 1
+)
+echo Installed. Every Gradle invocation now defaults to --offline.
+echo To opt out for one shell: set VLEARN2_ONLINE=1
+
+:done
 echo.
 echo === Done ===
-echo %ZIP% is in place. All three gradle wrappers in this repo can now
-echo resolve their distribution offline.
+echo Vendored Gradle:  %ZIP%
+echo Offline init:     %INIT_DEST%
+echo.
+echo Verify the offline build with: cmds\verify_offline_build.bat
 endlocal
 exit /b 0
 
