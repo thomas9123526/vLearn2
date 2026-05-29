@@ -102,3 +102,15 @@ temp/
 # tools/gradle/ — vendored Gradle distribution (large binary, not tracked).
 # Re-fetch with cmds\bootstrap_offline_gradle.bat if missing.
 tools/gradle/*.zip
+
+# thirdparty/ — Gradle caches, NDK/CMake caches, and Visual Studio build artifacts
+thirdparty/**/.gradle/
+thirdparty/**/.cxx/
+thirdparty/**/obj/
+thirdparty/**/*.pdb
+thirdparty/**/*.dll
+
+# Flutter / Kotlin extras
+pubspec.lock
+**/pubspec.lock
+**/.kotlin/
