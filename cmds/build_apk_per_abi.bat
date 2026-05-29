@@ -145,6 +145,32 @@ if defined NO_Z_COPY (
                 echo   copied %%~nxF  -^>  %Z_DEST%\
             )
         )
+
+        rem ── Release only: also stage the de-obfuscation maps ──────────
+        rem  Two maps matter for a shipped release and must be archived
+        rem  alongside the APK (you cannot regenerate them later, and you
+        rem  need them to read crash stacktraces / map obfuscated names):
+        rem    - R8 code mapping : build\...\mapping\release\mapping.txt
+        rem    - AndResGuard res : resguard outapk\resource_mapping_input.txt
+        rem  Debug builds have neither, so we skip this unless MODE=release.
+        if /I "%MODE%"=="release" (
+            set "R8_MAP=%FLUTTER_APP_DIR%\build\app\outputs\mapping\release\mapping.txt"
+            set "RES_MAP=C:\project\tool\resguard\tool_output\outapk\resource_mapping_input.txt"
+            echo.
+            echo --- Copying release maps to %Z_DEST% ---
+            if exist "!R8_MAP!" (
+                copy /Y "!R8_MAP!" "%Z_DEST%\mapping.txt" >nul
+                if errorlevel 1 ( echo   [WARN] failed to copy R8 mapping.txt ) else ( echo   copied mapping.txt ^(R8 code map^) )
+            ) else (
+                echo   [skip] R8 mapping.txt not found ^(minify off? not built yet?^)
+            )
+            if exist "!RES_MAP!" (
+                copy /Y "!RES_MAP!" "%Z_DEST%\resource_mapping.txt" >nul
+                if errorlevel 1 ( echo   [WARN] failed to copy resource map ) else ( echo   copied resource_mapping.txt ^(AndResGuard res map^) )
+            ) else (
+                echo   [skip] resource map not found ^(run resguard build_apk.bat first^)
+            )
+        )
     )
 )
 
