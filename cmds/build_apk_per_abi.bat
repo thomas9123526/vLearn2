@@ -15,9 +15,16 @@ rem             "all" → both
 rem
 rem  Produces (under flutter_app\build\app\outputs\flutter-apk\):
 rem    app-^<abi^>-^<mode^>.apk  — one APK per ABI in the target set.
-rem  After a successful build the APK(s) are also copied to Z:\project
-rem  (the VMware shared drive) so the host can pick them up. That copy
-rem  is non-fatal and can be skipped by setting NO_Z_COPY=1.
+rem
+rem  RELEASE mode also runs AndResGuard on each APK and produces:
+rem    app-^<abi^>-release-resguard.apk          (smaller, 7z-repacked)
+rem    app-^<abi^>-release-resource_mapping.txt  (resource name map)
+rem  Skip with NO_RESGUARD=1.
+rem
+rem  After a successful build the APK(s) are copied to Z:\project (the
+rem  VMware shared drive) so the host can pick them up; in release mode
+rem  the R8 code map (mapping.txt) and resource map(s) go too, as one
+rem  consistent set. Skip the whole copy with NO_Z_COPY=1.
 rem  --split-per-abi uses AGP's `splits.abi` mechanism which DOES
 rem  filter native libs from AAR dependencies (unlike a plain
 rem  `flutter build apk --target-platform`, which only constrains
@@ -119,6 +126,41 @@ for %%F in ("%OUT_DIR%\app-*-%MODE%.apk") do (
     echo   %%~nxF  ^=  !MB! MB
 )
 
+rem ── Release only: AndResGuard (resource shrink + 7z repack) ───────
+rem  Centralised HERE rather than in a gradle finalizedBy: the gradle
+rem  hook fired during assembleRelease, BEFORE flutter copies the APK
+rem  into flutter-apk\, so it resguarded a stale/absent APK. Running it
+rem  from this script guarantees the freshly-built APK exists first.
+rem  Per release APK we produce, alongside it in flutter-apk\:
+rem    app-<abi>-release-resguard.apk          (smaller, 7z-repacked)
+rem    app-<abi>-release-resource_mapping.txt  (that APK's res name map)
+rem  Skippable with NO_RESGUARD=1. Non-fatal: a resguard failure leaves
+rem  the original APK untouched and the build still "succeeds".
+set "RESGUARD_DIR=C:\project\tool\resguard\tool_output"
+if /I "%MODE%"=="release" if not defined NO_RESGUARD (
+    if exist "%RESGUARD_DIR%\build_apk.bat" (
+        for %%F in ("%OUT_DIR%\app-*-release.apk") do (
+            set "BASE=%%~nF"
+            set "RG_ABI=!BASE:app-=!"
+            set "RG_ABI=!RG_ABI:-release=!"
+            echo.
+            echo --- AndResGuard: !RG_ABI! ---
+            call "%RESGUARD_DIR%\build_apk.bat" "%%F"
+            if exist "%RESGUARD_DIR%\outapk\input_signed_7zip_aligned.apk" (
+                copy /Y "%RESGUARD_DIR%\outapk\input_signed_7zip_aligned.apk" "%OUT_DIR%\app-!RG_ABI!-release-resguard.apk" >nul
+                echo   produced app-!RG_ABI!-release-resguard.apk
+            ) else (
+                echo   [WARN] resguard output missing for !RG_ABI! ^(see log above^)
+            )
+            if exist "%RESGUARD_DIR%\outapk\resource_mapping_input.txt" (
+                copy /Y "%RESGUARD_DIR%\outapk\resource_mapping_input.txt" "%OUT_DIR%\app-!RG_ABI!-release-resource_mapping.txt" >nul
+            )
+        )
+    ) else (
+        echo [skip] resguard tool not found at %RESGUARD_DIR%
+    )
+)
+
 rem ── Post-build: copy the produced APK(s) to the shared drive ──────
 rem  Z:\project is the VMware shared folder (mapped to the host). We
 rem  stage the final APK there so the host can grab it without reaching
@@ -137,7 +179,11 @@ if defined NO_Z_COPY (
         echo        Mount the VMware shared drive, or set NO_Z_COPY=1.
     ) else (
         if not exist "%Z_DEST%\" mkdir "%Z_DEST%" 2>nul
-        for %%F in ("%OUT_DIR%\app-*-%MODE%.apk") do (
+        rem  Glob has a trailing * so it matches both the plain
+        rem  app-<abi>-release.apk AND the app-<abi>-release-resguard.apk
+        rem  produced above (the strict resguard/Sizes loops use the
+        rem  no-trailing-* form so they only ever touch originals).
+        for %%F in ("%OUT_DIR%\app-*-%MODE%*.apk") do (
             copy /Y "%%F" "%Z_DEST%\" >nul
             if errorlevel 1 (
                 echo   [WARN] failed to copy %%~nxF to %Z_DEST%
@@ -147,15 +193,15 @@ if defined NO_Z_COPY (
         )
 
         rem ── Release only: also stage the de-obfuscation maps ──────────
-        rem  Two maps matter for a shipped release and must be archived
-        rem  alongside the APK (you cannot regenerate them later, and you
-        rem  need them to read crash stacktraces / map obfuscated names):
-        rem    - R8 code mapping : build\...\mapping\release\mapping.txt
-        rem    - AndResGuard res : resguard outapk\resource_mapping_input.txt
+        rem  Maps you cannot regenerate later and need to read crash
+        rem  stacktraces / map obfuscated names. Copied as ONE consistent
+        rem  set with the APKs they belong to:
+        rem    - R8 code map     : build\...\mapping\release\mapping.txt
+        rem    - per-ABI res maps: app-<abi>-release-resource_mapping.txt
+        rem      (written by the resguard step above, one per APK)
         rem  Debug builds have neither, so we skip this unless MODE=release.
         if /I "%MODE%"=="release" (
             set "R8_MAP=%FLUTTER_APP_DIR%\build\app\outputs\mapping\release\mapping.txt"
-            set "RES_MAP=C:\project\tool\resguard\tool_output\outapk\resource_mapping_input.txt"
             echo.
             echo --- Copying release maps to %Z_DEST% ---
             if exist "!R8_MAP!" (
@@ -164,11 +210,13 @@ if defined NO_Z_COPY (
             ) else (
                 echo   [skip] R8 mapping.txt not found ^(minify off? not built yet?^)
             )
-            if exist "!RES_MAP!" (
-                copy /Y "!RES_MAP!" "%Z_DEST%\resource_mapping.txt" >nul
-                if errorlevel 1 ( echo   [WARN] failed to copy resource map ) else ( echo   copied resource_mapping.txt ^(AndResGuard res map^) )
+            if exist "%OUT_DIR%\app-*-release-resource_mapping.txt" (
+                for %%M in ("%OUT_DIR%\app-*-release-resource_mapping.txt") do (
+                    copy /Y "%%M" "%Z_DEST%\" >nul
+                    if errorlevel 1 ( echo   [WARN] failed to copy %%~nxM ) else ( echo   copied %%~nxM ^(res map^) )
+                )
             ) else (
-                echo   [skip] resource map not found ^(run resguard build_apk.bat first^)
+                echo   [skip] no resguard resource maps ^(NO_RESGUARD set, or resguard failed^)
             )
         )
     )
