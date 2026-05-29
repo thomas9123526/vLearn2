@@ -50,11 +50,19 @@ echo.
 
 rem `--split-per-abi` alone tries to split across all three Flutter
 rem ABIs (armeabi-v7a + arm64-v8a + x86_64). That conflicts with the
-rem narrower `ndk { abiFilters }` pinned in app/build.gradle.kts, so
-rem we explicitly tell Flutter which target platforms to split on.
-rem Keep this list in lockstep with abiFilters there.
+rem narrower `ndk { abiFilters }` pinned per-buildType in
+rem app/build.gradle.kts, so we explicitly tell Flutter which target
+rem platforms to split on for each mode:
+rem   debug   → android-arm64,android-x64  (phone + LDPlayer emulator)
+rem   release → android-arm64              (phone only)
+rem Keep this in lockstep with abiFilters in app/build.gradle.kts.
+if "%MODE%"=="debug" (
+    set "TARGETS=android-arm64,android-x64"
+) else (
+    set "TARGETS=android-arm64"
+)
 pushd "%FLUTTER_APP_DIR%"
-call flutter build apk --%MODE% --split-per-abi --target-platform android-arm64,android-x64
+call flutter build apk --%MODE% --split-per-abi --target-platform %TARGETS%
 if errorlevel 1 (
     echo.
     echo ERROR: flutter build apk failed. See the error above.

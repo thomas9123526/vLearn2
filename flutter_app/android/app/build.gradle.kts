@@ -28,22 +28,25 @@ android {
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        ndk {
-            // Per todoList/list/05_post_process_android: ship only 64-bit
-            // ABIs (arm64 + x64). Older 32-bit ABIs (armeabi-v7a, x86) are
-            // dropped — Google Play has required 64-bit since Aug 2019 and
-            // modern Android devices all support arm64-v8a. Pruning them
-            // shrinks the APK and drops the native .so files that the
-            // legacy 32-bit slots would otherwise pull in.
-            abiFilters += listOf("arm64-v8a", "x86_64")
-        }
     }
 
     buildTypes {
+        // ABI strategy: we ship only 64-bit ABIs (32-bit dropped — Google
+        // Play has required 64-bit since Aug 2019).
+        //   debug   → arm64-v8a + x86_64  (real phone OR LDPlayer emulator)
+        //   release → arm64-v8a only      (smallest distributable APK)
+        debug {
+            ndk {
+                abiFilters += listOf("arm64-v8a", "x86_64")
+            }
+        }
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
         }
     }
 }
