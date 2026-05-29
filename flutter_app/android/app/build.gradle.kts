@@ -71,6 +71,7 @@ flutter {
 dependencies {
     // Local AARs under app/libs/ (AndroidDevIDLib, qrscan-release, etc.)
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
+    implementation(files("libs/AndroidDevIDLib.aar"))
 
     // Transitive deps required by qrscan-release.aar (not inherited from a local AAR file)
     implementation("androidx.appcompat:appcompat:1.7.0")
