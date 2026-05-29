@@ -19,6 +19,26 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    // Compress native libs inside the APK (download-size win).
+    //
+    // AGP's modern default (useLegacyPackaging=false) STORES .so files
+    // uncompressed and page-aligned so they map straight out of the APK
+    // with no on-device extraction. That's fast/disk-cheap but makes the
+    // download big: our .so payload is ~58 MB and dominates the APK.
+    //
+    // Flipping to legacy packaging zips the .so entries (native code
+    // compresses ~50%) and has Android extract them to the app's lib dir
+    // at install time — i.e. exactly the "pack compressed / unpack at
+    // launch" scheme, but handled by the platform loader instead of
+    // custom code (no Flutter-loader patching, no startup-crash risk).
+    // Trade-off: install uses ~2x lib disk transiently and is a little
+    // slower; acceptable to get the APK under 50 MB.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     defaultConfig {
         applicationId = "com.ryongma.vfls"
         // Minimum supported platform: API 24 (Android 7.0) — also the
