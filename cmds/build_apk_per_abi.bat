@@ -15,6 +15,9 @@ rem             "all" → both
 rem
 rem  Produces (under flutter_app\build\app\outputs\flutter-apk\):
 rem    app-^<abi^>-^<mode^>.apk  — one APK per ABI in the target set.
+rem  After a successful build the APK(s) are also copied to Z:\project
+rem  (the VMware shared drive) so the host can pick them up. That copy
+rem  is non-fatal and can be skipped by setting NO_Z_COPY=1.
 rem  --split-per-abi uses AGP's `splits.abi` mechanism which DOES
 rem  filter native libs from AAR dependencies (unlike a plain
 rem  `flutter build apk --target-platform`, which only constrains
@@ -114,6 +117,35 @@ for %%F in ("%OUT_DIR%\app-*-%MODE%.apk") do (
     set "BYTES=%%~zF"
     set /a "MB=!BYTES! / 1048576"
     echo   %%~nxF  ^=  !MB! MB
+)
+
+rem ── Post-build: copy the produced APK(s) to the shared drive ──────
+rem  Z:\project is the VMware shared folder (mapped to the host). We
+rem  stage the final APK there so the host can grab it without reaching
+rem  into the VM. Non-fatal: the build already succeeded, so a copy
+rem  failure (Z: not mounted, host folder gone) only warns. Set
+rem  NO_Z_COPY=1 to skip this step entirely.
+set "Z_DEST=Z:\project"
+if defined NO_Z_COPY (
+    echo.
+    echo [skip] NO_Z_COPY set - not copying to %Z_DEST%.
+) else (
+    echo.
+    echo --- Copying APK^(s^) to %Z_DEST% ---
+    if not exist "Z:\" (
+        echo [WARN] Z: is not available - skipping copy.
+        echo        Mount the VMware shared drive, or set NO_Z_COPY=1.
+    ) else (
+        if not exist "%Z_DEST%\" mkdir "%Z_DEST%" 2>nul
+        for %%F in ("%OUT_DIR%\app-*-%MODE%.apk") do (
+            copy /Y "%%F" "%Z_DEST%\" >nul
+            if errorlevel 1 (
+                echo   [WARN] failed to copy %%~nxF to %Z_DEST%
+            ) else (
+                echo   copied %%~nxF  -^>  %Z_DEST%\
+            )
+        )
+    )
 )
 
 endlocal
