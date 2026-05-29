@@ -2,14 +2,16 @@
 rem ----------------------------------------------------------------
 rem  Build per-ABI APKs for the Flutter app.
 rem
-rem  Usage: cmds\build_apk_per_abi.bat ^<debug^|release^> [abi]
+rem  Usage: cmds\build_apk_per_abi.bat ^<debug^|release^> [x64^|arm64^|both]
 rem
-rem  abi (optional): x64 ^| arm64 ^| ^<omit for default^>
+rem  abi (optional): x64 ^| arm64 ^| both ^| ^<omit for default^>
 rem    omit      → debug=both, release=arm64-only
 rem    x64       → x86_64 APK only       (good for LDPlayer)
 rem    arm64     → arm64-v8a APK only    (real Android phone)
+rem    both      → x86_64 + arm64-v8a    (both APKs, any mode)
 rem    Aliases: "x86_64" / "android-x64" → x64
 rem             "arm64-v8a" / "android-arm64" → arm64
+rem             "all" → both
 rem
 rem  Produces (under flutter_app\build\app\outputs\flutter-apk\):
 rem    app-^<abi^>-^<mode^>.apk  — one APK per ABI in the target set.
@@ -26,7 +28,7 @@ set "ABI=%~2"
 
 if "%MODE%"=="" (
     echo ERROR: missing mode argument.
-    echo Usage: %~nx0 ^<debug^|release^> [x64^|arm64]
+    echo Usage: %~nx0 ^<debug^|release^> [x64^|arm64^|both]
     exit /b 1
 )
 
@@ -72,6 +74,10 @@ if /I "%ABI%"=="x64" (
     set "TARGETS=android-arm64"
 ) else if /I "%ABI%"=="android-arm64" (
     set "TARGETS=android-arm64"
+) else if /I "%ABI%"=="both" (
+    set "TARGETS=android-arm64,android-x64"
+) else if /I "%ABI%"=="all" (
+    set "TARGETS=android-arm64,android-x64"
 ) else if "%ABI%"=="" (
     if "%MODE%"=="debug" (
         set "TARGETS=android-arm64,android-x64"
@@ -79,7 +85,7 @@ if /I "%ABI%"=="x64" (
         set "TARGETS=android-arm64"
     )
 ) else (
-    echo ERROR: invalid abi "%ABI%". Use x64, arm64, or omit.
+    echo ERROR: invalid abi "%ABI%". Use x64, arm64, both, or omit.
     exit /b 1
 )
 pushd "%FLUTTER_APP_DIR%"
