@@ -40,7 +40,7 @@ if "%HOST_IP%"=="" (
 set "ADB=C:\tools\platform-tools\adb.exe"
 if not exist "%ADB%" (
     echo [ERROR] adb not found at %ADB%
-    echo         Fix C:\tools\platform-tools (see memory: vm-environment).
+    echo         Fix C:\tools\platform-tools ^(see memory: vm-environment^).
     exit /b 1
 )
 
@@ -80,7 +80,7 @@ echo --- Connecting to %HOST_IP%:%PORT% ---
 if errorlevel 1 (
     echo [ERROR] adb connect failed.
     echo Check that:
-    echo   - adb-host-portproxy.bat was run on the host (as admin).
+    echo   - adb-host-portproxy.bat was run on the host ^(as admin^).
     echo   - LDPlayer is running on the host.
     echo   - The host's firewall allows VMnet8 inbound :%PORT%.
     exit /b 1

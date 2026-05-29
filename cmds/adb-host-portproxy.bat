@@ -34,7 +34,7 @@ if "%PORT%"=="" set "PORT=5555"
 REM ── Admin check ──
 net session >nul 2>&1
 if not %errorlevel%==0 (
-    echo [ERROR] This script needs admin (netsh portproxy + firewall).
+    echo [ERROR] This script needs admin ^(netsh portproxy + firewall^).
     echo         Right-click cmd → "Run as administrator", then re-run.
     exit /b 1
 )
