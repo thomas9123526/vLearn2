@@ -60,11 +60,13 @@ for %%V in (ANDROID_ADB_SERVER_ADDRESS ANDROID_ADB_SERVER_PORT ANDROID_ADB_SERVE
 )
 echo.
 
-REM ── 2. Restart adb locally. Use explicit -H/-P so the client cannot be
-REM    redirected by any env var we missed.
+REM ── 2. Restart adb locally. kill-server / start-server must NOT receive
+REM    -H/-P: when -H is set (even to 127.0.0.1), adb treats the server as
+REM    remote and refuses to auto-spawn it. Env vars are already cleared
+REM    above, so defaults (127.0.0.1:5037) are correct.
 echo --- Restarting local adb server ---
-"%ADB%" -H 127.0.0.1 -P 5037 kill-server
-"%ADB%" -H 127.0.0.1 -P 5037 start-server
+"%ADB%" kill-server
+"%ADB%" start-server
 if errorlevel 1 (
     echo [ERROR] adb start-server failed.
     exit /b 1
