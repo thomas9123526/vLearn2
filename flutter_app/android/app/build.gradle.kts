@@ -19,7 +19,7 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
-    // Compress native libs inside the APK (download-size win).
+    // Compress native libs inside the APK (download-size win) — RELEASE ONLY.
     //
     // AGP's modern default (useLegacyPackaging=false) STORES .so files
     // uncompressed and page-aligned so they map straight out of the APK
@@ -32,10 +32,20 @@ android {
     // launch" scheme, but handled by the platform loader instead of
     // custom code (no Flutter-loader patching, no startup-crash risk).
     // Trade-off: install uses ~2x lib disk transiently and is a little
-    // slower; acceptable to get the APK under 50 MB.
+    // slower.
+    //
+    // We only want this for RELEASE (the artifact we ship). For DEBUG,
+    // uncompressed libs make install/hot-restart faster during dev, so we
+    // leave the default. AGP's `packaging` block is global (not per
+    // buildType), so gate on the requested gradle tasks: any "*Release*"
+    // task (assembleRelease, bundleRelease, the per-ABI variants) turns it
+    // on; debug/other invocations leave it off.
+    val isReleaseBuild = gradle.startParameter.taskNames.any {
+        it.contains("Release", ignoreCase = true)
+    }
     packaging {
         jniLibs {
-            useLegacyPackaging = true
+            useLegacyPackaging = isReleaseBuild
         }
     }
 
