@@ -21,10 +21,13 @@ rem    app-^<abi^>-release-resguard.apk          (smaller, 7z-repacked)
 rem    app-^<abi^>-release-resource_mapping.txt  (resource name map)
 rem  Skip with NO_RESGUARD=1.
 rem
+rem  Release builds also Dart-obfuscate (--obfuscate --split-debug-info)
+rem  and emit per-ABI app.android-*.symbols for `flutter symbolize`.
+rem
 rem  After a successful build the APK(s) are copied to Z:\project (the
 rem  VMware shared drive) so the host can pick them up; in release mode
-rem  the R8 code map (mapping.txt) and resource map(s) go too, as one
-rem  consistent set. Skip the whole copy with NO_Z_COPY=1.
+rem  the R8 code map (mapping.txt), resource map(s), and Dart .symbols go
+rem  too, as one consistent set. Skip the whole copy with NO_Z_COPY=1.
 rem  --split-per-abi uses AGP's `splits.abi` mechanism which DOES
 rem  filter native libs from AAR dependencies (unlike a plain
 rem  `flutter build apk --target-platform`, which only constrains
@@ -98,8 +101,22 @@ if /I "%ABI%"=="x64" (
     echo ERROR: invalid abi "%ABI%". Use x64, arm64, both, or omit.
     exit /b 1
 )
+rem ── Release: obfuscate Dart + emit symbols for crash symbolication ──
+rem  Your Dart code is AOT-compiled into libapp.so, NOT into the dex that
+rem  R8/mapping.txt covers. --obfuscate renames Dart symbols; the matching
+rem  --split-debug-info dir captures the symbol files needed to read a Dart
+rem  stacktrace later (via `flutter symbolize`). One .symbols file per ABI.
+rem  Release only: obfuscation isn't supported for debug.
+set "DART_SYMBOLS=%FLUTTER_APP_DIR%\build\app\outputs\symbols\%MODE%"
+set "OBFUSCATE_ARGS="
+if /I "%MODE%"=="release" (
+    if exist "%DART_SYMBOLS%" rd /s /q "%DART_SYMBOLS%"
+    mkdir "%DART_SYMBOLS%" 2>nul
+    set "OBFUSCATE_ARGS=--obfuscate --split-debug-info=%DART_SYMBOLS%"
+)
+
 pushd "%FLUTTER_APP_DIR%"
-call flutter build apk --%MODE% --split-per-abi --target-platform %TARGETS%
+call flutter build apk --%MODE% --split-per-abi --target-platform %TARGETS% %OBFUSCATE_ARGS%
 if errorlevel 1 (
     echo.
     echo ERROR: flutter build apk failed. See the error above.
@@ -193,13 +210,17 @@ if defined NO_Z_COPY (
         )
 
         rem ── Release only: also stage the de-obfuscation maps ──────────
-        rem  Maps you cannot regenerate later and need to read crash
-        rem  stacktraces / map obfuscated names. Copied as ONE consistent
-        rem  set with the APKs they belong to:
+        rem  Maps/symbols you cannot regenerate later and need to read
+        rem  crash stacktraces / map obfuscated names. Copied as ONE
+        rem  consistent set with the APKs they belong to:
         rem    - R8 code map     : build\...\mapping\release\mapping.txt
+        rem      (Java/Kotlin/Android side -> `flutter symbolize` n/a; use
+        rem       Android retrace / Play Console)
+        rem    - Dart symbols    : build\...\symbols\release\*.symbols
+        rem      (your Dart code in libapp.so -> `flutter symbolize`)
         rem    - per-ABI res maps: app-<abi>-release-resource_mapping.txt
         rem      (written by the resguard step above, one per APK)
-        rem  Debug builds have neither, so we skip this unless MODE=release.
+        rem  Debug builds have none, so we skip this unless MODE=release.
         if /I "%MODE%"=="release" (
             set "R8_MAP=%FLUTTER_APP_DIR%\build\app\outputs\mapping\release\mapping.txt"
             echo.
@@ -217,6 +238,15 @@ if defined NO_Z_COPY (
                 )
             ) else (
                 echo   [skip] no resguard resource maps ^(NO_RESGUARD set, or resguard failed^)
+            )
+            rem  Dart obfuscation symbol files (one per ABI: app.android-*.symbols)
+            if exist "%DART_SYMBOLS%\*.symbols" (
+                for %%S in ("%DART_SYMBOLS%\*.symbols") do (
+                    copy /Y "%%S" "%Z_DEST%\" >nul
+                    if errorlevel 1 ( echo   [WARN] failed to copy %%~nxS ) else ( echo   copied %%~nxS ^(Dart symbols^) )
+                )
+            ) else (
+                echo   [skip] no Dart .symbols ^(--obfuscate not run? debug?^)
             )
         )
     )
