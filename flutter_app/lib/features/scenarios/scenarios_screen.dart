@@ -20,25 +20,34 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
   int? _difficulty;
   String _query = '';
 
-  static const _categories = ['travel', 'business', 'social', 'daily'];
   static const _difficultyLabels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
   @override
   Widget build(BuildContext context) {
     final cached = ref.watch(scenariosProvider);
+    final categoriesAsync = ref.watch(categoriesProvider);
     final locale = ref.watch(localeProvider).languageCode;
 
     // The full scenario list is cached; filtering runs client-side, so
     // typing a query or tapping a chip is instant — no network per filter.
     final all = cached.value ?? const <Scenario>[];
+    final categories = categoriesAsync.value ??
+        all.map((s) => s.category).toSet().map((slug) {
+          return Category(
+            slug: slug,
+            title: I18nText(en: _capitalize(slug)),
+          );
+        }).toList();
     final filtered = all.where((s) {
       if (_category != null && s.category != _category) return false;
       if (_difficulty != null && s.difficulty != _difficulty) return false;
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
         final inTitle = s.title.forLocale(locale).toLowerCase().contains(q);
-        final inDesc =
-            s.description.forLocale(locale).toLowerCase().contains(q);
+        final inDesc = s.description
+            .forLocale(locale)
+            .toLowerCase()
+            .contains(q);
         if (!inTitle && !inDesc) return false;
       }
       return true;
@@ -75,14 +84,22 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               scrollDirection: Axis.horizontal,
               children: [
-                _Chip(label: 'All', selected: _category == null, onTap: () => setState(() => _category = null)),
-                for (final c in _categories)
+                _Chip(
+                  label: 'All',
+                  selected: _category == null,
+                  onTap: () => setState(() => _category = null),
+                ),
+                for (final category in categories)
                   Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: _Chip(
-                      label: _capitalize(c),
-                      selected: _category == c,
-                      onTap: () => setState(() => _category = _category == c ? null : c),
+                      label: category.title.forLocale(locale),
+                      selected: _category == category.slug,
+                      onTap: () => setState(
+                        () => _category = _category == category.slug
+                            ? null
+                            : category.slug,
+                      ),
                     ),
                   ),
               ],
@@ -100,7 +117,9 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
                     child: _Chip(
                       label: _difficultyLabels[i],
                       selected: _difficulty == i + 1,
-                      onTap: () => setState(() => _difficulty = _difficulty == i + 1 ? null : i + 1),
+                      onTap: () => setState(
+                        () => _difficulty = _difficulty == i + 1 ? null : i + 1,
+                      ),
                       compact: true,
                     ),
                   ),
@@ -131,8 +150,11 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
     if (!cached.hasValue) {
       // Cold first launch — nothing cached yet.
       if (cached.error != null) {
-        logRawError('scenarios_screen', cached.error!,
-            cached.stackTrace ?? StackTrace.current);
+        logRawError(
+          'scenarios_screen',
+          cached.error!,
+          cached.stackTrace ?? StackTrace.current,
+        );
         return PoliteErrorCenter(
           error: cached.error!,
           context: ErrorContext.loadList,
@@ -184,7 +206,10 @@ class _Chip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 14, vertical: compact ? 4 : 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: compact ? 4 : 8,
+        ),
         decoration: BoxDecoration(
           color: selected ? scheme.primary : scheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(999),
@@ -204,7 +229,11 @@ class _Chip extends StatelessWidget {
 }
 
 class _ScenarioTile extends StatelessWidget {
-  const _ScenarioTile({required this.scenario, required this.locale, required this.onStart});
+  const _ScenarioTile({
+    required this.scenario,
+    required this.locale,
+    required this.onStart,
+  });
   final Scenario scenario;
   final String locale;
   final VoidCallback onStart;
@@ -236,33 +265,62 @@ class _ScenarioTile extends StatelessWidget {
                 color: scheme.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(levelLabel,
-                  style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w700)),
+              child: Text(
+                levelLabel,
+                style: TextStyle(
+                  color: scheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(scenario.title.forLocale(locale),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    scenario.title.forLocale(locale),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(scenario.description.forLocale(locale),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
+                  Text(
+                    scenario.description.forLocale(locale),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.timer_outlined, size: 14, color: scheme.onSurfaceVariant),
+                      Icon(
+                        Icons.timer_outlined,
+                        size: 14,
+                        color: scheme.onSurfaceVariant,
+                      ),
                       const SizedBox(width: 4),
-                      Text('${scenario.estimatedMinutes} min',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                      Text(
+                        '${scenario.estimatedMinutes} min',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Icon(Icons.star_outline, size: 14, color: scheme.onSurfaceVariant),
+                      Icon(
+                        Icons.star_outline,
+                        size: 14,
+                        color: scheme.onSurfaceVariant,
+                      ),
                       const SizedBox(width: 4),
-                      Text('${scenario.xpReward} XP',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                      Text(
+                        '${scenario.xpReward} XP',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ],

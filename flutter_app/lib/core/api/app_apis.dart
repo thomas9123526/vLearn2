@@ -81,6 +81,17 @@ class ScenariosApi {
   }
 }
 
+// ─── Categories ─────────────────────────────────────────────
+class CategoriesApi {
+  CategoriesApi(this._dio);
+  final Dio _dio;
+
+  Future<List<Map<String, dynamic>>> list() async {
+    final res = await _dio.get<List<dynamic>>('/categories');
+    return res.data!.cast<Map<String, dynamic>>();
+  }
+}
+
 // ─── Courses ────────────────────────────────────────────────
 class CoursesApi {
   CoursesApi(this._dio);
@@ -135,22 +146,29 @@ class ConversationsApi {
   }
 
   Future<Map<String, dynamic>> getSession(String id) async {
-    final res = await _dio.get<Map<String, dynamic>>('/conversations/sessions/$id');
-    return res.data!;
-  }
-
-  Future<Map<String, dynamic>> sendMessage(String sessionId, String content, {String? audioUrl}) async {
-    final res = await _dio.post<Map<String, dynamic>>(
-      '/conversations/sessions/$sessionId/messages',
-      data: <String, Object?>{
-        'content': content,
-        'audioUrl': audioUrl,
-      }..removeWhere((_, v) => v == null),
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/conversations/sessions/$id',
     );
     return res.data!;
   }
 
-  Future<Map<String, dynamic>> endSession(String sessionId, {String status = 'completed'}) async {
+  Future<Map<String, dynamic>> sendMessage(
+    String sessionId,
+    String content, {
+    String? audioUrl,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/conversations/sessions/$sessionId/messages',
+      data: <String, Object?>{'content': content, 'audioUrl': audioUrl}
+        ..removeWhere((_, v) => v == null),
+    );
+    return res.data!;
+  }
+
+  Future<Map<String, dynamic>> endSession(
+    String sessionId, {
+    String status = 'completed',
+  }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '/conversations/sessions/$sessionId/end',
       data: {'status': status},
@@ -308,12 +326,33 @@ class LicenseApi {
 // ─── Providers ──────────────────────────────────────────────
 // AuthApi + authApiProvider live in auth_api.dart -- importing
 // both files used to cause `authApiProvider` to be ambiguous.
-final usersApiProvider = Provider<UsersApi>((ref) => UsersApi(ref.watch(apiClientProvider)));
-final personasApiProvider = Provider<PersonasApi>((ref) => PersonasApi(ref.watch(apiClientProvider)));
-final scenariosApiProvider = Provider<ScenariosApi>((ref) => ScenariosApi(ref.watch(apiClientProvider)));
-final coursesApiProvider = Provider<CoursesApi>((ref) => CoursesApi(ref.watch(apiClientProvider)));
-final conversationsApiProvider = Provider<ConversationsApi>((ref) => ConversationsApi(ref.watch(apiClientProvider)));
-final progressApiProvider = Provider<ProgressApi>((ref) => ProgressApi(ref.watch(apiClientProvider)));
-final achievementsApiProvider = Provider<AchievementsApi>((ref) => AchievementsApi(ref.watch(apiClientProvider)));
-final newsApiProvider = Provider<NewsApi>((ref) => NewsApi(ref.watch(apiClientProvider)));
-final licenseApiProvider = Provider<LicenseApi>((ref) => LicenseApi(ref.watch(apiClientProvider)));
+final usersApiProvider = Provider<UsersApi>(
+  (ref) => UsersApi(ref.watch(apiClientProvider)),
+);
+final personasApiProvider = Provider<PersonasApi>(
+  (ref) => PersonasApi(ref.watch(apiClientProvider)),
+);
+final scenariosApiProvider = Provider<ScenariosApi>(
+  (ref) => ScenariosApi(ref.watch(apiClientProvider)),
+);
+final categoriesApiProvider = Provider<CategoriesApi>(
+  (ref) => CategoriesApi(ref.watch(apiClientProvider)),
+);
+final coursesApiProvider = Provider<CoursesApi>(
+  (ref) => CoursesApi(ref.watch(apiClientProvider)),
+);
+final conversationsApiProvider = Provider<ConversationsApi>(
+  (ref) => ConversationsApi(ref.watch(apiClientProvider)),
+);
+final progressApiProvider = Provider<ProgressApi>(
+  (ref) => ProgressApi(ref.watch(apiClientProvider)),
+);
+final achievementsApiProvider = Provider<AchievementsApi>(
+  (ref) => AchievementsApi(ref.watch(apiClientProvider)),
+);
+final newsApiProvider = Provider<NewsApi>(
+  (ref) => NewsApi(ref.watch(apiClientProvider)),
+);
+final licenseApiProvider = Provider<LicenseApi>(
+  (ref) => LicenseApi(ref.watch(apiClientProvider)),
+);

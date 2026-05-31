@@ -37,7 +37,8 @@ class _ProgressSummaryNotifier extends CachedNotifier<Map<String, dynamic>> {
 
 final progressSummaryProvider =
     NotifierProvider<_ProgressSummaryNotifier, Cached<Map<String, dynamic>>>(
-        _ProgressSummaryNotifier.new);
+      _ProgressSummaryNotifier.new,
+    );
 
 // ─── scenarios (/scenarios, full list) — Home strip + Scenarios ──────
 class _ScenariosNotifier extends CachedNotifier<List<Scenario>> {
@@ -51,8 +52,7 @@ class _ScenariosNotifier extends CachedNotifier<List<Scenario>> {
   }
 
   @override
-  Object encode(List<Scenario> value) =>
-      value.map((s) => s.toJson()).toList();
+  Object encode(List<Scenario> value) => value.map((s) => s.toJson()).toList();
 
   @override
   List<Scenario> decode(Object json) => (json as List)
@@ -62,7 +62,32 @@ class _ScenariosNotifier extends CachedNotifier<List<Scenario>> {
 
 final scenariosProvider =
     NotifierProvider<_ScenariosNotifier, Cached<List<Scenario>>>(
-        _ScenariosNotifier.new);
+      _ScenariosNotifier.new,
+    );
+
+class _CategoriesNotifier extends CachedNotifier<List<Category>> {
+  @override
+  String cacheKey() => 'categories';
+
+  @override
+  Future<List<Category>> fetch() async {
+    final raw = await ref.read(categoriesApiProvider).list();
+    return raw.map(Category.fromJson).toList();
+  }
+
+  @override
+  Object encode(List<Category> value) => value.map((c) => c.toJson()).toList();
+
+  @override
+  List<Category> decode(Object json) => (json as List)
+      .map((e) => Category.fromJson((e as Map).cast<String, dynamic>()))
+      .toList();
+}
+
+final categoriesProvider =
+    NotifierProvider<_CategoriesNotifier, Cached<List<Category>>>(
+      _CategoriesNotifier.new,
+    );
 
 // ─── progress snapshots (/progress/snapshots) — Progress chart ───────
 class _SnapshotsNotifier extends CachedNotifier<List<Map<String, dynamic>>> {
@@ -77,17 +102,17 @@ class _SnapshotsNotifier extends CachedNotifier<List<Map<String, dynamic>>> {
   Object encode(List<Map<String, dynamic>> value) => value;
 
   @override
-  List<Map<String, dynamic>> decode(Object json) => (json as List)
-      .map((e) => (e as Map).cast<String, dynamic>())
-      .toList();
+  List<Map<String, dynamic>> decode(Object json) =>
+      (json as List).map((e) => (e as Map).cast<String, dynamic>()).toList();
 }
 
-final progressSnapshotsProvider = NotifierProvider<_SnapshotsNotifier,
-    Cached<List<Map<String, dynamic>>>>(_SnapshotsNotifier.new);
+final progressSnapshotsProvider =
+    NotifierProvider<_SnapshotsNotifier, Cached<List<Map<String, dynamic>>>>(
+      _SnapshotsNotifier.new,
+    );
 
 // ─── progress completions (/progress/completions) — Progress list ───
-class _CompletionsNotifier
-    extends CachedNotifier<List<Map<String, dynamic>>> {
+class _CompletionsNotifier extends CachedNotifier<List<Map<String, dynamic>>> {
   @override
   String cacheKey() => 'progress.completions:${_userScope(ref)}';
 
@@ -99,10 +124,11 @@ class _CompletionsNotifier
   Object encode(List<Map<String, dynamic>> value) => value;
 
   @override
-  List<Map<String, dynamic>> decode(Object json) => (json as List)
-      .map((e) => (e as Map).cast<String, dynamic>())
-      .toList();
+  List<Map<String, dynamic>> decode(Object json) =>
+      (json as List).map((e) => (e as Map).cast<String, dynamic>()).toList();
 }
 
-final progressCompletionsProvider = NotifierProvider<_CompletionsNotifier,
-    Cached<List<Map<String, dynamic>>>>(_CompletionsNotifier.new);
+final progressCompletionsProvider =
+    NotifierProvider<_CompletionsNotifier, Cached<List<Map<String, dynamic>>>>(
+      _CompletionsNotifier.new,
+    );

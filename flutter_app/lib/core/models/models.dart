@@ -21,27 +21,28 @@ class UserProfile {
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
-        id: j['id'] as String,
-        email: j['email'] as String?,
-        displayName: j['displayName'] as String,
-        avatarEmoji: j['avatarEmoji'] as String? ?? '🐣',
-        avatarUrl: j['avatarUrl'] as String?,
-        gender: j['gender'] as String? ?? 'unspecified',
-        uiLanguage: j['uiLanguage'] as String? ?? 'en',
-        currentLevel: (j['currentLevel'] as num).toInt(),
-        xpTotal: (j['xpTotal'] as num).toInt(),
-        streakDays: (j['streakDays'] as num).toInt(),
-        activePersonaId: j['activePersonaId'] as String?,
-        activeTheme: j['activeTheme'] as String? ?? 'apricot',
-        onboardingDone: j['onboardingDone'] as bool? ?? false,
-        role: j['role'] as String? ?? 'user',
-        status: j['status'] as String? ?? 'active',
-      );
+    id: j['id'] as String,
+    email: j['email'] as String?,
+    displayName: j['displayName'] as String,
+    avatarEmoji: j['avatarEmoji'] as String? ?? '🐣',
+    avatarUrl: j['avatarUrl'] as String?,
+    gender: j['gender'] as String? ?? 'unspecified',
+    uiLanguage: j['uiLanguage'] as String? ?? 'en',
+    currentLevel: (j['currentLevel'] as num).toInt(),
+    xpTotal: (j['xpTotal'] as num).toInt(),
+    streakDays: (j['streakDays'] as num).toInt(),
+    activePersonaId: j['activePersonaId'] as String?,
+    activeTheme: j['activeTheme'] as String? ?? 'apricot',
+    onboardingDone: j['onboardingDone'] as bool? ?? false,
+    role: j['role'] as String? ?? 'user',
+    status: j['status'] as String? ?? 'active',
+  );
 
   final String id;
   final String? email;
   final String displayName;
   final String avatarEmoji;
+
   /// Server-side path, joined with the API base URL on render.
   /// e.g. `/uploads/avatars/<id>.jpg`. Null = use [avatarEmoji].
   final String? avatarUrl;
@@ -74,19 +75,23 @@ class Persona {
   });
 
   factory Persona.fromJson(Map<String, dynamic> j) => Persona(
-        id: j['id'] as String,
-        slug: j['slug'] as String,
-        name: j['name'] as String,
-        accent: j['accent'] as String,
-        style: j['style'] as String,
-        specialties: (j['specialties'] as List<dynamic>? ?? []).cast<String>(),
-        gradientFrom: j['gradient_from'] as String? ?? j['gradientFrom'] as String? ?? '#FF6B47',
-        gradientTo: j['gradient_to'] as String? ?? j['gradientTo'] as String? ?? '#FFB997',
-        gender: j['gender'] as String? ?? 'neutral',
-        voiceId: j['voice_id'] as String? ?? j['voiceId'] as String?,
-        riveAsset: j['rive_asset'] as String? ?? j['riveAsset'] as String?,
-        imageUrl: j['image_url'] as String? ?? j['imageUrl'] as String?,
-      );
+    id: j['id'] as String,
+    slug: j['slug'] as String,
+    name: j['name'] as String,
+    accent: j['accent'] as String,
+    style: j['style'] as String,
+    specialties: (j['specialties'] as List<dynamic>? ?? []).cast<String>(),
+    gradientFrom:
+        j['gradient_from'] as String? ??
+        j['gradientFrom'] as String? ??
+        '#FF6B47',
+    gradientTo:
+        j['gradient_to'] as String? ?? j['gradientTo'] as String? ?? '#FFB997',
+    gender: j['gender'] as String? ?? 'neutral',
+    voiceId: j['voice_id'] as String? ?? j['voiceId'] as String?,
+    riveAsset: j['rive_asset'] as String? ?? j['riveAsset'] as String?,
+    imageUrl: j['image_url'] as String? ?? j['imageUrl'] as String?,
+  );
 
   final String id;
   final String slug;
@@ -116,20 +121,20 @@ class I18nText {
   const I18nText({required this.en, this.ko, this.zh});
 
   factory I18nText.fromJson(Map<String, dynamic> j) => I18nText(
-        en: j['en'] as String? ?? '',
-        ko: j['ko'] as String?,
-        zh: j['zh'] as String?,
-      );
+    en: j['en'] as String? ?? '',
+    ko: j['ko'] as String?,
+    zh: j['zh'] as String?,
+  );
 
   final String en;
   final String? ko;
   final String? zh;
 
   Map<String, dynamic> toJson() => {
-        'en': en,
-        if (ko != null) 'ko': ko,
-        if (zh != null) 'zh': zh,
-      };
+    'en': en,
+    if (ko != null) 'ko': ko,
+    if (zh != null) 'zh': zh,
+  };
 
   String forLocale(String locale) {
     switch (locale) {
@@ -141,6 +146,28 @@ class I18nText {
         return en;
     }
   }
+}
+
+class Category {
+  const Category({required this.slug, required this.title, this.description});
+
+  factory Category.fromJson(Map<String, dynamic> j) => Category(
+    slug: j['slug'] as String,
+    title: I18nText.fromJson((j['title'] as Map).cast<String, dynamic>()),
+    description: j['description'] == null
+        ? null
+        : I18nText.fromJson((j['description'] as Map).cast<String, dynamic>()),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'slug': slug,
+    'title': title.toJson(),
+    if (description != null) 'description': description!.toJson(),
+  };
+
+  final String slug;
+  final I18nText title;
+  final I18nText? description;
 }
 
 class Scenario {
@@ -157,30 +184,32 @@ class Scenario {
   });
 
   factory Scenario.fromJson(Map<String, dynamic> j) => Scenario(
-        id: j['id'] as String,
-        slug: j['slug'] as String,
-        category: j['category'] as String,
-        difficulty: (j['difficulty'] as num).toInt(),
-        title: I18nText.fromJson(j['title'] as Map<String, dynamic>),
-        description: I18nText.fromJson(j['description'] as Map<String, dynamic>),
-        estimatedMinutes: (j['estimated_minutes'] as num? ?? j['estimatedMinutes'] as num? ?? 5).toInt(),
-        xpReward: (j['xp_reward'] as num? ?? j['xpReward'] as num? ?? 50).toInt(),
-        imageUrl: j['image_url'] as String? ?? j['imageUrl'] as String?,
-      );
+    id: j['id'] as String,
+    slug: j['slug'] as String,
+    category: j['category'] as String,
+    difficulty: (j['difficulty'] as num).toInt(),
+    title: I18nText.fromJson(j['title'] as Map<String, dynamic>),
+    description: I18nText.fromJson(j['description'] as Map<String, dynamic>),
+    estimatedMinutes:
+        (j['estimated_minutes'] as num? ?? j['estimatedMinutes'] as num? ?? 5)
+            .toInt(),
+    xpReward: (j['xp_reward'] as num? ?? j['xpReward'] as num? ?? 50).toInt(),
+    imageUrl: j['image_url'] as String? ?? j['imageUrl'] as String?,
+  );
 
   /// Inverse of [Scenario.fromJson] — used to cache the list to SQLite.
   /// Keys match the snake_case form `fromJson` reads back.
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'slug': slug,
-        'category': category,
-        'difficulty': difficulty,
-        'title': title.toJson(),
-        'description': description.toJson(),
-        'estimated_minutes': estimatedMinutes,
-        'xp_reward': xpReward,
-        if (imageUrl != null) 'image_url': imageUrl,
-      };
+    'id': id,
+    'slug': slug,
+    'category': category,
+    'difficulty': difficulty,
+    'title': title.toJson(),
+    'description': description.toJson(),
+    'estimated_minutes': estimatedMinutes,
+    'xp_reward': xpReward,
+    if (imageUrl != null) 'image_url': imageUrl,
+  };
 
   final String id;
   final String slug;
@@ -206,7 +235,8 @@ class ConversationSession {
     this.endedAt,
   });
 
-  factory ConversationSession.fromJson(Map<String, dynamic> j) => ConversationSession(
+  factory ConversationSession.fromJson(Map<String, dynamic> j) =>
+      ConversationSession(
         id: j['id'] as String,
         personaId: j['personaId'] as String,
         mode: j['mode'] as String,
@@ -215,7 +245,9 @@ class ConversationSession {
         turnCount: (j['turnCount'] as num? ?? 0).toInt(),
         xpEarned: (j['xpEarned'] as num? ?? 0).toInt(),
         scenarioId: j['scenarioId'] as String?,
-        endedAt: j['endedAt'] == null ? null : DateTime.parse(j['endedAt'] as String),
+        endedAt: j['endedAt'] == null
+            ? null
+            : DateTime.parse(j['endedAt'] as String),
       );
 
   final String id;
@@ -238,7 +270,8 @@ class ConversationMessage {
     required this.createdAt,
   });
 
-  factory ConversationMessage.fromJson(Map<String, dynamic> j) => ConversationMessage(
+  factory ConversationMessage.fromJson(Map<String, dynamic> j) =>
+      ConversationMessage(
         id: j['id'] as String,
         role: j['role'] as String,
         content: j['content'] as String,
@@ -268,21 +301,21 @@ class NewsPost {
   });
 
   factory NewsPost.fromJson(Map<String, dynamic> j) => NewsPost(
-        id: j['id'] as String,
-        slug: j['slug'] as String,
-        title: (j['title'] as Map).cast<String, dynamic>(),
-        body: (j['body'] as Map).cast<String, dynamic>(),
-        summary: j['summary'] == null
-            ? null
-            : (j['summary'] as Map).cast<String, dynamic>(),
-        imageUrl: j['image_url'] as String?,
-        status: j['status'] as String,
-        pinned: (j['pinned'] as bool?) ?? false,
-        publishedAt: j['published_at'] == null
-            ? null
-            : DateTime.parse(j['published_at'] as String),
-        read: (j['read'] as bool?) ?? false,
-      );
+    id: j['id'] as String,
+    slug: j['slug'] as String,
+    title: (j['title'] as Map).cast<String, dynamic>(),
+    body: (j['body'] as Map).cast<String, dynamic>(),
+    summary: j['summary'] == null
+        ? null
+        : (j['summary'] as Map).cast<String, dynamic>(),
+    imageUrl: j['image_url'] as String?,
+    status: j['status'] as String,
+    pinned: (j['pinned'] as bool?) ?? false,
+    publishedAt: j['published_at'] == null
+        ? null
+        : DateTime.parse(j['published_at'] as String),
+    read: (j['read'] as bool?) ?? false,
+  );
 
   final String id;
   final String slug;
