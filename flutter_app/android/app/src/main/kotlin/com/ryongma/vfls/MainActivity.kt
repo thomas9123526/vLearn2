@@ -66,6 +66,29 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
+        // ── App install check channel ────────────────────────────────────────
+        // "isInstalled" → returns true if the given packageName is installed.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.vlearn2/app_check")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isInstalled" -> {
+                        val packageName = call.argument<String>("packageName")
+                        if (packageName.isNullOrBlank()) {
+                            result.error("BAD_ARG", "packageName is required", null)
+                        } else {
+                            try {
+                                @Suppress("DEPRECATION")
+                                packageManager.getPackageInfo(packageName, 0)
+                                result.success(true)
+                            } catch (e: Exception) {
+                                result.success(false)
+                            }
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
         // ── License-file scan channel ────────────────────────────────────────
         // Walks every mounted volume (internal + SD card) for
         // 룡마/가상외국어회화/license/*.lic and returns the file bytes so the
