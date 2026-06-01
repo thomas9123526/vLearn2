@@ -79,6 +79,9 @@ build/
 postgres-data/
 pg_data/
 
+# Uploads & Generated Data
+backend/uploads/
+
 # OS
 .DS_Store
 Thumbs.db
