@@ -430,6 +430,23 @@ const CATALOG: ConfigSeed[] = [
     description: 'Topics the tutor must not discuss',
   },
 
+  // ── User reports & usage analytics ──────────────────────
+  {
+    key: 'system.user_report_enabled',
+    value: true,
+    value_type: 'boolean',
+    category: 'system',
+    description: 'Show the "Send feedback / report a bug" button in the app settings screen',
+    is_visible_to_app: true,
+  },
+  {
+    key: 'system.usage_analytics_enabled',
+    value: true,
+    value_type: 'boolean',
+    category: 'system',
+    description: 'Track per-platform session counts and network bytes (stored in vl_user_network_stats)',
+  },
+
   // ── System ───────────────────────────────────────────────
   {
     key: 'system.maintenance_banner',

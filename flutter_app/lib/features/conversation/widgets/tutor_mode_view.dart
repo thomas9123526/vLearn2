@@ -107,9 +107,10 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     if (!ref.read(speechReadyProvider)) return;
     final tts = ref.read(ttsServiceProvider);
     final voiceId = widget.persona.voiceId ??
-        (tts.capabilities.availableVoices.isNotEmpty
-            ? tts.capabilities.availableVoices.first
-            : '');
+        _pickVoiceForGender(
+          tts.capabilities.availableVoices,
+          widget.persona.gender,
+        );
     final preview = last.content.length > 80
         ? '${last.content.substring(0, 80)}…'
         : last.content;
@@ -118,6 +119,24 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
       debugPrint('[tts] failed: $e');
       logRawError('tutor_mode.tts', e, st);
     });
+  }
+
+  /// Pick the best available voice for a given gender string ('female', 'male', 'neutral').
+  /// Falls back to the first voice if no gender-matching voice is found.
+  String _pickVoiceForGender(List<String> voices, String gender) {
+    if (voices.isEmpty) return '';
+    // Common female/male name fragments used in piper/vits voice IDs.
+    const femaleHints = ['amy', 'jenny', 'linda', 'sarah', 'lisa', 'emma', 'aria'];
+    const maleHints   = ['alan', 'james', 'john', 'ryan', 'guy', 'davis', 'tony'];
+    final hints = gender == 'female' ? femaleHints : gender == 'male' ? maleHints : const <String>[];
+    if (hints.isNotEmpty) {
+      final match = voices.firstWhere(
+        (v) => hints.any((h) => v.toLowerCase().contains(h)),
+        orElse: () => '',
+      );
+      if (match.isNotEmpty) return match;
+    }
+    return voices.first;
   }
 
   bool get _tutorSpeaking =>

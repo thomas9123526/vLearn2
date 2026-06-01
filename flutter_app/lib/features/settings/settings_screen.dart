@@ -136,6 +136,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ],
+          if (ref.watch(layoutConfigProvider).maybeWhen(
+                data: (cfg) => cfg.get<bool>('system.user_report_enabled') ?? true,
+                orElse: () => true,
+              )) ...[
+            const Divider(),
+            const _SectionHeader(text: 'Feedback'),
+            ListTile(
+              leading: const Icon(Icons.feedback_outlined),
+              title: const Text('Send feedback'),
+              subtitle: const Text('Report a bug or share your opinion'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showReportDialog(context, ref),
+            ),
+          ],
           const Divider(),
           const _SectionHeader(text: 'Account'),
           ListTile(
@@ -152,6 +166,77 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _showReportDialog(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController();
+    String type = 'feedback';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Send feedback'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: type,
+                decoration: const InputDecoration(labelText: 'Type'),
+                items: const [
+                  DropdownMenuItem(value: 'feedback', child: Text('Feedback')),
+                  DropdownMenuItem(value: 'bug',      child: Text('Bug report')),
+                  DropdownMenuItem(value: 'other',    child: Text('Other')),
+                ],
+                onChanged: (v) => setState(() => type = v ?? 'feedback'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 4,
+                maxLength: 2000,
+                decoration: const InputDecoration(
+                  labelText: 'Message',
+                  hintText: 'Describe what you experienced…',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final text = controller.text.trim();
+                if (text.isEmpty) return;
+                Navigator.of(ctx).pop();
+                try {
+                  await ref.read(usersApiProvider).sendReport(
+                    content: text,
+                    type: type,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Feedback sent. Thank you!')),
+                    );
+                  }
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to send feedback. Try again later.')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
   }
 
   String _languageLabel(String code) => switch (code) {

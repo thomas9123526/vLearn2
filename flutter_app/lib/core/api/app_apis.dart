@@ -36,6 +36,21 @@ class UsersApi {
     );
     return res.data!;
   }
+
+  /// Submit a feedback / bug report from the user.
+  Future<void> sendReport({
+    required String content,
+    String type = 'feedback',
+    String? platform,
+    String? appVersion,
+  }) async {
+    await _dio.post<void>('/users/report', data: {
+      'type': type,
+      'content': content,
+      'platform': platform,
+      'app_version': appVersion,
+    });
+  }
 }
 
 // ─── Teachers (personas) ────────────────────────────────────

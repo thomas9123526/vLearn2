@@ -17,6 +17,8 @@ import {
   MessageSquareCode,
   ListTree,
   KeyRound,
+  BarChart2,
+  MessageCircleWarning,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { tokenStore, currentClaims } from '@/lib/auth';
@@ -31,6 +33,8 @@ const NAV = [
   { href: '/users', label: 'Users', icon: Users, perm: 'users.view' },
   { href: '/news', label: 'News', icon: Newspaper, perm: 'news.view' },
   { href: '/leaderboard', label: 'Leaderboard', icon: Trophy, perm: 'leaderboard.view' },
+  { href: '/usage', label: 'Usage', icon: BarChart2, perm: 'analytics.view' },
+  { href: '/reports', label: 'Reports', icon: MessageCircleWarning, perm: 'analytics.view' },
   { href: '/audit', label: 'Audit log', icon: ScrollText, perm: 'audit.view' },
   { href: '/admins', label: 'Admins', icon: ShieldCheck, perm: 'admins.view' },
   { href: '/config', label: 'Config flags', icon: Settings, perm: 'config.view' },
