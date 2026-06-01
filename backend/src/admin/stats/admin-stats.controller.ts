@@ -95,7 +95,7 @@ export class AdminStatsController {
 
   /** List user-submitted reports (paginated). */
   @Get('reports')
-  @RequirePermission('analytics.view')
+  @RequirePermission('reports.view')
   @ApiOperation({ summary: 'List user feedback/bug reports' })
   async listReports(
     @Query('type') type?: string,
