@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -327,6 +328,47 @@ class _ChatModeBody extends ConsumerStatefulWidget {
 class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
   bool _recording = false;
   bool _transcribing = false;
+  bool _ttsSpeaking = false;
+  String? _lastSpokenId;
+  StreamSubscription<bool>? _ttsSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _ttsSub = ref.read(ttsServiceProvider).isSpeakingStream.listen((speaking) {
+      if (mounted) setState(() => _ttsSpeaking = speaking);
+    });
+  }
+
+  @override
+  void didUpdateWidget(_ChatModeBody old) {
+    super.didUpdateWidget(old);
+    if (widget.messages.length > old.messages.length) {
+      _maybeSpeakLatestAssistantReply();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ttsSub?.cancel();
+    super.dispose();
+  }
+
+  void _maybeSpeakLatestAssistantReply() {
+    final messages = widget.messages;
+    if (messages.isEmpty) return;
+    final last = messages.last;
+    if (last.role != 'assistant') return;
+    if (last.id == _lastSpokenId) return;
+    _lastSpokenId = last.id;
+    if (!ref.read(speechReadyProvider)) return;
+    final tts = ref.read(ttsServiceProvider);
+    final voices = tts.capabilities.availableVoices;
+    final voiceId = voices.isNotEmpty ? voices.first : '';
+    tts.speak(last.content, voiceId: voiceId).catchError((Object e, StackTrace st) {
+      logRawError('chat_mode.tts', e, st);
+    });
+  }
 
   Future<void> _startRecording() async {
     final recorder = ref.read(audioRecorderProvider);
@@ -439,7 +481,7 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
   @override
   Widget build(BuildContext context) {
     final scheme = widget.scheme;
-    final busy = widget.sending || _transcribing;
+    final busy = widget.sending || _transcribing || _ttsSpeaking;
     return Column(
       children: [
         if (widget.readOnly) _ReadOnlyBanner(status: widget.status, scheme: scheme),
@@ -475,15 +517,17 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
                             amplitudeStream:
                                 ref.read(audioRecorderProvider).amplitudeStream,
                           )
-                        : TextField(
-                            controller: widget.input,
-                            minLines: 1,
-                            maxLines: 4,
-                            textInputAction: TextInputAction.send,
-                            onSubmitted: (_) => widget.onSend(),
-                            decoration: const InputDecoration(
-                                hintText: 'Type your message…'),
-                          ),
+                        : _ttsSpeaking
+                            ? const _TtsPlayingBar()
+                            : TextField(
+                                controller: widget.input,
+                                minLines: 1,
+                                maxLines: 4,
+                                textInputAction: TextInputAction.send,
+                                onSubmitted: (_) => widget.onSend(),
+                                decoration: const InputDecoration(
+                                    hintText: 'Type your message…'),
+                              ),
                   ),
                   const SizedBox(width: 8),
                   _ChatMicButton(
@@ -591,6 +635,71 @@ class _VoiceWaveformState extends State<_VoiceWaveform> {
             ),
           );
         }),
+      ),
+    );
+  }
+}
+
+// ─── TTS playing animation ───────────────────────────────────────────────────
+
+class _TtsPlayingBar extends StatefulWidget {
+  const _TtsPlayingBar();
+  @override
+  State<_TtsPlayingBar> createState() => _TtsPlayingBarState();
+}
+
+class _TtsPlayingBarState extends State<_TtsPlayingBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  // Symmetric phase offsets — centre bar peaks first, outer bars lag behind,
+  // giving a natural mouth-open ripple that matches spoken audio.
+  static const _phaseOffsets = [0.6, 0.3, 0.0, 0.3, 0.6];
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.secondary;
+    return SizedBox(
+      height: 48,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, _) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_phaseOffsets.length, (i) {
+              final angle =
+                  (_ctrl.value + _phaseOffsets[i]) * 2 * math.pi;
+              final t = (math.sin(angle) + 1) / 2;
+              final height = 6.0 + t * 36.0;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: Container(
+                  width: 4,
+                  height: height,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              );
+            }),
+          );
+        },
       ),
     );
   }
