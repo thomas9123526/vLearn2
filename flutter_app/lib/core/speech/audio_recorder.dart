@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,7 +62,6 @@ class AudioRecorderService {
   final _buffer = BytesBuilder(copy: false);
   DateTime? _startedAt;
   Timer? _maxTimer;
-  Timer? _ampTimer;
 
   AudioRecorderState get state => _state;
   Stream<AudioRecorderState> get stateStream => _stateCtrl.stream;
@@ -123,19 +123,26 @@ class AudioRecorderService {
       );
       _startedAt = DateTime.now();
       _sub = stream.listen(
-        _buffer.add,
+        (chunk) {
+          _buffer.add(chunk);
+          // Compute RMS from the 16-bit PCM chunk and emit normalised 0..1.
+          if (chunk.length < 2) return;
+          final samples = chunk.buffer.asInt16List(
+            chunk.offsetInBytes,
+            chunk.lengthInBytes ~/ 2,
+          );
+          double sum = 0;
+          for (final s in samples) {
+            sum += s * s;
+          }
+          final rms = math.sqrt(sum / samples.length);
+          // int16 max is 32767; apply mild compression so quiet voices show up.
+          final normalized = math.pow(rms / 32767.0, 0.4).clamp(0.0, 1.0).toDouble();
+          _amplitudeCtrl.add(normalized);
+        },
         onError: (Object _) => _setState(AudioRecorderState.error),
         cancelOnError: true,
       );
-      _ampTimer = Timer.periodic(const Duration(milliseconds: 80), (_) async {
-        if (!isRecording) return;
-        final amp = await _recorder.getAmplitude();
-        // ignore: avoid_print
-        print('[AudioRecorder] amplitude: ${amp.current.toStringAsFixed(1)} dBFS');
-        // amp.current is dBFS (typically -160..0). Map -60..0 dBFS → 0..1.
-        final normalized = ((amp.current + 60.0) / 60.0).clamp(0.0, 1.0);
-        _amplitudeCtrl.add(normalized);
-      });
       _maxTimer = Timer(maxDuration, stop);
       _setState(AudioRecorderState.recording);
       return true;
@@ -153,8 +160,6 @@ class AudioRecorderService {
     if (!isRecording) return null;
     _maxTimer?.cancel();
     _maxTimer = null;
-    _ampTimer?.cancel();
-    _ampTimer = null;
     await _recorder.stop();
     await _sub?.cancel();
     _sub = null;
@@ -179,8 +184,6 @@ class AudioRecorderService {
     if (!isRecording) return;
     _maxTimer?.cancel();
     _maxTimer = null;
-    _ampTimer?.cancel();
-    _ampTimer = null;
     await _recorder.stop();
     await _sub?.cancel();
     _sub = null;
