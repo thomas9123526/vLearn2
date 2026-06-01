@@ -126,11 +126,12 @@ class AudioRecorderService {
         (chunk) {
           _buffer.add(chunk);
           // Compute RMS from the 16-bit PCM chunk and emit normalised 0..1.
+          // Copy to a fresh buffer first — chunk may be a sub-view with a
+          // non-zero offsetInBytes that isn't 2-byte-aligned, which would
+          // throw a RangeError from asInt16List.
           if (chunk.length < 2) return;
-          final samples = chunk.buffer.asInt16List(
-            chunk.offsetInBytes,
-            chunk.lengthInBytes ~/ 2,
-          );
+          final aligned = Uint8List.fromList(chunk);
+          final samples = aligned.buffer.asInt16List(0, aligned.lengthInBytes ~/ 2);
           double sum = 0;
           for (final s in samples) {
             sum += s * s;
