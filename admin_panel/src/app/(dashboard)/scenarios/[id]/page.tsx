@@ -313,7 +313,7 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
                   <div>
                     <p className="text-xs text-muted-foreground">Scene background</p>
                     <img
-                      src={scenario.background_image_url}
+                      src={resolveUploadUrl(scenario.background_image_url) ?? undefined}
                       alt="Background"
                       className="mt-2 h-40 w-full rounded-lg object-cover border border-border"
                     />
@@ -323,7 +323,7 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
                   <div>
                     <p className="text-xs text-muted-foreground">Hero image</p>
                     <img
-                      src={scenario.image_url}
+                      src={resolveUploadUrl(scenario.image_url) ?? undefined}
                       alt="Hero"
                       className="mt-2 h-40 w-full rounded-lg object-cover border border-border"
                     />

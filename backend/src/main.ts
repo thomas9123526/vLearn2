@@ -90,7 +90,12 @@ async function bootstrap() {
     origin: corsOrigins.length > 0 ? corsOrigins : true,
     credentials: true,
   };
-  app.use('/uploads/', cors(corsOptions));
+  app.use('/uploads/', cors(corsOptions), (_req: any, res: any, next: any) => {
+    // Helmet sets CORP to same-origin by default; override so cross-origin
+    // pages (admin panel on :4101) can load images served from :5101.
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  });
 
   // ─── Static uploads (scenario hero images, news hero images) ──
   const uploadsDir = process.env.UPLOADS_DIR ?? path.resolve('uploads');
