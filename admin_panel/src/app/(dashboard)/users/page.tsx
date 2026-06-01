@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ban, ChevronDown, Eye, KeyRound, RotateCcw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -214,24 +215,41 @@ function ActionsMenu({
   restore: { mutate: (id: string) => void };
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        btnRef.current && !btnRef.current.contains(e.target as Node)
+      ) setOpen(false);
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  function handleToggle() {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.right - 176 }); // 176px = w-44
+    }
+    setOpen((v) => !v);
+  }
+
   return (
-    <div ref={ref} className="relative inline-block">
-      <Button size="sm" variant="outline" onClick={() => setOpen((v) => !v)}>
+    <div className="relative inline-block">
+      <Button ref={btnRef} size="sm" variant="outline" onClick={handleToggle}>
         Actions <ChevronDown className="ml-1 h-3 w-3" />
       </Button>
-      {open && (
-        <div className="absolute right-0 z-50 mt-1 w-44 rounded-md border border-border bg-background shadow-md">
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="w-44 rounded-md border border-border bg-background shadow-md"
+        >
           <MenuItem icon={<Eye className="h-4 w-4" />} onClick={() => { setOpen(false); onViewDetails(); }}>
             View details
           </MenuItem>
@@ -258,7 +276,8 @@ function ActionsMenu({
               Restore
             </MenuItem>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
