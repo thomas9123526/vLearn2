@@ -58,6 +58,7 @@ export default function CategoriesPage() {
 
   const [editing, setEditing] = useState<Category | null>(null);
   const [creating, setCreating] = useState(false);
+  const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
 
   const create = useMutation({
     mutationFn: (body: {
@@ -142,17 +143,35 @@ export default function CategoriesPage() {
             category={c}
             canEdit={canEdit}
             canDelete={canDelete}
+            deleteError={deleteErrors[c.id]}
             onEdit={() => setEditing(c)}
             onToggleActive={() =>
               update.mutate({ id: c.id, patch: { is_active: !c.is_active } })
             }
-            onDelete={() => {
+            onDelete={async () => {
               if (
-                confirm(
+                !confirm(
                   `Delete category "${c.title.en}"? This fails if any scenario still uses it.`,
                 )
-              ) {
-                remove.mutate(c.id);
+              )
+                return;
+              try {
+                await remove.mutateAsync(c.id);
+                // clear any previous error for this category
+                setDeleteErrors((p) => {
+                  const copy = { ...p };
+                  delete copy[c.id];
+                  return copy;
+                });
+              } catch (err: any) {
+                const body = err?.body ?? err?.body?.message ?? err;
+                let msg = err?.message ?? String(err);
+                if (body?.i18nKey === 'category.in_use' || body?.message?.i18nKey === 'category.in_use') {
+                  const count = body.inUseCount ?? body.message?.inUseCount ?? 'unknown';
+                  msg = `Cannot delete: ${count} scenario(s) still use this category.`;
+                }
+                setDeleteErrors((p) => ({ ...p, [c.id]: msg }));
+                console.error('Delete category failed', err);
               }
             }}
           />
@@ -190,6 +209,7 @@ function CategoryCard({
   onEdit,
   onToggleActive,
   onDelete,
+  deleteError,
 }: {
   category: Category;
   canEdit: boolean;
@@ -197,6 +217,7 @@ function CategoryCard({
   onEdit: () => void;
   onToggleActive: () => void;
   onDelete: () => void;
+  deleteError?: string;
 }) {
   return (
     <Card className="flex h-full flex-col">
@@ -251,6 +272,9 @@ function CategoryCard({
             </Button>
           )}
         </div>
+        {deleteError && (
+          <p className="text-sm text-destructive mt-2">{deleteError}</p>
+        )}
       </CardContent>
     </Card>
   );
