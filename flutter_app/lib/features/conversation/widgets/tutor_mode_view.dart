@@ -22,7 +22,7 @@ class TutorModeView extends ConsumerStatefulWidget {
     required this.turnCount,
     required this.onSendText,
     required this.onIdleSuggestion,
-    required this.onSwitchToChat,
+    this.onSwitchToChat,
     required this.onEnd,
     required this.ending,
     super.key,
@@ -34,7 +34,7 @@ class TutorModeView extends ConsumerStatefulWidget {
   final int turnCount;
   final Future<void> Function(String text) onSendText;
   final Future<String?> Function() onIdleSuggestion;
-  final VoidCallback onSwitchToChat;
+  final VoidCallback? onSwitchToChat;
   final VoidCallback onEnd;
   final bool ending;
 
@@ -292,14 +292,14 @@ class _TutorTopBar extends StatelessWidget {
     required this.turnCount,
     required this.ending,
     required this.onBack,
-    required this.onSwitchToChat,
+    this.onSwitchToChat,
     required this.onEnd,
   });
 
   final int turnCount;
   final bool ending;
   final VoidCallback onBack;
-  final VoidCallback onSwitchToChat;
+  final VoidCallback? onSwitchToChat;
   final VoidCallback onEnd;
 
   @override
@@ -326,11 +326,12 @@ class _TutorTopBar extends StatelessWidget {
                       ),
                 ),
               ),
-              IconButton(
-                tooltip: 'Chat mode (typing)',
-                icon: const Icon(Icons.chat_bubble_outline),
-                onPressed: onSwitchToChat,
-              ),
+              if (onSwitchToChat != null)
+                IconButton(
+                  tooltip: 'Chat mode (typing)',
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  onPressed: onSwitchToChat,
+                ),
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: TextButton(

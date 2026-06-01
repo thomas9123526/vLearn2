@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/app_apis.dart';
+import '../../core/config/layout_config_provider.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/guard/content_guard.dart';
 import '../../core/models/models.dart';
@@ -179,8 +180,22 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
     final scheme = Theme.of(context).colorScheme;
     final bubbleStyle = ref.watch(bubbleStyleProvider);
+    // 'tutor' | 'message' | 'both' — controls which modes are available.
+    final conversationMode =
+        ref.watch(layoutConfigProvider).valueOrNull?.get<String>('conversation.mode') ?? 'both';
+
+    // Resolve the effective view mode:
+    //   tutor   → always face
+    //   message → always chat
+    //   both    → user's local toggle or the session's stored default
+    String effectiveMode(_SessionData d) {
+      if (conversationMode == 'tutor') return 'face';
+      if (conversationMode == 'message') return 'chat';
+      return _viewMode ?? d.session.mode;
+    }
+
     final isTutorMode = data.maybeWhen(
-      data: (d) => (_viewMode ?? d.session.mode) == 'face' && d.session.status == 'active',
+      data: (d) => effectiveMode(d) == 'face' && d.session.status == 'active',
       orElse: () => false,
     );
     final isReadOnly = data.maybeWhen(
@@ -205,7 +220,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 orElse: () => const Text('Conversation'),
               ),
               actions: [
-                if (!isReadOnly)
+                // Toggle to tutor mode — only shown when both modes are enabled.
+                if (!isReadOnly && conversationMode == 'both')
                   data.maybeWhen(
                     data: (_) => IconButton(
                       tooltip: 'Tutor mode',
@@ -234,7 +250,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         },
         data: (d) {
           final readOnly = d.session.status != 'active';
-          final mode = _viewMode ?? d.session.mode;
+          final mode = effectiveMode(d);
           if (mode == 'face' && !readOnly) {
             return _TutorModeWrapper(
               sessionId: widget.sessionId,
@@ -243,7 +259,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               turnCount: d.session.turnCount,
               onSendText: _send,
               onIdleSuggestion: _fetchSuggestion,
-              onSwitchToChat: () => setState(() => _viewMode = 'chat'),
+              // Hide the switch-to-chat button when locked to tutor-only mode.
+              onSwitchToChat: conversationMode == 'both'
+                  ? () => setState(() => _viewMode = 'chat')
+                  : null,
               onEnd: _end,
               ending: _ending,
             );
@@ -620,7 +639,7 @@ class _TutorModeWrapper extends ConsumerWidget {
     required this.turnCount,
     required this.onSendText,
     required this.onIdleSuggestion,
-    required this.onSwitchToChat,
+    this.onSwitchToChat,
     required this.onEnd,
     required this.ending,
   });
@@ -631,7 +650,7 @@ class _TutorModeWrapper extends ConsumerWidget {
   final int turnCount;
   final Future<void> Function(String text) onSendText;
   final Future<String?> Function() onIdleSuggestion;
-  final VoidCallback onSwitchToChat;
+  final VoidCallback? onSwitchToChat;
   final VoidCallback onEnd;
   final bool ending;
 

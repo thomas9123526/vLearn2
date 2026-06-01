@@ -264,6 +264,14 @@ const CATALOG: ConfigSeed[] = [
 
   // ── Conversation ─────────────────────────────────────────
   {
+    key: 'conversation.mode',
+    value: 'both',
+    value_type: 'string',
+    category: 'conversation',
+    description: 'Conversation mode: tutor | message | both',
+    is_visible_to_app: true,
+  },
+  {
     key: 'conversation.mode_toggle',
     value: true,
     value_type: 'boolean',

@@ -176,6 +176,12 @@ export default function ConfigPage() {
   );
 }
 
+const MODE_LABELS: Record<string, string> = {
+  tutor: 'Tutor',
+  message: 'Message',
+  both: 'Both',
+};
+
 function FlagRow({
   descriptor,
   entry,
@@ -190,7 +196,8 @@ function FlagRow({
   // If the catalog references a key the backend doesn't know about yet,
   // we render a placeholder row that prompts a seed run.
   const missing = !entry;
-  const isBool = entry?.value_type === 'boolean';
+  const isSelect = descriptor.type === 'select';
+  const isBool = !isSelect && entry?.value_type === 'boolean';
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex-1">
@@ -209,9 +216,28 @@ function FlagRow({
           </div>
         )}
       </div>
-      <div className="w-28 text-right">
+      <div className="text-right">
         {missing ? (
           <span className="text-xs text-muted-foreground">—</span>
+        ) : isSelect ? (
+          <div className="flex gap-1">
+            {(descriptor.options ?? []).map((opt) => (
+              <button
+                key={opt}
+                disabled={!canEdit}
+                onClick={() => onChange(opt)}
+                className={
+                  'rounded-full border px-3 py-1 text-xs transition ' +
+                  (entry!.value === opt
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border hover:bg-muted') +
+                  (!canEdit ? ' cursor-not-allowed opacity-50' : ' cursor-pointer')
+                }
+              >
+                {MODE_LABELS[opt] ?? opt}
+              </button>
+            ))}
+          </div>
         ) : isBool ? (
           <input
             type="checkbox"
