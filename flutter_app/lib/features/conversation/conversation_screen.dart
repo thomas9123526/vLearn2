@@ -4,10 +4,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/app_apis.dart';
 import '../../core/errors/polite_error.dart';
+import '../../core/guard/content_guard.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/providers/personas_provider.dart';
 import '../../core/router/app_router.dart';
+import '../../core/speech/audio_recorder.dart';
+import '../../core/speech/speech_service.dart';
+import '../../core/storage/model_registry.dart';
 import '../../core/theme/bubble_style.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/tutor_mode_view.dart';
@@ -250,6 +254,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             scheme: scheme,
             input: _input,
             onSend: () => _send(_input.text),
+            onSendVoiceText: _send,
             readOnly: readOnly,
             status: d.session.status,
           );
@@ -260,8 +265,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 }
 
 /// Splits chat mode into its own widget so the build method stays
-/// readable. Same chat-bubble list + send box as before.
-class _ChatModeBody extends StatelessWidget {
+/// readable. Same chat-bubble list + send box as before, now with an
+/// optional mic button for voice input.
+class _ChatModeBody extends ConsumerStatefulWidget {
   const _ChatModeBody({
     required this.scroll,
     required this.messages,
@@ -270,6 +276,7 @@ class _ChatModeBody extends StatelessWidget {
     required this.scheme,
     required this.input,
     required this.onSend,
+    required this.onSendVoiceText,
     this.readOnly = false,
     this.status,
   });
@@ -282,6 +289,10 @@ class _ChatModeBody extends StatelessWidget {
   final TextEditingController input;
   final VoidCallback onSend;
 
+  /// Called with the transcribed text when voice input completes and
+  /// passes the content guard. Bypasses the text field.
+  final Future<void> Function(String) onSendVoiceText;
+
   /// When true, hides the send composer and shows a banner explaining the
   /// session is finished. Used for completed and abandoned sessions opened
   /// from the history screen.
@@ -289,30 +300,148 @@ class _ChatModeBody extends StatelessWidget {
   final String? status;
 
   @override
+  ConsumerState<_ChatModeBody> createState() => _ChatModeBodyState();
+}
+
+class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
+  bool _recording = false;
+  bool _transcribing = false;
+
+  Future<void> _startRecording() async {
+    final recorder = ref.read(audioRecorderProvider);
+    final granted = await recorder.requestPermission();
+    if (!granted) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mic access is needed for voice input. Enable it in Settings.'),
+        ),
+      );
+      return;
+    }
+    final started = await recorder.start();
+    if (!started) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the microphone.')),
+      );
+      return;
+    }
+    setState(() => _recording = true);
+  }
+
+  Future<void> _stopRecording() async {
+    setState(() => _recording = false);
+    final recorder = ref.read(audioRecorderProvider);
+    final capture = await recorder.stop();
+    if (!mounted || capture == null) return;
+
+    if (!ref.read(speechReadyProvider)) {
+      final snap = ref.read(modelRegistrySnapshotProvider).valueOrNull;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(speechModelsStatusMessage(snap)),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _transcribing = true);
+    try {
+      final stt = ref.read(sttServiceProvider);
+      final result = await stt.transcribe(capture.pcm, language: 'en');
+      final text = result.text.trim();
+      if (text.isEmpty || !mounted) return;
+
+      final guard = ref.read(contentGuardProvider);
+      final guardResult = guard.check(text);
+
+      if (guardResult.severity == GuardSeverity.block) {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Inappropriate content'),
+            content: Text(
+              'Your message contains words that cannot be sent:\n'
+              '${guardResult.matchedTerms.join(', ')}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      if (guardResult.severity == GuardSeverity.warn) {
+        if (!mounted) return;
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Language warning'),
+            content: Text(
+              'Your message may contain inappropriate language '
+              '(${guardResult.matchedTerms.join(', ')}).\n\nSend it anyway?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Send'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+      }
+
+      await widget.onSendVoiceText(text);
+    } catch (e, st) {
+      if (mounted) {
+        showPoliteErrorSnack(context, e, tag: 'chat_mode.stt', stack: st);
+      }
+    } finally {
+      if (mounted) setState(() => _transcribing = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final scheme = widget.scheme;
+    final busy = widget.sending || _transcribing;
     return Column(
       children: [
-        if (readOnly) _ReadOnlyBanner(status: status, scheme: scheme),
+        if (widget.readOnly) _ReadOnlyBanner(status: widget.status, scheme: scheme),
         Expanded(
-          child: messages.isEmpty
+          child: widget.messages.isEmpty
               ? Center(
                   child: Text(
-                    readOnly
+                    widget.readOnly
                         ? 'This session has no messages.'
                         : 'Send your first message to get started.',
                   ),
                 )
               : ListView.builder(
-                  controller: scroll,
+                  controller: widget.scroll,
                   padding: const EdgeInsets.all(16),
-                  itemCount: messages.length,
+                  itemCount: widget.messages.length,
                   itemBuilder: (_, i) => ChatBubble(
-                    message: messages[i],
-                    style: bubbleStyle,
+                    message: widget.messages[i],
+                    style: widget.bubbleStyle,
                   ),
                 ),
         ),
-        if (!readOnly)
+        if (!widget.readOnly)
           SafeArea(
             top: false,
             child: Padding(
@@ -321,18 +450,25 @@ class _ChatModeBody extends StatelessWidget {
                 children: [
                   Expanded(
                     child: TextField(
-                      controller: input,
+                      controller: widget.input,
                       minLines: 1,
                       maxLines: 4,
                       textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => onSend(),
+                      onSubmitted: (_) => widget.onSend(),
                       decoration: const InputDecoration(hintText: 'Type your message…'),
                     ),
                   ),
                   const SizedBox(width: 8),
+                  _ChatMicButton(
+                    recording: _recording,
+                    transcribing: _transcribing,
+                    disabled: busy,
+                    onToggle: _recording ? _stopRecording : _startRecording,
+                  ),
+                  const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: sending ? null : onSend,
-                    icon: sending
+                    onPressed: (busy || _recording) ? null : widget.onSend,
+                    icon: widget.sending
                         ? SizedBox(
                             width: 18,
                             height: 18,
@@ -345,6 +481,43 @@ class _ChatModeBody extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ChatMicButton extends StatelessWidget {
+  const _ChatMicButton({
+    required this.recording,
+    required this.transcribing,
+    required this.disabled,
+    required this.onToggle,
+  });
+
+  final bool recording;
+  final bool transcribing;
+  final bool disabled;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (transcribing) {
+      return SizedBox(
+        width: 48,
+        height: 48,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: CircularProgressIndicator(strokeWidth: 2.5, color: scheme.primary),
+        ),
+      );
+    }
+    return IconButton.filled(
+      onPressed: disabled ? null : onToggle,
+      style: IconButton.styleFrom(
+        backgroundColor: recording ? scheme.error : scheme.secondaryContainer,
+        foregroundColor: recording ? scheme.onError : scheme.onSecondaryContainer,
+      ),
+      icon: Icon(recording ? Icons.stop_rounded : Icons.mic_rounded),
     );
   }
 }
