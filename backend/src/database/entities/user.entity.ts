@@ -7,7 +7,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { UserInfoEntity } from './user-info.entity';
-import { encryptedFieldTransformer } from '../../common/field-encryption';
 
 export type UserRole = 'user' | 'admin' | 'superadmin';
 export type UserStatus = 'active' | 'suspended' | 'deleted';
@@ -20,7 +19,8 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 255, select: false })
   password_hash!: string;
 
-  @Column({ type: 'varchar', length: 512, transformer: encryptedFieldTransformer })
+  // No encryption — users table is shared with other systems; keep it plain.
+  @Column({ type: 'varchar', length: 512 })
   name!: string;
 
   @Column({ type: 'varchar', length: 10, nullable: true, unique: true })
@@ -37,21 +37,9 @@ export class UserEntity {
   @OneToOne(() => UserInfoEntity, (i) => i.user, { eager: true, cascade: ['insert', 'update'] })
   info!: UserInfoEntity;
 
-  @Column({ type: 'timestamptz', nullable: true })
-  license_valid_until!: Date | null;
-
-  @Column({ type: 'text', nullable: true, transformer: encryptedFieldTransformer })
-  license_machine_id!: string | null;
-
-  @Column({ type: 'text', nullable: true, transformer: encryptedFieldTransformer })
-  license_serial!: string | null;
-
-  /// Platform tag reported by the client at /license/verify time.
-  /// Values are the canonical Flutter ones: 'android', 'windows',
-  /// 'ios', 'macos', 'linux', 'fuchsia', 'web'. Trust-on-write —
-  /// for the admin Users list, not for security decisions.
-  @Column({ type: 'text', nullable: true })
-  license_platform!: string | null;
+  // license_valid_until / license_machine_id / license_serial / license_platform
+  // columns still exist in the DB (for cross-system compatibility) but are no
+  // longer managed by this app — see UserInfoEntity for the live fields.
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at!: Date;

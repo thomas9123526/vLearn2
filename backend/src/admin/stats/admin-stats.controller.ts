@@ -70,13 +70,13 @@ export class AdminStatsController {
   @ApiOperation({ summary: 'Platform usage breakdown (sessions + bytes)' })
   async usage() {
     const [sessionsByPlatform, networkByPlatform] = await Promise.all([
-      // Sessions per platform from vl_conversation_sessions joined to users.
+      // Sessions per platform from vl_conversation_sessions joined to vl_user_info.
       this.dataSource.query(`
-        SELECT u.license_platform AS platform, COUNT(*)::int AS session_count
+        SELECT ui.license_platform AS platform, COUNT(*)::int AS session_count
         FROM vl_conversation_sessions s
-        JOIN users u ON u.id = s.user_id
-        WHERE u.license_platform IS NOT NULL
-        GROUP BY u.license_platform
+        JOIN vl_user_info ui ON ui.user_id = s.user_id
+        WHERE ui.license_platform IS NOT NULL
+        GROUP BY ui.license_platform
         ORDER BY session_count DESC
       `),
       // Network bytes per platform (summed across all users).

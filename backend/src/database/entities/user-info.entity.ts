@@ -83,4 +83,23 @@ export class UserInfoEntity {
 
   @Column({ type: 'boolean', default: true })
   leaderboard_opt_in!: boolean;
+
+  // ─── License (moved from users table) ──────────────────────────────────────
+  // Physical columns on users.license_* are kept for cross-system compatibility
+  // but this app reads/writes here exclusively.
+
+  @Column({ type: 'timestamptz', nullable: true })
+  license_valid_until!: Date | null;
+
+  @Column({ type: 'text', nullable: true, transformer: encryptedFieldTransformer })
+  license_machine_id!: string | null;
+
+  @Column({ type: 'text', nullable: true, transformer: encryptedFieldTransformer })
+  license_serial!: string | null;
+
+  /// Platform tag reported by the client at /license/verify time.
+  /// Values mirror Flutter's defaultTargetPlatform: 'android', 'windows',
+  /// 'ios', 'macos', 'linux', 'fuchsia', 'web'.
+  @Column({ type: 'text', nullable: true })
+  license_platform!: string | null;
 }

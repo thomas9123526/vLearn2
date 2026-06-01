@@ -8,15 +8,17 @@
  * ┌───────────────────┬──────────────────────┬────────────────────────────────┐
  * │ Table             │ Column               │ Reason                         │
  * ├───────────────────┼──────────────────────┼────────────────────────────────┤
- * │ users             │ name                 │ PII — display name             │
- * │ users             │ license_machine_id   │ Device fingerprint             │
- * │ users             │ license_serial       │ License credential             │
  * │ vl_user_info      │ email                │ Primary identifier (PII)       │
+ * │ vl_user_info      │ license_machine_id   │ Device fingerprint             │
+ * │ vl_user_info      │ license_serial       │ License credential             │
+ * │ vl_user_info      │ suspended_reason     │ Internal moderation note       │
  * └───────────────────┴──────────────────────┴────────────────────────────────┘
  *
+ * Note: users.name / users.license_* columns are NOT encrypted — the users
+ * table is shared with other systems and must remain plain-text.
+ *
  * Entity files:
- *   backend/src/database/entities/user.entity.ts       — name, license_*
- *   backend/src/database/entities/user-info.entity.ts  — email
+ *   backend/src/database/entities/user-info.entity.ts  — all encrypted fields
  *
  * Search constraints:
  *   • Deterministic encryption (HMAC-derived IV) means UNIQUE indexes work.
@@ -39,8 +41,8 @@
  */
 
 export const ENCRYPTED_FIELDS = [
-  { table: 'users',        column: 'name',               entity: 'UserEntity',     reason: 'PII — display name' },
-  { table: 'users',        column: 'license_machine_id', entity: 'UserEntity',     reason: 'Device fingerprint' },
-  { table: 'users',        column: 'license_serial',     entity: 'UserEntity',     reason: 'License credential' },
   { table: 'vl_user_info', column: 'email',              entity: 'UserInfoEntity', reason: 'Primary identifier (PII)' },
+  { table: 'vl_user_info', column: 'license_machine_id', entity: 'UserInfoEntity', reason: 'Device fingerprint' },
+  { table: 'vl_user_info', column: 'license_serial',     entity: 'UserInfoEntity', reason: 'License credential' },
+  { table: 'vl_user_info', column: 'suspended_reason',   entity: 'UserInfoEntity', reason: 'Internal moderation note' },
 ] as const;

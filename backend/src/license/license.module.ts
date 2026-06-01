@@ -28,7 +28,7 @@ import { Repository } from 'typeorm';
 
 import { Public } from '../auth/decorators/public.decorator';
 import { AppConfigEntity } from '../database/entities/app-config.entity';
-import { UserEntity } from '../database/entities/user.entity';
+import { UserInfoEntity } from '../database/entities/user-info.entity';
 
 // ─── DTOs ────────────────────────────────────────────────────────────────────
 
@@ -170,8 +170,8 @@ class LicenseService implements OnModuleInit {
   constructor(
     @InjectRepository(AppConfigEntity)
     private readonly configRepo: Repository<AppConfigEntity>,
-    @InjectRepository(UserEntity)
-    private readonly usersRepo: Repository<UserEntity>,
+    @InjectRepository(UserInfoEntity)
+    private readonly userInfoRepo: Repository<UserInfoEntity>,
   ) {}
 
   onModuleInit() {
@@ -236,10 +236,11 @@ class LicenseService implements OnModuleInit {
 
     const serial = cert.serialNumber;
 
-    // 7. Update users license columns
+    // 7. Update license columns on vl_user_info (users table columns are kept
+    //    for cross-system compatibility but this app writes here exclusively).
     if (dto.userId) {
       try {
-        await this.usersRepo
+        await this.userInfoRepo
           .createQueryBuilder()
           .update()
           .set({
@@ -251,7 +252,7 @@ class LicenseService implements OnModuleInit {
             // that haven't been updated yet.
             ...(dto.platform ? { license_platform: dto.platform } : {}),
           } as object)
-          .where('id = :id', { id: dto.userId })
+          .where('user_id = :id', { id: dto.userId })
           .execute();
       } catch (e: unknown) {
         this.log.warn(`Failed to update user license: ${(e as Error).message}`);
@@ -337,7 +338,7 @@ class LicenseController {
 // ─── Module ──────────────────────────────────────────────────────────────────
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AppConfigEntity, UserEntity])],
+  imports: [TypeOrmModule.forFeature([AppConfigEntity, UserInfoEntity])],
   providers: [LicenseService],
   controllers: [LicenseController],
 })
