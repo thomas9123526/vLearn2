@@ -393,7 +393,7 @@ class _AvatarPreview extends ConsumerWidget {
   /// origin so NetworkImage gets a fully-qualified URL.
   String _resolveAvatarUrl(WidgetRef ref, String relative) {
     if (relative.startsWith('http')) return relative;
-    final base = AppConfig.defaults.backendBaseUrl;
+    final base = (ref.read(appConfigProvider).asData?.value ?? AppConfig.defaults).backendBaseUrl;
     // strip the /vfls or /api suffix from the API base — uploads sit
     // at the server root, not behind the /api prefix.
     final origin = _stripApiSuffix(base);
