@@ -22,6 +22,7 @@ class HomeScreen extends ConsumerWidget {
     final progress = ref.watch(progressSummaryProvider);
     final locale = ref.watch(localeProvider).languageCode;
     final scheme = Theme.of(context).colorScheme;
+    final isLoading = scenarios.refreshing || progress.refreshing;
 
     return Scaffold(
       appBar: AppBar(
@@ -33,6 +34,20 @@ class HomeScreen extends ConsumerWidget {
           ),
           SizedBox(width: 4),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(3),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: isLoading
+                ? LinearProgressIndicator(
+                    key: const ValueKey('loading'),
+                    minHeight: 3,
+                    backgroundColor: Colors.transparent,
+                    color: scheme.primary,
+                  )
+                : const SizedBox.shrink(key: ValueKey('idle')),
+          ),
+        ),
       ),
       body: SafeArea(
         child: RefreshIndicator(
@@ -75,10 +90,6 @@ class HomeScreen extends ConsumerWidget {
                       'Recommended scenarios',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                     ),
-                    if (scenarios.refreshing && scenarios.hasValue) ...[
-                      const SizedBox(width: 10),
-                      const RefreshingDot(size: 13),
-                    ],
                   ],
                 ),
               ),
