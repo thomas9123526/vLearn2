@@ -128,7 +128,6 @@ export default function UsersPage() {
         <table className="w-full text-sm">
           <thead className="border-b border-border bg-muted/50">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">Email</th>
               <th className="px-4 py-2 text-left font-medium">Name</th>
               <th className="px-4 py-2 text-left font-medium">Status</th>
               {showLicense && (
@@ -137,7 +136,6 @@ export default function UsersPage() {
                   <th className="px-4 py-2 text-left font-medium">License</th>
                 </>
               )}
-              <th className="px-4 py-2 text-right font-medium">XP</th>
               <th className="px-4 py-2 text-right font-medium">Streak</th>
               <th className="px-4 py-2"></th>
             </tr>
@@ -145,7 +143,6 @@ export default function UsersPage() {
           <tbody>
             {(data?.items ?? []).map((u) => (
               <tr key={u.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-2">{u.email}</td>
                 <td className="px-4 py-2">{u.display_name}</td>
                 <td className="px-4 py-2">
                   <StatusPill status={u.status} />
@@ -163,7 +160,6 @@ export default function UsersPage() {
                     </td>
                   </>
                 )}
-                <td className="px-4 py-2 text-right tabular-nums">{u.xp_total}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{u.streak_days}</td>
                 <td className="px-4 py-2 text-right">
                   <ActionsMenu
@@ -180,7 +176,7 @@ export default function UsersPage() {
             ))}
             {(data?.items ?? []).length === 0 && !isLoading && (
               <tr>
-                <td colSpan={showLicense ? 8 : 6} className="px-4 py-6 text-center text-muted-foreground">
+                <td colSpan={showLicense ? 6 : 4} className="px-4 py-6 text-center text-muted-foreground">
                   No users.
                 </td>
               </tr>
