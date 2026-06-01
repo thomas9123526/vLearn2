@@ -58,6 +58,14 @@ export class ConversationsService {
       }
     }
 
+    // Resolve chosen CEFR level — use the value sent by the client, or fall
+    // back to the user's own current level when omitted.
+    let cefrLevel = dto.cefrLevel;
+    if (!cefrLevel) {
+      const user = await this.users.findOne({ where: { id: userId } });
+      cefrLevel = user?.info?.current_level ?? 1;
+    }
+
     const session = await this.sessions.save(
       this.sessions.create({
         user_id: userId,
@@ -65,6 +73,7 @@ export class ConversationsService {
         persona_id: persona.id,
         mode: dto.mode,
         status: 'active',
+        cefr_level: cefrLevel,
       }),
     );
 
@@ -174,7 +183,7 @@ export class ConversationsService {
       reply = await this.orchestrator.generateTutorReply({
         persona,
         scenario,
-        userLevel: user.info.current_level,
+        userLevel: session.cefr_level ?? user.info.current_level,
         userNativeLanguage: user.info.native_language,
         history,
       });
@@ -238,7 +247,7 @@ export class ConversationsService {
     const suggestion = await this.orchestrator.suggestNextLine({
       persona,
       scenario,
-      userLevel: user.info.current_level,
+      userLevel: session.cefr_level ?? user.info.current_level,
       userNativeLanguage: user.info.native_language,
       history: history.map((m) => ({
         role: m.role,
@@ -345,6 +354,7 @@ export class ConversationsService {
       turnCount: s.turn_count,
       wordCount: s.word_count,
       xpEarned: s.xp_earned,
+      cefrLevel: s.cefr_level,
     };
   }
 

@@ -117,6 +117,7 @@ class ConversationsApi {
     required String personaId,
     String? scenarioId,
     required String mode,
+    int? cefrLevel,
   }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '/conversations/sessions',
@@ -124,6 +125,7 @@ class ConversationsApi {
         'personaId': personaId,
         'scenarioId': scenarioId,
         'mode': mode,
+        'cefrLevel': cefrLevel,
       }..removeWhere((_, v) => v == null),
     );
     return res.data!;

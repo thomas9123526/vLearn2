@@ -49,6 +49,11 @@ export class ConversationSessionEntity {
 
   @Column({ type: 'smallint', default: 0 })
   xp_earned!: number;
+
+  /** CEFR level chosen by the user at session start (1=A1 … 6=C2).
+   *  May differ from the user's current_level by ±1. */
+  @Column({ type: 'smallint', nullable: true })
+  cefr_level!: number | null;
 }
 
 @Entity({ name: 'vl_conversation_messages' })
