@@ -191,9 +191,10 @@ class SherpaOnnxSttService extends SpeechToTextService {
         }
         final text = _online!.getResult(stream).text;
         stream.free();
-        debugPrint('[stt] engine.result (online) = "${text.trim()}"');
+        final normalized = text.trim().toLowerCase();
+        debugPrint('[stt] engine.result (online) = "$normalized"');
         return SttResult(
-          text: text.trim(),
+          text: normalized,
           confidence: 1.0,
           audioDuration: Duration(milliseconds: (durationSeconds * 1000).round()),
         );
@@ -203,10 +204,11 @@ class SherpaOnnxSttService extends SpeechToTextService {
         _offline!.decode(stream);
         final result = _offline!.getResult(stream);
         stream.free();
-        debugPrint('[stt] engine.result (whisper) = "${result.text.trim()}" '
+        final normalizedW = result.text.trim().toLowerCase();
+        debugPrint('[stt] engine.result (whisper) = "$normalizedW" '
             'lang=${result.lang.isEmpty ? "?" : result.lang}');
         return SttResult(
-          text: result.text.trim(),
+          text: normalizedW,
           confidence: 1.0,
           audioDuration: Duration(milliseconds: (durationSeconds * 1000).round()),
           detectedLanguage: result.lang.isEmpty ? null : result.lang,
