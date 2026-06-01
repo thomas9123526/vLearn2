@@ -51,6 +51,7 @@ class ScenarioBriefScreen extends ConsumerWidget {
     final locale = ref.watch(localeProvider).languageCode;
     final scheme = Theme.of(context).colorScheme;
     final user = ref.watch(authProvider).user;
+    final uploadsOrigin = _resolveUploadsOrigin(ref);
 
     final activeSession = activeSessionAsync.asData?.value;
 
@@ -105,7 +106,7 @@ class ScenarioBriefScreen extends ConsumerWidget {
                 _ContinueBanner(session: activeSession),
                 const SizedBox(height: 16),
               ],
-              _HeroCard(scenario: scenario, locale: locale),
+              _HeroCard(scenario: scenario, locale: locale, uploadsOrigin: uploadsOrigin),
               const SizedBox(height: 20),
               _RolesRow(scenario: scenario, persona: activePersona),
               const SizedBox(height: 20),
@@ -167,6 +168,19 @@ class ScenarioBriefScreen extends ConsumerWidget {
         orElse: () => const SizedBox.shrink(),
       ),
     );
+  }
+
+  /// Computes the origin that /uploads/... paths should be resolved against.
+  /// Uses the actual loaded config (or env override), not the hardcoded defaults.
+  String _resolveUploadsOrigin(WidgetRef ref) {
+    const envOverride = String.fromEnvironment('API_BASE_URL');
+    final config = ref.read(appConfigProvider).asData?.value ?? AppConfig.defaults;
+    final base = envOverride.isNotEmpty ? envOverride : config.backendBaseUrl;
+    String strip(String s, String suffix) {
+      final i = s.indexOf(suffix);
+      return i > 0 ? s.substring(0, i) : s;
+    }
+    return strip(strip(base, '/api'), '/vfls');
   }
 
   Future<void> _startFresh(
@@ -339,9 +353,14 @@ class _ContinueDock extends StatelessWidget {
 }
 
 class _HeroCard extends StatelessWidget {
-  const _HeroCard({required this.scenario, required this.locale});
+  const _HeroCard({
+    required this.scenario,
+    required this.locale,
+    required this.uploadsOrigin,
+  });
   final Scenario scenario;
   final String locale;
+  final String uploadsOrigin;
 
   @override
   Widget build(BuildContext context) {
@@ -458,20 +477,9 @@ class _HeroCard extends StatelessWidget {
     );
   }
 
-  /// `/uploads/...` is mounted at the server root, not behind /api or
-  /// /vfls. Strip whichever suffix the configured backendBaseUrl has
-  /// before joining.
   String _resolveScenarioImage(String relative) {
     if (relative.startsWith('http')) return relative;
-    final base = AppConfig.defaults.backendBaseUrl;
-    final cut1 = _stripSuffix(base, '/api');
-    final cut2 = _stripSuffix(cut1, '/vfls');
-    return '$cut2$relative';
-  }
-
-  String _stripSuffix(String s, String suffix) {
-    final i = s.indexOf(suffix);
-    return i > 0 ? s.substring(0, i) : s;
+    return '$uploadsOrigin$relative';
   }
 }
 
