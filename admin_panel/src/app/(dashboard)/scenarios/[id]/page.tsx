@@ -21,7 +21,6 @@ const i18nText = z.object({
 const schema = z.object({
   slug: z.string().min(2).max(100),
   category: z.enum(['travel', 'business', 'social', 'daily']),
-  difficulty: z.coerce.number().int().min(1).max(5),
   title: i18nText,
   description: i18nText,
   scene_description: i18nText,
@@ -65,7 +64,6 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
     reset({
       slug: scenario.slug,
       category: scenario.category,
-      difficulty: scenario.difficulty,
       title: scenario.title,
       description: scenario.description,
       scene_description: scenario.scene_description,
@@ -154,7 +152,6 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
                   <option>daily</option>
                 </select>
               </div>
-              <Field id="difficulty" label="Difficulty (1-5)" type="number" {...register('difficulty')} />
               <Field id="estimated_minutes" label="Estimated minutes" type="number" {...register('estimated_minutes')} />
             </div>
             <Field id="xp_reward" label="XP reward" type="number" {...register('xp_reward')} />

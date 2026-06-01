@@ -13,7 +13,6 @@ interface Scenario {
   id: string;
   slug: string;
   category: string;
-  difficulty: number;
   status: 'draft' | 'published' | 'archived';
   title: Record<string, string>;
   image_url: string | null;
@@ -126,7 +125,6 @@ export default function ScenariosPage() {
             <tr>
               <th className="px-4 py-2 text-left font-medium">Title</th>
               <th className="px-4 py-2 text-left font-medium">Category</th>
-              <th className="px-4 py-2 text-left font-medium">Difficulty</th>
               <th className="px-4 py-2 text-left font-medium">Status</th>
               <th className="px-4 py-2"></th>
             </tr>
@@ -140,7 +138,6 @@ export default function ScenariosPage() {
                   <span>{s.title?.en ?? s.slug}</span>
                 </td>
                 <td className="px-4 py-2 capitalize">{s.category}</td>
-                <td className="px-4 py-2">{'★'.repeat(s.difficulty)}</td>
                 <td className="px-4 py-2 capitalize">{s.status}</td>
                 <td className="px-4 py-2 text-right space-x-1">
                   {canEdit && s.status === 'draft' && (

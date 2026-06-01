@@ -20,7 +20,6 @@ const i18nText = z.object({
 const schema = z.object({
   slug: z.string().min(2).max(100),
   category: z.enum(['travel', 'business', 'social', 'daily']),
-  difficulty: z.coerce.number().int().min(1).max(5),
   title: i18nText,
   description: i18nText,
   scene_description: i18nText,
@@ -43,7 +42,7 @@ export default function NewScenarioPage() {
     formState: { isSubmitting, errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { category: 'daily', difficulty: 2, estimated_minutes: 5, xp_reward: 50 },
+    defaultValues: { category: 'daily', estimated_minutes: 5, xp_reward: 50 },
   });
 
   async function onSubmit(values: FormValues) {
@@ -103,7 +102,6 @@ export default function NewScenarioPage() {
                 <option>daily</option>
               </select>
             </div>
-            <Field id="difficulty" label="Difficulty (1-5)" type="number" {...register('difficulty')} />
             <Field id="estimated_minutes" label="Estimated minutes" type="number" {...register('estimated_minutes')} />
           </div>
           <Field id="xp_reward" label="XP reward" type="number" {...register('xp_reward')} />
