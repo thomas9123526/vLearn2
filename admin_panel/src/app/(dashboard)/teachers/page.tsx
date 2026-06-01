@@ -8,11 +8,7 @@ import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { usePermission } from '@/hooks/use-permission';
 
-/**
- * Mirrors PersonaEntity on the backend. We only type the fields this page
- * renders — full editing happens on the detail page.
- */
-interface Persona {
+interface Teacher {
   id: string;
   slug: string;
   name: string;
@@ -27,33 +23,33 @@ interface Persona {
   is_active: boolean;
 }
 
-export default function PersonasPage() {
+export default function TeachersPage() {
   const canEdit = usePermission('personas.edit');
   const qc = useQueryClient();
 
-  const { data, isLoading, error } = useQuery<Persona[]>({
-    queryKey: ['admin-personas'],
-    queryFn: () => api<Persona[]>('/admin/personas'),
+  const { data, isLoading, error } = useQuery<Teacher[]>({
+    queryKey: ['admin-teachers'],
+    queryFn: () => api<Teacher[]>('/admin/teachers'),
   });
 
   const deactivate = useMutation({
-    mutationFn: (id: string) => api(`/admin/personas/${id}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-personas'] }),
+    mutationFn: (id: string) => api(`/admin/teachers/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-teachers'] }),
   });
   const restore = useMutation({
-    mutationFn: (id: string) => api(`/admin/personas/${id}/restore`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-personas'] }),
+    mutationFn: (id: string) => api(`/admin/teachers/${id}/restore`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-teachers'] }),
   });
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Tutors (personas)</h1>
+        <h1 className="text-2xl font-semibold">Teachers</h1>
         {canEdit && (
-          <Link href="/personas/new">
+          <Link href="/teachers/new">
             <Button>
               <Plus className="h-4 w-4" />
-              New tutor
+              New teacher
             </Button>
           </Link>
         )}
@@ -79,7 +75,7 @@ export default function PersonasPage() {
             {(data ?? []).map((p) => (
               <tr key={p.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-2">
-                  <Link href={`/personas/${p.id}`} className="flex items-center gap-3 hover:underline">
+                  <Link href={`/teachers/${p.id}`} className="flex items-center gap-3 hover:underline">
                     <span
                       className="inline-block h-7 w-7 rounded-full"
                       style={{
@@ -108,7 +104,7 @@ export default function PersonasPage() {
                 <td className="px-4 py-2 text-right">
                   <div className="flex items-center justify-end gap-1">
                     {canEdit && (
-                      <Link href={`/personas/${p.id}`}>
+                      <Link href={`/teachers/${p.id}`}>
                         <Button size="sm" variant="ghost">
                           <Pencil className="h-4 w-4" />
                           Edit
@@ -121,7 +117,7 @@ export default function PersonasPage() {
                           size="sm"
                           variant="ghost"
                           onClick={() => {
-                            if (confirm(`Deactivate tutor "${p.name}"? Past sessions stay attributed to them.`)) {
+                            if (confirm(`Deactivate teacher "${p.name}"? Past sessions stay attributed to them.`)) {
                               deactivate.mutate(p.id);
                             }
                           }}
@@ -142,7 +138,7 @@ export default function PersonasPage() {
             {(data ?? []).length === 0 && !isLoading && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
-                  No tutors yet.
+                  No teachers yet.
                 </td>
               </tr>
             )}

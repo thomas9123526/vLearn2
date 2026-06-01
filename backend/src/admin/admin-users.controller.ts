@@ -31,6 +31,7 @@ import {
 } from './permissions/permission.guard';
 import { AdminAuditLogService } from './audit/admin-audit-log.service';
 import { NetworkStatsService } from '../network-stats/network-stats.service';
+import { encryptField } from '../common/field-encryption';
 
 const BCRYPT_ROUNDS = 10;
 
@@ -102,7 +103,11 @@ export class AdminUsersController {
       .skip(off)
       .take(lim);
     if (q) {
-      qb.andWhere(`(i.email ILIKE :q OR u.name ILIKE :q)`, { q: `%${q}%` });
+      // email is AES-encrypted — only exact-match is possible; name supports ILIKE partial match.
+      qb.andWhere(`(i.email = :eq OR u.name ILIKE :q)`, {
+        eq: encryptField(q),
+        q: `%${q}%`,
+      });
     }
     if (status) qb.andWhere('i.status = :s', { s: status });
     const [items, total] = await qb.getManyAndCount();
@@ -140,6 +145,8 @@ export class AdminUsersController {
       id: i.user_id,
       email: i.email,
       display_name: i.user.name,
+      avatar_url: i.avatar_url,
+      avatar_emoji: i.avatar_emoji,
       status: i.status,
       suspended_until: i.suspended_until,
       suspended_reason: i.suspended_reason,

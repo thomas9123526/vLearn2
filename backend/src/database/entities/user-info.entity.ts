@@ -78,7 +78,7 @@ export class UserInfoEntity {
   @Column({ type: 'timestamptz', nullable: true })
   suspended_until!: Date | null;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, transformer: encryptedFieldTransformer })
   suspended_reason!: string | null;
 
   @Column({ type: 'boolean', default: true })

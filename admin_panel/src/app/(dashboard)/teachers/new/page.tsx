@@ -35,7 +35,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export default function NewPersonaPage() {
+export default function NewTeacherPage() {
   const router = useRouter();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export default function NewPersonaPage() {
   async function onSubmit(values: FormValues) {
     setError(null);
     try {
-      const created = await api<{ id: string }>('/admin/personas', {
+      const created = await api<{ id: string }>('/admin/teachers', {
         method: 'POST',
         body: {
           ...values,
@@ -70,13 +70,13 @@ export default function NewPersonaPage() {
       if (imageFile) {
         const fd = new FormData();
         fd.append('file', imageFile);
-        await api(`/admin/personas/${created.id}/image`, {
+        await api(`/admin/teachers/${created.id}/image`, {
           method: 'POST',
           body: fd,
           multipart: true,
         });
       }
-      router.replace(`/personas/${created.id}`);
+      router.replace(`/teachers/${created.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create persona');
     }
@@ -85,7 +85,7 @@ export default function NewPersonaPage() {
   return (
     <Card className="max-w-2xl">
       <CardHeader>
-        <CardTitle>New tutor</CardTitle>
+        <CardTitle>New teacher</CardTitle>
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>

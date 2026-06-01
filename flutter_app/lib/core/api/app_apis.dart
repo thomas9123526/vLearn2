@@ -38,18 +38,18 @@ class UsersApi {
   }
 }
 
-// ─── Personas ───────────────────────────────────────────────
+// ─── Teachers (personas) ────────────────────────────────────
 class PersonasApi {
   PersonasApi(this._dio);
   final Dio _dio;
 
   Future<List<Map<String, dynamic>>> list() async {
-    final res = await _dio.get<List<dynamic>>('/personas');
+    final res = await _dio.get<List<dynamic>>('/teachers');
     return res.data!.cast<Map<String, dynamic>>();
   }
 
   Future<Map<String, dynamic>> get(String id) async {
-    final res = await _dio.get<Map<String, dynamic>>('/personas/$id');
+    final res = await _dio.get<Map<String, dynamic>>('/teachers/$id');
     return res.data!;
   }
 }

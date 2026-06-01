@@ -35,6 +35,8 @@ interface UserRow {
 }
 
 interface UserDetail extends UserRow {
+  avatar_url: string | null;
+  avatar_emoji: string;
   native_language: string;
   ui_language: string;
   active_theme: string;
@@ -305,6 +307,26 @@ function UserDetailsModal({ userId, onClose }: { userId: string | null; onClose:
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <div className="space-y-5 text-sm">
+          {/* ── Avatar ── */}
+          <div className="flex items-center gap-3">
+            {data.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={data.avatar_url}
+                alt={data.display_name}
+                className="h-16 w-16 rounded-full object-cover border border-border"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-3xl border border-border">
+                {data.avatar_emoji}
+              </div>
+            )}
+            <div>
+              <p className="font-medium">{data.display_name}</p>
+              <p className="text-xs text-muted-foreground">{data.email}</p>
+            </div>
+          </div>
+
           {/* ── Identity ── */}
           <Section title="Identity">
             <Row label="ID"         value={data.id} mono />

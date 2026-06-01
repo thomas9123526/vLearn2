@@ -48,8 +48,8 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
   const { data: persona, isLoading } = useQuery<
     Persona & { specialties: string[] | string }
   >({
-    queryKey: ['admin-persona', id],
-    queryFn: () => api(`/admin/personas/${id}`),
+    queryKey: ['admin-teacher', id],
+    queryFn: () => api(`/admin/teachers/${id}`),
   });
 
   const { register, handleSubmit, reset, formState: { isSubmitting, errors } } =
@@ -77,7 +77,7 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
 
   const save = useMutation({
     mutationFn: (values: FormValues) =>
-      api(`/admin/personas/${id}`, {
+      api(`/admin/teachers/${id}`, {
         method: 'PATCH',
         body: {
           ...values,
@@ -86,7 +86,7 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
           specialties: values.specialties.split(',').map((s) => s.trim()).filter(Boolean),
         },
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-persona', id] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-teacher', id] }),
   });
 
   async function onSubmit(values: FormValues) {
@@ -96,14 +96,14 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
       if (imageFile) {
         const fd = new FormData();
         fd.append('file', imageFile);
-        await api(`/admin/personas/${id}/image`, {
+        await api(`/admin/teachers/${id}/image`, {
           method: 'POST',
           body: fd,
           multipart: true,
         });
         setImageFile(null);
       }
-      qc.invalidateQueries({ queryKey: ['admin-personas'] });
+      qc.invalidateQueries({ queryKey: ['admin-teachers'] });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save');
     }
@@ -187,7 +187,7 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
               <Button type="submit" disabled={isSubmitting || save.isPending}>
                 {isSubmitting || save.isPending ? 'Saving…' : 'Save changes'}
               </Button>
-              <Button type="button" variant="outline" onClick={() => router.push('/personas')}>
+              <Button type="button" variant="outline" onClick={() => router.push('/teachers')}>
                 Back
               </Button>
             </div>

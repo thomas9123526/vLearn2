@@ -24,7 +24,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 
 const NAV = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard, perm: null },
-  { href: '/personas', label: 'Tutors', icon: Sparkles, perm: 'personas.edit' },
+  { href: '/teachers', label: 'Teachers', icon: Sparkles, perm: 'personas.edit' },
   { href: '/prompt-templates', label: 'Prompts', icon: MessageSquareCode, perm: 'prompts.view' },
   { href: '/scenarios', label: 'Scenarios', icon: BookOpen, perm: 'scenarios.view' },
   { href: '/categories', label: 'Categories', icon: ListTree, perm: 'categories.view' },

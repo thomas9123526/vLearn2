@@ -145,10 +145,10 @@ class UpdatePersonaDto {
   is_active?: boolean;
 }
 
-@ApiTags('Admin / Personas')
+@ApiTags('Admin / Teachers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionGuard)
-@Controller('admin/personas')
+@Controller('admin/teachers')
 export class AdminPersonasController {
   constructor(
     @InjectRepository(PersonaEntity)

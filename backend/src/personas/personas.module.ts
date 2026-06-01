@@ -35,10 +35,10 @@ class PersonasService {
   }
 }
 
-@ApiTags('Personas')
+@ApiTags('Teachers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('personas')
+@Controller('teachers')
 class PersonasController {
   constructor(private readonly svc: PersonasService) {}
 
