@@ -181,6 +181,7 @@ class Scenario {
     required this.estimatedMinutes,
     required this.xpReward,
     this.imageUrl,
+    this.backgroundImageUrl,
   });
 
   factory Scenario.fromJson(Map<String, dynamic> j) => Scenario(
@@ -195,6 +196,9 @@ class Scenario {
             .toInt(),
     xpReward: (j['xp_reward'] as num? ?? j['xpReward'] as num? ?? 50).toInt(),
     imageUrl: j['image_url'] as String? ?? j['imageUrl'] as String?,
+    backgroundImageUrl:
+        j['background_image_url'] as String? ??
+        j['backgroundImageUrl'] as String?,
   );
 
   /// Inverse of [Scenario.fromJson] — used to cache the list to SQLite.
@@ -209,6 +213,7 @@ class Scenario {
     'estimated_minutes': estimatedMinutes,
     'xp_reward': xpReward,
     if (imageUrl != null) 'image_url': imageUrl,
+    if (backgroundImageUrl != null) 'background_image_url': backgroundImageUrl,
   };
 
   final String id;
@@ -220,6 +225,7 @@ class Scenario {
   final int estimatedMinutes;
   final int xpReward;
   final String? imageUrl;
+  final String? backgroundImageUrl;
 }
 
 class ConversationSession {

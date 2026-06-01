@@ -355,9 +355,16 @@ class _HeroCard extends StatelessWidget {
     // origin — Dio's baseUrl is /vfls/api on prod, but the static
     // mount lives at the server root, so we strip the suffix here.
     final imageUrl = scenario.imageUrl;
+    final bgImageUrl = scenario.backgroundImageUrl;
+    final hasHero = imageUrl != null && imageUrl.isNotEmpty;
+    final hasBg = bgImageUrl != null && bgImageUrl.isNotEmpty;
+    final cardRadius = BorderRadius.vertical(
+      top: hasHero ? Radius.zero : const Radius.circular(20),
+      bottom: const Radius.circular(20),
+    );
     return Column(
       children: [
-        if (imageUrl != null && imageUrl.isNotEmpty)
+        if (hasHero)
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             child: AspectRatio(
@@ -371,21 +378,31 @@ class _HeroCard extends StatelessWidget {
               ),
             ),
           ),
-        Container(
+        DecoratedBox(
+          decoration: BoxDecoration(
+            // Background image sits behind the gradient overlay.
+            image: hasBg
+                ? DecorationImage(
+                    image: NetworkImage(_resolveScenarioImage(bgImageUrl)),
+                    fit: BoxFit.cover,
+                    onError: (_, _) {},
+                  )
+                : null,
+            borderRadius: cardRadius,
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.3)),
+          ),
+          child: Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [scheme.primaryContainer, scheme.surfaceContainerHighest],
+          colors: [
+            scheme.primaryContainer.withValues(alpha: hasBg ? 0.82 : 1.0),
+            scheme.surfaceContainerHighest.withValues(alpha: hasBg ? 0.82 : 1.0),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.vertical(
-          top: imageUrl != null && imageUrl.isNotEmpty
-              ? Radius.zero
-              : const Radius.circular(20),
-          bottom: const Radius.circular(20),
-        ),
-        border: Border.all(color: scheme.outline.withValues(alpha: 0.3)),
+        borderRadius: cardRadius,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,6 +453,7 @@ class _HeroCard extends StatelessWidget {
         ],
       ),
     ),
+        ),
       ],
     );
   }
