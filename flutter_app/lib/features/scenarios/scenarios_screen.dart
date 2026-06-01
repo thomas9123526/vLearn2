@@ -17,10 +17,7 @@ class ScenariosScreen extends ConsumerStatefulWidget {
 
 class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
   String? _category;
-  int? _difficulty;
   String _query = '';
-
-  static const _difficultyLabels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +37,6 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
         }).toList();
     final filtered = all.where((s) {
       if (_category != null && s.category != _category) return false;
-      if (_difficulty != null && s.difficulty != _difficulty) return false;
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
         final inTitle = s.title.forLocale(locale).toLowerCase().contains(q);
@@ -100,27 +96,6 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
                             ? null
                             : category.slug,
                       ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          SizedBox(
-            height: 36,
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (var i = 0; i < _difficultyLabels.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _Chip(
-                      label: _difficultyLabels[i],
-                      selected: _difficulty == i + 1,
-                      onTap: () => setState(
-                        () => _difficulty = _difficulty == i + 1 ? null : i + 1,
-                      ),
-                      compact: true,
                     ),
                   ),
               ],
@@ -241,10 +216,7 @@ class _ScenarioTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final levelLabels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-    final levelLabel = scenario.difficulty >= 1 && scenario.difficulty <= 6
-        ? levelLabels[scenario.difficulty - 1]
-        : '—';
+    final levelLabel = 'Lv ${scenario.difficulty}';
     return InkWell(
       onTap: onStart,
       borderRadius: BorderRadius.circular(16),
