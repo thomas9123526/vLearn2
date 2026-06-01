@@ -155,6 +155,8 @@ flutter:
     - assets/wordlists/
     - assets/images/
     - assets/animations/
+    - assets/seed/scenarios.json
+    - assets/seed/categories.json
     - assets/icons/
     # DataManage trust anchors. `root_ca.crt` (public) is committed
     # and pinned for cert-chain validation. `admin.key` (private) is

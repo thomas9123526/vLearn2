@@ -21,6 +21,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 import 'package:rive/rive.dart' as rive;
+import 'core/cache/cache_seeder.dart';
+import 'core/cache/cache_store.dart';
 import 'core/config/app_config.dart';
 import 'core/license/license_state_provider.dart';
 import 'core/providers/settings_provider.dart';
@@ -73,6 +75,10 @@ Future<void> main() async {
     // Treat unreadable config as "use defaults" — the service itself rewrites
     // a broken file on the next save, so this never leaves the app stuck.
   }
+  // Pre-seed the local SQLite cache from bundled asset JSON files so the
+  // scenario/category lists show instantly on first launch without a network
+  // round-trip. No-op on subsequent launches (cache already populated).
+  await CacheSeeder.seedIfEmpty(container.read(cacheStoreProvider));
   runApp(
     UncontrolledProviderScope(
       container: container,
