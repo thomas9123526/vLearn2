@@ -245,10 +245,16 @@ export class PromptBuilderService {
   }
 
   private render(template: string, ctx: Record<string, string>): string {
-    return template.replace(
+    // Pass 1: {{group.field}} placeholders
+    let out = template.replace(
       /\{\{\s*([\w.]+)\s*\}\}/g,
       (_m, key: string) => ctx[key] ?? '',
     );
+    // Pass 2: [cefr_level] used as an inline variable in custom prompts and
+    // global templates — replace with the actual level label so the selected
+    // level from the scenario detail screen reaches the AI model.
+    out = out.replace(/\[cefr_level\]/g, ctx['user.level_label'] ?? '');
+    return out;
   }
 
   private async loadTemplate(kind: PromptKind): Promise<string | null> {

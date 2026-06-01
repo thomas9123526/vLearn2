@@ -244,7 +244,7 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
               <p className="text-xs text-muted-foreground">
                 Overrides the global cch_prompt template for this scenario only.
                 Leave blank to use the global template.
-                Supports <code>{`{{persona.name}}`}</code>, <code>{`{{scenario.title}}`}</code>, etc.
+                Supports <code>{`{{persona.name}}`}</code>, <code>{`{{scenario.title}}`}</code>, <code>{`{{user.level_label}}`}</code> (e.g. B2), <code>{`[cefr_level]`}</code> (replaced with selected CEFR level), etc.
               </p>
               <textarea
                 id="custom_prompt"
