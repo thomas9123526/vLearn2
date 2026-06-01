@@ -20,6 +20,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import compression from 'compression';
+import cors from 'cors';
 import * as path from 'path';
 import { AppModule } from './app.module';
 import { GzipFlagCache } from './app-config/app-config.module';
@@ -81,6 +82,15 @@ async function bootstrap() {
 
   // ─── API prefix + versioning ───────────────────────────────
   app.setGlobalPrefix('api', { exclude: ['health', 'uploads/(.*)'] });
+
+  // ─── CORS for static files ──────────────────────────────────
+  // The global CORS middleware may not apply to static files served via
+  // useStaticAssets, so we add explicit CORS middleware for /uploads/
+  const corsOptions = {
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
+    credentials: true,
+  };
+  app.use('/uploads/', cors(corsOptions));
 
   // ─── Static uploads (scenario hero images, news hero images) ──
   const uploadsDir = process.env.UPLOADS_DIR ?? path.resolve('uploads');
