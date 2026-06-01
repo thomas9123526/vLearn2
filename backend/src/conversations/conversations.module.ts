@@ -86,6 +86,12 @@ class ConversationsController {
     return this.svc.endSession(user.sub, id, dto);
   }
 
+  @Delete('sessions')
+  @ApiOperation({ summary: 'Delete ALL sessions for the current user' })
+  removeAll(@CurrentUser() user: JwtPayload) {
+    return this.svc.deleteAllSessions(user.sub);
+  }
+
   @Delete('sessions/:id')
   @ApiOperation({
     summary:

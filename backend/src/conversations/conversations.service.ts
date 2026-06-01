@@ -294,6 +294,32 @@ export class ConversationsService {
     return { ok: true };
   }
 
+  async deleteAllSessions(userId: string): Promise<{ deleted: number }> {
+    const sessionIds = await this.sessions
+      .find({ where: { user_id: userId }, select: ['id'] })
+      .then((rows) => rows.map((r) => r.id));
+
+    if (sessionIds.length === 0) return { deleted: 0 };
+
+    await this.dataSource.transaction(async (em) => {
+      for (const id of sessionIds) {
+        await em
+          .getRepository(GuardViolationEntity)
+          .update({ session_id: id }, { session_id: null });
+      }
+      await em
+        .getRepository(ConversationMessageEntity)
+        .delete({ session_id: sessionIds as any });
+      await em
+        .getRepository(SessionScoreEntity)
+        .delete({ session_id: sessionIds as any });
+      await em
+        .getRepository(ConversationSessionEntity)
+        .delete({ id: sessionIds as any });
+    });
+    return { deleted: sessionIds.length };
+  }
+
   async endSession(
     userId: string,
     sessionId: string,
