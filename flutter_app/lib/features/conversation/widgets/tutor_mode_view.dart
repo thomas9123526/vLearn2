@@ -386,59 +386,57 @@ class _AvatarStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Reserve room for the name + status pill + spacing below the avatar
-        // so the Column never overflows its slot on shorter screens.
-        const reservedBelow = 12.0 + 30.0 + 8.0 + 36.0;
-        final availableHeight =
-            (constraints.maxHeight - reservedBelow).clamp(0.0, double.infinity);
-        final side = math.min(constraints.maxWidth, availableHeight);
-        final avatarSize = (side * 0.72).clamp(96.0, 280.0);
+    final statusLabel = switch (mood) {
+      TutorMood.listening => 'Listening…',
+      TutorMood.speaking => 'Speaking…',
+      TutorMood.thinking => 'Thinking…',
+      TutorMood.encouraging => 'Your turn',
+      _ => 'Tap the mic below to speak',
+    };
 
-        final statusLabel = switch (mood) {
-          TutorMood.listening => 'Listening…',
-          TutorMood.speaking => 'Speaking…',
-          TutorMood.thinking => 'Thinking…',
-          TutorMood.encouraging => 'Your turn',
-          _ => 'Tap the mic below to speak',
-        };
-
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                scheme.primary.withValues(alpha: 0.06),
-                scheme.surface,
-              ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            scheme.primary.withValues(alpha: 0.06),
+            scheme.surface,
+          ],
+        ),
+      ),
+      // Fill the full Expanded slot. Avatar gets the flexible top portion;
+      // name + pill sit below at their natural height and can never overflow.
+      child: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final side = math.min(constraints.maxWidth, constraints.maxHeight);
+                  final avatarSize = (side * 0.85).clamp(96.0, 280.0);
+                  return TutorAvatar(
+                    key: ValueKey(persona.id),
+                    persona: persona,
+                    mood: mood,
+                    size: avatarSize,
+                  );
+                },
+              ),
             ),
           ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TutorAvatar(
-                  key: ValueKey(persona.id),
-                  persona: persona,
-                  mood: mood,
-                  size: avatarSize,
+          const SizedBox(height: 12),
+          Text(
+            persona.name,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  persona.name,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                _StatusPill(label: statusLabel, mood: mood),
-              ],
-            ),
           ),
-        );
-      },
+          const SizedBox(height: 8),
+          _StatusPill(label: statusLabel, mood: mood),
+          const SizedBox(height: 12),
+        ],
+      ),
     );
   }
 }
