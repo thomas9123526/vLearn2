@@ -36,6 +36,7 @@ export class ConversationOrchestrator {
       args.userLevel,
       args.userNativeLanguage,
     );
+    this.logger.log(`\n${'─'.repeat(60)}\nSYSTEM PROMPT\n${'─'.repeat(60)}\n${systemPrompt}\n${'─'.repeat(60)}`);
     try {
       const res = await this.ai.chat({
         systemPrompt,
