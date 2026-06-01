@@ -164,11 +164,16 @@ export class AdminScenariosController {
 
   @Get()
   @RequirePermission('scenarios.view')
-  async list(@Query('status') status?: string, @Query('q') q?: string) {
+  async list(
+    @Query('status') status?: string,
+    @Query('q') q?: string,
+    @Query('category') category?: string,
+  ) {
     const qb = this.scenarios
       .createQueryBuilder('s')
       .orderBy('s.created_at', 'DESC');
     if (status) qb.andWhere('s.status = :s', { s: status });
+    if (category) qb.andWhere('s.category = :category', { category });
     if (q) qb.andWhere(`s.title ->> 'en' ILIKE :q`, { q: `%${q}%` });
     return qb.getMany();
   }
