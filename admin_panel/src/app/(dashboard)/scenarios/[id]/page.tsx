@@ -1,16 +1,17 @@
 'use client';
 
-import { forwardRef, useEffect, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { api } from '@/lib/api';
+import { env } from '@/lib/env';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { api } from '@/lib/api';
 
 const i18nText = z.object({
   en: z.string().min(1),
@@ -46,6 +47,51 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const imagePreviewUrl = useMemo(
+    () => (imageFile ? URL.createObjectURL(imageFile) : null),
+    [imageFile],
+  );
+  const backgroundImagePreviewUrl = useMemo(
+    () => (backgroundImageFile ? URL.createObjectURL(backgroundImageFile) : null),
+    [backgroundImageFile],
+  );
+
+  const uploadsOrigin = useMemo(() => {
+    const base = env.NEXT_PUBLIC_API_BASE_URL;
+    if (base.startsWith('http://') || base.startsWith('https://')) {
+      try {
+        const url = new URL(base);
+        return `${url.origin}${url.pathname.replace(/\/api(?:\/backend)?$/, '')}`;
+      } catch {
+        return base.replace(/\/api(?:\/backend)?$/, '');
+      }
+    }
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}${base.replace(/\/api(?:\/backend)?$/, '')}`;
+    }
+    return '';
+  }, []);
+
+  const resolveUploadUrl = (url: string | null) => {
+    if (!url) return null;
+    if (url.startsWith('/uploads')) {
+      return `${uploadsOrigin}${url}`;
+    }
+    return url;
+  };
+
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    };
+  }, [imagePreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (backgroundImagePreviewUrl) URL.revokeObjectURL(backgroundImagePreviewUrl);
+    };
+  }, [backgroundImagePreviewUrl]);
 
   const { data: scenario, isLoading } = useQuery<Scenario>({
     queryKey: ['admin-scenario', id],
@@ -109,7 +155,6 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
       }
 
       setImageFile(null);
-      setLogoImageFile(null);
       setBackgroundImageFile(null);
       qc.invalidateQueries({ queryKey: ['admin-scenarios', 'admin-scenario', id] });
     } catch (e) {
@@ -203,6 +248,18 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
               <p className="mt-1 text-xs text-muted-foreground">
                 Background artwork shown behind the scenario. PNG / JPEG / WEBP, ≤ 5 MB.
               </p>
+              {(backgroundImagePreviewUrl || scenario.background_image_url) && (
+                <div className="mt-3 rounded-lg border border-border overflow-hidden">
+                  <p className="px-3 py-1 text-xs font-medium text-muted-foreground">
+                    {backgroundImagePreviewUrl ? 'Selected background preview' : 'Current background image'}
+                  </p>
+                  <img
+                    src={backgroundImagePreviewUrl ?? resolveUploadUrl(scenario.background_image_url) ?? undefined}
+                    alt={backgroundImagePreviewUrl ? 'Selected background preview' : 'Current background image'}
+                    className="h-40 w-full object-cover"
+                  />
+                </div>
+              )}
             </div>
 
             <div>
@@ -216,6 +273,18 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
               <p className="mt-1 text-xs text-muted-foreground">
                 PNG / JPEG / WEBP, ≤ 5 MB. Uploaded after the scenario is saved.
               </p>
+              {(imagePreviewUrl || scenario.image_url) && (
+                <div className="mt-3 rounded-lg border border-border overflow-hidden">
+                  <p className="px-3 py-1 text-xs font-medium text-muted-foreground">
+                    {imagePreviewUrl ? 'Selected hero preview' : 'Current hero image'}
+                  </p>
+                  <img
+                    src={imagePreviewUrl ?? resolveUploadUrl(scenario.image_url) ?? undefined}
+                    alt={imagePreviewUrl ? 'Selected hero preview' : 'Current hero image'}
+                    className="h-40 w-full object-cover"
+                  />
+                </div>
+              )}
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
