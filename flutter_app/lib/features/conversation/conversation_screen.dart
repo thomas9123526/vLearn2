@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -449,14 +451,20 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: widget.input,
-                      minLines: 1,
-                      maxLines: 4,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => widget.onSend(),
-                      decoration: const InputDecoration(hintText: 'Type your message…'),
-                    ),
+                    child: _recording
+                        ? _VoiceWaveform(
+                            amplitudeStream:
+                                ref.read(audioRecorderProvider).amplitudeStream,
+                          )
+                        : TextField(
+                            controller: widget.input,
+                            minLines: 1,
+                            maxLines: 4,
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => widget.onSend(),
+                            decoration: const InputDecoration(
+                                hintText: 'Type your message…'),
+                          ),
                   ),
                   const SizedBox(width: 8),
                   _ChatMicButton(
@@ -518,6 +526,66 @@ class _ChatMicButton extends StatelessWidget {
         foregroundColor: recording ? scheme.onError : scheme.onSecondaryContainer,
       ),
       icon: Icon(recording ? Icons.stop_rounded : Icons.mic_rounded),
+    );
+  }
+}
+
+/// Animated bar visualiser that reacts to microphone amplitude (0.0–1.0).
+/// Shown in place of the text field while the user is recording.
+class _VoiceWaveform extends StatefulWidget {
+  const _VoiceWaveform({required this.amplitudeStream});
+  final Stream<double> amplitudeStream;
+
+  @override
+  State<_VoiceWaveform> createState() => _VoiceWaveformState();
+}
+
+class _VoiceWaveformState extends State<_VoiceWaveform> {
+  double _amplitude = 0.0;
+  StreamSubscription<double>? _sub;
+
+  // Per-bar multipliers so the bars reach different heights at the same
+  // amplitude level, giving a natural multi-band equaliser appearance.
+  static const _multipliers = [0.60, 0.90, 1.00, 0.85, 0.65];
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = widget.amplitudeStream.listen((amp) {
+      if (mounted) setState(() => _amplitude = amp);
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return SizedBox(
+      height: 48,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(_multipliers.length, (i) {
+          final height = 6.0 + _amplitude * _multipliers[i] * 36.0;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 80),
+              curve: Curves.easeOut,
+              width: 4,
+              height: height,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          );
+        }),
+      ),
     );
   }
 }

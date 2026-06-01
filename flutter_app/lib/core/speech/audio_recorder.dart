@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,6 +55,7 @@ class AudioRecorderService {
 
   final _stateCtrl =
       StreamController<AudioRecorderState>.broadcast(sync: true);
+  final _amplitudeCtrl = StreamController<double>.broadcast(sync: true);
   AudioRecorderState _state = AudioRecorderState.idle;
 
   StreamSubscription<Uint8List>? _sub;
@@ -63,12 +65,30 @@ class AudioRecorderService {
 
   AudioRecorderState get state => _state;
   Stream<AudioRecorderState> get stateStream => _stateCtrl.stream;
+
+  /// Emits normalised RMS amplitude (0.0–1.0) for each PCM chunk received
+  /// during recording. Resets to 0.0 when recording stops.
+  Stream<double> get amplitudeStream => _amplitudeCtrl.stream;
+
   bool get isRecording => _state == AudioRecorderState.recording;
 
   void _setState(AudioRecorderState next) {
     if (_state == next) return;
     _state = next;
     _stateCtrl.add(next);
+  }
+
+  /// RMS of a 16-bit little-endian mono PCM chunk, normalised to 0.0–1.0.
+  double _rms(Uint8List chunk) {
+    final count = chunk.length ~/ 2;
+    if (count == 0) return 0.0;
+    var sum = 0.0;
+    for (var i = 0; i < count * 2; i += 2) {
+      var s = (chunk[i + 1] << 8) | chunk[i];
+      if (s >= 32768) s -= 65536;
+      sum += s * s;
+    }
+    return math.sqrt(sum / count) / 32768.0;
   }
 
   /// Asks the OS for mic permission. Returns `true` if granted.
@@ -116,7 +136,10 @@ class AudioRecorderService {
       );
       _startedAt = DateTime.now();
       _sub = stream.listen(
-        _buffer.add,
+        (chunk) {
+          _buffer.add(chunk);
+          _amplitudeCtrl.add(_rms(chunk));
+        },
         onError: (Object _) => _setState(AudioRecorderState.error),
         cancelOnError: true,
       );
@@ -140,6 +163,7 @@ class AudioRecorderService {
     await _recorder.stop();
     await _sub?.cancel();
     _sub = null;
+    _amplitudeCtrl.add(0.0);
     _setState(AudioRecorderState.idle);
     final pcm = _buffer.takeBytes();
     if (pcm.isEmpty) return null;
@@ -165,6 +189,7 @@ class AudioRecorderService {
     _sub = null;
     _buffer.clear();
     _startedAt = null;
+    _amplitudeCtrl.add(0.0);
     _setState(AudioRecorderState.idle);
   }
 
@@ -172,6 +197,7 @@ class AudioRecorderService {
     await cancel();
     await _recorder.dispose();
     await _stateCtrl.close();
+    await _amplitudeCtrl.close();
   }
 }
 
