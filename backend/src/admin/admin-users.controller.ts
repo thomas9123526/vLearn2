@@ -30,6 +30,7 @@ import {
   RequirePermission,
 } from './permissions/permission.guard';
 import { AdminAuditLogService } from './audit/admin-audit-log.service';
+import { NetworkStatsService } from '../network-stats/network-stats.service';
 
 const BCRYPT_ROUNDS = 10;
 
@@ -79,6 +80,7 @@ export class AdminUsersController {
     private readonly refreshTokens: Repository<RefreshTokenEntity>,
     private readonly audit: AdminAuditLogService,
     private readonly dataSource: DataSource,
+    private readonly networkStats: NetworkStatsService,
   ) {}
 
   @Get()
@@ -133,7 +135,27 @@ export class AdminUsersController {
       relations: ['user'],
     });
     if (!i) throw new NotFoundException({ i18nKey: 'user.not_found' });
-    return i;
+    const netStats = await this.networkStats.getStatsForUser(id);
+    return {
+      id: i.user_id,
+      email: i.email,
+      display_name: i.user.name,
+      status: i.status,
+      suspended_until: i.suspended_until,
+      suspended_reason: i.suspended_reason,
+      xp_total: i.xp_total,
+      current_level: i.current_level,
+      streak_days: i.streak_days,
+      native_language: i.native_language,
+      ui_language: i.ui_language,
+      active_theme: i.active_theme,
+      onboarding_done: i.onboarding_done,
+      last_active_date: i.last_active_date,
+      license_platform: i.user.license_platform,
+      license_valid_until: i.user.license_valid_until,
+      created_at: i.user.created_at,
+      network_stats: netStats,
+    };
   }
 
   @Post(':id/suspend')
