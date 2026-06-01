@@ -469,14 +469,13 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
                   const SizedBox(width: 8),
                   _ChatMicButton(
                     recording: _recording,
-                    transcribing: _transcribing,
                     disabled: busy,
                     onToggle: _recording ? _stopRecording : _startRecording,
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
                     onPressed: (busy || _recording) ? null : widget.onSend,
-                    icon: widget.sending
+                    icon: (widget.sending || _transcribing)
                         ? SizedBox(
                             width: 18,
                             height: 18,
@@ -496,29 +495,17 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
 class _ChatMicButton extends StatelessWidget {
   const _ChatMicButton({
     required this.recording,
-    required this.transcribing,
     required this.disabled,
     required this.onToggle,
   });
 
   final bool recording;
-  final bool transcribing;
   final bool disabled;
   final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    if (transcribing) {
-      return SizedBox(
-        width: 48,
-        height: 48,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: CircularProgressIndicator(strokeWidth: 2.5, color: scheme.primary),
-        ),
-      );
-    }
     return IconButton.filled(
       onPressed: disabled ? null : onToggle,
       style: IconButton.styleFrom(
