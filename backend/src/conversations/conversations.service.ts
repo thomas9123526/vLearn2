@@ -4,7 +4,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
+import { DataSource, FindOptionsWhere, In, Repository } from 'typeorm';
 import {
   ConversationSessionEntity,
   ConversationMessageEntity,
@@ -309,13 +309,13 @@ export class ConversationsService {
       }
       await em
         .getRepository(ConversationMessageEntity)
-        .delete({ session_id: sessionIds as any });
+        .delete({ session_id: In(sessionIds) });
       await em
         .getRepository(SessionScoreEntity)
-        .delete({ session_id: sessionIds as any });
+        .delete({ session_id: In(sessionIds) });
       await em
         .getRepository(ConversationSessionEntity)
-        .delete({ id: sessionIds as any });
+        .delete({ id: In(sessionIds) });
     });
     return { deleted: sessionIds.length };
   }
