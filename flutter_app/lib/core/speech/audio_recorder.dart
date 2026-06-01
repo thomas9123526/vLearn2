@@ -123,11 +123,7 @@ class AudioRecorderService {
       );
       _startedAt = DateTime.now();
       _sub = stream.listen(
-        (chunk) {
-          _buffer.add(chunk);
-          // ignore: avoid_print
-          print('[AudioRecorder] PCM chunk: ${chunk.length} bytes (total: ${_buffer.length})');
-        },
+        _buffer.add,
         onError: (Object _) => _setState(AudioRecorderState.error),
         cancelOnError: true,
       );
