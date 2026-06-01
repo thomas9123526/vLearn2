@@ -12,6 +12,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/theme/bubble_style.dart';
 import '../../core/theme/font_group.dart';
 import '../../features/conversation/widgets/chat_bubble.dart';
+import '../../core/config/app_config.dart';
 import '../../core/models/models.dart';
 import '../license/license_screen.dart';
 import 'change_password_dialog.dart';
@@ -45,7 +46,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settings = ref.watch(appSettingsProvider);
     final fontGroup = ref.watch(fontGroupProvider);
     final bubbleStyle = ref.watch(bubbleStyleProvider);
-    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -54,10 +54,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           if (user != null)
             ListTile(
-              leading: CircleAvatar(
-                backgroundColor: scheme.primaryContainer,
-                child: Text(user.avatarEmoji, style: const TextStyle(fontSize: 20)),
-              ),
+              leading: _UserAvatarCircle(user: user),
               title: Text(user.displayName),
               subtitle: Text(user.email ?? ''),
               trailing: const Icon(Icons.edit_outlined),
@@ -655,6 +652,40 @@ class _ModelStorageTile extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Profile tile avatar: shows the uploaded photo (rounded circle) when
+/// avatar_url is set; falls back to the emoji avatar otherwise.
+class _UserAvatarCircle extends StatelessWidget {
+  const _UserAvatarCircle({required this.user});
+
+  final UserProfile user;
+
+  String? _resolveUrl(String relative) {
+    if (relative.startsWith('http')) return relative;
+    final base = AppConfig.defaults.backendBaseUrl;
+    final idx = base.indexOf('/api');
+    final idx2 = base.indexOf('/vfls');
+    final origin =
+        idx > 0 ? base.substring(0, idx) : (idx2 > 0 ? base.substring(0, idx2) : base);
+    return '$origin$relative';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final url = user.avatarUrl;
+    final fullUrl = (url != null && url.isNotEmpty) ? _resolveUrl(url) : null;
+
+    return CircleAvatar(
+      radius: 22,
+      backgroundColor: scheme.primaryContainer,
+      backgroundImage: fullUrl != null ? NetworkImage(fullUrl) : null,
+      child: fullUrl == null
+          ? Text(user.avatarEmoji, style: const TextStyle(fontSize: 20))
+          : null,
     );
   }
 }

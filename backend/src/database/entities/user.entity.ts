@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { UserInfoEntity } from './user-info.entity';
+import { encryptedFieldTransformer } from '../../common/field-encryption';
 
 export type UserRole = 'user' | 'admin' | 'superadmin';
 export type UserStatus = 'active' | 'suspended' | 'deleted';
@@ -19,7 +20,7 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 255, select: false })
   password_hash!: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'varchar', length: 512, transformer: encryptedFieldTransformer })
   name!: string;
 
   @Column({ type: 'varchar', length: 10, nullable: true, unique: true })
@@ -39,10 +40,10 @@ export class UserEntity {
   @Column({ type: 'timestamptz', nullable: true })
   license_valid_until!: Date | null;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, transformer: encryptedFieldTransformer })
   license_machine_id!: string | null;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, transformer: encryptedFieldTransformer })
   license_serial!: string | null;
 
   /// Platform tag reported by the client at /license/verify time.

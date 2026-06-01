@@ -1,0 +1,10 @@
+I want put voice record buttonon chat mode screen like tutor mode screen.
+So the user tap the button then voice start.
+The user tap the button again to finish voice recognition.
+Then the recognitioin text is sent to server immediately.
+Btw if there's illegal words inside recognition text then the app must alert about the illegal words.
+
+also where can i find the illegal words list
+
+------pushed
+--------------checked

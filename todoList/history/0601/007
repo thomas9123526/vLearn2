@@ -1,0 +1,8 @@
+ok. we use our ai model for ai provider, it is not good as the other ones.
+So some fields is unnecessary on the system prompt.
+cch_prompt is the prompt that out model accept.
+Can you modify backend api and flutter app scenario details along with the cch_prompt.
+I don't want delete fields permantly , because if our model grows better then I would like to set tick or append fields. 
+What can you offer?
+
+------pushed

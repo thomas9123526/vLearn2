@@ -1,0 +1,7 @@
+I want input the cefr level when the user enter scenario detail screen based on the current user cefr level.
+But the user can pick up one level up or one level down cefr level.
+
+When the backend api create session for this, it remember the cefr level that the user chosen.
+And put the cefr level on the system prompt that is sent to the AI-PROVIDER.
+
+------pushed

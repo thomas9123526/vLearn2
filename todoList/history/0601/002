@@ -1,0 +1,7 @@
+If there's many data like scenarios with image in backend api, the app will consume many traffic network amount when the app first launch.
+I want prevent this.
+So is it possible to wrap the application with the default database?
+
+If so please make a script like tools to execute. If i execute the script then I get necessary information from the backend. then I put those inside application code, the .apk or .exe have those initial data.
+
+------pushed

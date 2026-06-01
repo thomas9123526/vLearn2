@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import type { UserRole, UserStatus } from './user.entity';
 import { UserEntity } from './user.entity';
+import { encryptedFieldTransformer } from '../../common/field-encryption';
 
 @Entity({ name: 'vl_user_info' })
 @Index(['xp_total'])
@@ -21,7 +22,7 @@ export class UserInfoEntity {
   user!: UserEntity;
 
   @Index({ unique: true })
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 512, transformer: encryptedFieldTransformer })
   email!: string;
 
   @Column({ type: 'varchar', length: 10, default: '🐣' })

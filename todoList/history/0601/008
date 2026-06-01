@@ -1,0 +1,3 @@
+I want certain values to be encrypt in the database fields so when the user query on pgadmin4 or other gui tool, he can't see the plain text for that fields.
+I want put fields names with table name in the appropriate file of the backend api code 
+
