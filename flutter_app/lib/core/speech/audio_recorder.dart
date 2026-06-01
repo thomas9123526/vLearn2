@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,6 +61,7 @@ class AudioRecorderService {
   final _buffer = BytesBuilder(copy: false);
   DateTime? _startedAt;
   Timer? _maxTimer;
+  Timer? _ampTimer;
 
   AudioRecorderState get state => _state;
   Stream<AudioRecorderState> get stateStream => _stateCtrl.stream;
@@ -78,20 +78,7 @@ class AudioRecorderService {
     _stateCtrl.add(next);
   }
 
-  /// RMS of a 16-bit little-endian mono PCM chunk, normalised to 0.0–1.0.
-  double _rms(Uint8List chunk) {
-    final count = chunk.length ~/ 2;
-    if (count == 0) return 0.0;
-    var sum = 0.0;
-    for (var i = 0; i < count * 2; i += 2) {
-      var s = (chunk[i + 1] << 8) | chunk[i];
-      if (s >= 32768) s -= 65536;
-      sum += s * s;
-    }
-    return math.sqrt(sum / count) / 32768.0;
-  }
-
-  /// Asks the OS for mic permission. Returns `true` if granted.
+/// Asks the OS for mic permission. Returns `true` if granted.
   ///
   /// On Android this triggers the system dialog the first time and reads the
   /// stored choice thereafter — `permission_handler` handles all of that.
@@ -136,13 +123,17 @@ class AudioRecorderService {
       );
       _startedAt = DateTime.now();
       _sub = stream.listen(
-        (chunk) {
-          _buffer.add(chunk);
-          _amplitudeCtrl.add(_rms(chunk));
-        },
+        _buffer.add,
         onError: (Object _) => _setState(AudioRecorderState.error),
         cancelOnError: true,
       );
+      _ampTimer = Timer.periodic(const Duration(milliseconds: 80), (_) async {
+        if (!isRecording) return;
+        final amp = await _recorder.getAmplitude();
+        // amp.current is dBFS (typically -160..0). Map -60..0 dBFS → 0..1.
+        final normalized = ((amp.current + 60.0) / 60.0).clamp(0.0, 1.0);
+        _amplitudeCtrl.add(normalized);
+      });
       _maxTimer = Timer(maxDuration, stop);
       _setState(AudioRecorderState.recording);
       return true;
@@ -160,6 +151,8 @@ class AudioRecorderService {
     if (!isRecording) return null;
     _maxTimer?.cancel();
     _maxTimer = null;
+    _ampTimer?.cancel();
+    _ampTimer = null;
     await _recorder.stop();
     await _sub?.cancel();
     _sub = null;
@@ -184,6 +177,8 @@ class AudioRecorderService {
     if (!isRecording) return;
     _maxTimer?.cancel();
     _maxTimer = null;
+    _ampTimer?.cancel();
+    _ampTimer = null;
     await _recorder.stop();
     await _sub?.cancel();
     _sub = null;
