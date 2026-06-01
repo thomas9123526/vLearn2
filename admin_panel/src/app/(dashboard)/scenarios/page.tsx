@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, CheckCircle2, Archive, Trash2 } from 'lucide-react';
+import { Plus, CheckCircle2, Archive, Trash2, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
@@ -16,6 +16,7 @@ interface Scenario {
   status: 'draft' | 'published' | 'archived';
   title: Record<string, string>;
   image_url: string | null;
+  background_image_url?: string | null;
   created_at: string;
 }
 
@@ -91,6 +92,13 @@ export default function ScenariosPage() {
                     <Button size="sm" variant="ghost" onClick={() => archive.mutate(s.id)}>
                       <Archive className="h-4 w-4" /> Archive
                     </Button>
+                  )}
+                  {canEdit && (
+                    <Link href={`/scenarios/${s.id}`}>
+                      <Button size="sm" variant="outline">
+                        <Edit2 className="h-4 w-4" /> Edit
+                      </Button>
+                    </Link>
                   )}
                   {canDelete && (
                     <Button

@@ -98,6 +98,12 @@ export class ScenarioEntity {
   image_storage_key!: string | null;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
+  background_image_url!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  background_image_storage_key!: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
   image_alt_text!: string | null;
 
   @Column({ type: 'uuid', nullable: true })
