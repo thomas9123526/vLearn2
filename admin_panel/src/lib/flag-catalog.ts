@@ -14,6 +14,7 @@ export type AppTab =
   | 'settings'
   | 'report'
   | 'navigation'
+  | 'prompts'
   | 'system';
 
 export interface FlagDescriptor {
@@ -22,7 +23,7 @@ export interface FlagDescriptor {
   tier: 'big' | 'fine';
   tab: AppTab;
   /** Render hint. Defaults to 'boolean' (checkbox). */
-  type?: 'boolean' | 'select';
+  type?: 'boolean' | 'select' | 'text' | 'textarea';
   /** For type='select': the allowed option values. */
   options?: readonly string[];
 }
@@ -35,6 +36,7 @@ export const APP_TABS: { id: AppTab; label: string; hint: string }[] = [
   { id: 'settings', label: 'Settings', hint: 'Profile, theme, tutor, network, storage.' },
   { id: 'report', label: 'Report', hint: 'Post-session evaluation screen.' },
   { id: 'navigation', label: 'Navigation', hint: 'Show or hide the bottom navigation tabs.' },
+  { id: 'prompts', label: 'Prompts', hint: 'System prompt sections and global locale / avoided-topics text sent to the AI provider.' },
   { id: 'system', label: 'System', hint: 'App-wide overrides (gzip, maintenance banner).' },
 ];
 
@@ -101,6 +103,23 @@ export const FLAG_CATALOG: FlagDescriptor[] = [
   { key: 'tabs.history',   label: 'Conversation history tab', tier: 'big', tab: 'navigation' },
   { key: 'tabs.progress',  label: 'Progress tab',             tier: 'big', tab: 'navigation' },
   { key: 'tabs.settings',  label: 'Settings tab',             tier: 'big', tab: 'navigation' },
+
+  // ── Prompts ─────────────────────────────────────────────────────────────
+  // Section toggles — big tier (on/off per section)
+  { key: 'prompt.section.role',           label: '[role] — persona identity',        tier: 'big',  tab: 'prompts' },
+  { key: 'prompt.section.learner',        label: '[learner] — user role',            tier: 'big',  tab: 'prompts' },
+  { key: 'prompt.section.topic',          label: '[topic] — scenario title',         tier: 'big',  tab: 'prompts' },
+  { key: 'prompt.section.subtopics',      label: '[subtopics] — objectives',         tier: 'big',  tab: 'prompts' },
+  { key: 'prompt.section.cefr_level',     label: '[cefr_level] — learner level',     tier: 'big',  tab: 'prompts' },
+  { key: 'prompt.section.locale',         label: '[locale] — country context',       tier: 'big',  tab: 'prompts' },
+  { key: 'prompt.section.avoided_topics', label: '[avoided_topics] — banned topics', tier: 'big',  tab: 'prompts' },
+  { key: 'prompt.section.guidelines',     label: '[guidelines] — behavior rules',    tier: 'big',  tab: 'prompts' },
+  // Text values — fine tier
+  { key: 'prompt.locale.country',           label: 'Country',             tier: 'fine', tab: 'prompts', type: 'text' },
+  { key: 'prompt.locale.country_adjective', label: 'Country adjective',   tier: 'fine', tab: 'prompts', type: 'text' },
+  { key: 'prompt.locale.learner_audience',  label: 'Learner audience',    tier: 'fine', tab: 'prompts', type: 'text' },
+  { key: 'prompt.locale.avoid_cultures',    label: 'Avoid these cultures',tier: 'fine', tab: 'prompts', type: 'text' },
+  { key: 'prompt.avoided_topics',           label: 'Avoided topics text', tier: 'fine', tab: 'prompts', type: 'textarea' },
 
   // ── System (always shown last; advanced-only by default) ───────────────
   { key: 'system.gzip_enabled', label: 'Gzip response compression', tier: 'big', tab: 'system' },

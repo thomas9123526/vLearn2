@@ -17,6 +17,7 @@ interface ConfigSeed {
     | 'conversation'
     | 'scenarios'
     | 'settings'
+    | 'prompts'
     | 'system';
   description: string;
   is_visible_to_app?: boolean;
@@ -399,6 +400,34 @@ const CATALOG: ConfigSeed[] = [
     category: 'system',
     description: 'Show Settings tab in the bottom nav bar / sidebar',
     is_visible_to_app: true,
+  },
+
+  // ── Prompt sections ──────────────────────────────────────
+  // Section toggles — turn a section off to drop it from the system prompt
+  // sent to the AI provider. Default on. Restart not required; applied on
+  // the next conversation turn.
+  { key: 'prompt.section.role',           value: true, value_type: 'boolean', category: 'prompts', description: 'Include [role] section (persona identity + tutor role)' },
+  { key: 'prompt.section.learner',        value: true, value_type: 'boolean', category: 'prompts', description: 'Include [learner] section (user role description)' },
+  { key: 'prompt.section.topic',          value: true, value_type: 'boolean', category: 'prompts', description: 'Include [topic] section (scenario title)' },
+  { key: 'prompt.section.subtopics',      value: true, value_type: 'boolean', category: 'prompts', description: 'Include [subtopics] section (objectives + key phrases)' },
+  { key: 'prompt.section.cefr_level',     value: true, value_type: 'boolean', category: 'prompts', description: 'Include [cefr_level] section (learner level)' },
+  { key: 'prompt.section.locale',         value: true, value_type: 'boolean', category: 'prompts', description: 'Include [locale] section (country / audience context)' },
+  { key: 'prompt.section.avoided_topics', value: true, value_type: 'boolean', category: 'prompts', description: 'Include [avoided_topics] section' },
+  { key: 'prompt.section.guidelines',     value: true, value_type: 'boolean', category: 'prompts', description: 'Include [guidelines] section (behavior rules)' },
+
+  // Locale values — used when prompt.section.locale is on
+  { key: 'prompt.locale.country',          value: 'China',                          value_type: 'string', category: 'prompts', description: 'Country name for locale context' },
+  { key: 'prompt.locale.country_adjective',value: 'Chinese',                        value_type: 'string', category: 'prompts', description: 'Adjective form of country (e.g. Chinese)' },
+  { key: 'prompt.locale.learner_audience', value: 'adult learners of English',       value_type: 'string', category: 'prompts', description: 'Description of the target learner audience' },
+  { key: 'prompt.locale.avoid_cultures',   value: 'American or European',           value_type: 'string', category: 'prompts', description: 'Default cultures to avoid in examples' },
+
+  // Avoided topics — used when prompt.section.avoided_topics is on
+  {
+    key: 'prompt.avoided_topics',
+    value: 'Stay clear of politics, religion, alcohol, dating, partisan history, violence, harm, and distress.',
+    value_type: 'string',
+    category: 'prompts',
+    description: 'Topics the tutor must not discuss',
   },
 
   // ── System ───────────────────────────────────────────────

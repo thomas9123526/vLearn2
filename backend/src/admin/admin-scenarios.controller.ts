@@ -142,6 +142,12 @@ class UpdateScenarioDto {
   @IsInt()
   @Min(0)
   xp_reward?: number;
+
+  /** Scenario-specific system prompt. Empty string or null clears the override. */
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsString()
+  custom_prompt?: string | null;
 }
 
 /**

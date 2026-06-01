@@ -29,6 +29,7 @@ const schema = z.object({
   tutor_role: i18nText,
   estimated_minutes: z.coerce.number().int().min(1).max(60).default(5),
   xp_reward: z.coerce.number().int().min(0).max(1000).default(50),
+  custom_prompt: z.string().optional().nullable(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -38,6 +39,7 @@ interface Scenario extends FormValues {
   image_url: string | null;
   background_image_url: string | null;
   status: 'draft' | 'published' | 'archived';
+  custom_prompt: string | null;
 }
 
 export default function EditScenarioPage({ params }: { params: { id: string } }) {
@@ -117,6 +119,7 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
       tutor_role: scenario.tutor_role,
       estimated_minutes: scenario.estimated_minutes,
       xp_reward: scenario.xp_reward,
+      custom_prompt: scenario.custom_prompt ?? '',
     });
   }, [scenario, reset]);
 
@@ -234,6 +237,21 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
                 label="Tutor role (EN)"
                 {...register('tutor_role.en')}
                 error={errors.tutor_role?.en?.message}
+              />
+            </Section>
+
+            <Section title="Custom prompt (optional)">
+              <p className="text-xs text-muted-foreground">
+                Overrides the global cch_prompt template for this scenario only.
+                Leave blank to use the global template.
+                Supports <code>{`{{persona.name}}`}</code>, <code>{`{{scenario.title}}`}</code>, etc.
+              </p>
+              <textarea
+                id="custom_prompt"
+                rows={10}
+                placeholder="[role]&#10;You are …&#10;&#10;[learner]&#10;…"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                {...register('custom_prompt')}
               />
             </Section>
 

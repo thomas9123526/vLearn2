@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import type { PersonaEntity } from '../database/entities/persona.entity';
 import type {
   ScenarioEntity,
@@ -10,25 +10,46 @@ import {
   PromptKind,
   PromptTemplateEntity,
 } from '../database/entities/prompt-template.entity';
+import { AppConfigEntity } from '../database/entities/app-config.entity';
 
 /**
- * Builds vendor-agnostic prompts. Templates are loaded from the
- * `vl_prompt_templates` table so admins can tune them at runtime; if the
- * DB row is missing (fresh install, broken migration) the service falls
- * back to a hard-coded default so the app stays functional.
+ * Builds vendor-agnostic prompts in the cch_prompt section format
+ * ([role] / [learner] / [topic] / [subtopics] / [cefr_level] / [locale] /
+ * [avoided_topics] / [guidelines]).
  *
- * Placeholder syntax: `{{group.field}}` — resolved against a flat
- * key-value map built by [buildContext_*]. Unknown placeholders render
- * as empty strings (not the literal `{{key}}`) to prevent leaking
- * template internals to the user / model.
+ * Priority order for the tutor system prompt:
+ *   1. scenario.custom_prompt  — per-scenario full override (highest)
+ *   2. vl_prompt_templates row — global full-template override from DB
+ *   3. Section-by-section builder — toggleable via prompt.section.* flags
+ *
+ * Placeholder syntax: `{{group.field}}` — resolved against a flat key-value
+ * map. Unknown placeholders collapse to '' so template internals never leak.
  */
 @Injectable()
 export class PromptBuilderService {
   private readonly logger = new Logger('PromptBuilderService');
 
+  private static readonly SECTION_KEYS = [
+    'prompt.section.role',
+    'prompt.section.learner',
+    'prompt.section.topic',
+    'prompt.section.subtopics',
+    'prompt.section.cefr_level',
+    'prompt.section.locale',
+    'prompt.section.avoided_topics',
+    'prompt.section.guidelines',
+    'prompt.locale.country',
+    'prompt.locale.country_adjective',
+    'prompt.locale.learner_audience',
+    'prompt.locale.avoid_cultures',
+    'prompt.avoided_topics',
+  ] as const;
+
   constructor(
     @InjectRepository(PromptTemplateEntity)
     private readonly templates: Repository<PromptTemplateEntity>,
+    @InjectRepository(AppConfigEntity)
+    private readonly configRepo: Repository<AppConfigEntity>,
   ) {}
 
   async buildSystemPrompt(
@@ -37,14 +58,21 @@ export class PromptBuilderService {
     userLevel: number,
     userNativeLanguage: string,
   ): Promise<string> {
-    const ctx = this.tutorContext(
-      persona,
-      scenario,
-      userLevel,
-      userNativeLanguage,
-    );
+    const ctx = this.tutorContext(persona, scenario, userLevel, userNativeLanguage);
+
+    // Priority 1: per-scenario custom prompt
+    if (scenario?.custom_prompt?.trim()) {
+      return this.render(scenario.custom_prompt, ctx);
+    }
+
+    // Priority 2: global full-template override
     const tpl = await this.loadTemplate('tutor_system');
-    return this.render(tpl ?? DEFAULT_TUTOR_SYSTEM, ctx);
+    if (tpl) {
+      return this.render(tpl, ctx);
+    }
+
+    // Priority 3: section-by-section cch_prompt builder
+    return this.buildCchPrompt(ctx);
   }
 
   async buildGrammarPrompt(
@@ -88,9 +116,101 @@ export class PromptBuilderService {
     return this.render(tpl ?? DEFAULT_FEEDBACK, ctx);
   }
 
-  /// Build a flat key map of all placeholders supported in the tutor system
-  /// prompt. Scenario fields fall back to friendly defaults when null so the
-  /// template doesn't need conditional logic.
+  // ── Private helpers ──────────────────────────────────────────────────────
+
+  private async buildCchPrompt(ctx: Record<string, string>): Promise<string> {
+    let cfg: Record<string, unknown> = {};
+    try {
+      const rows = await this.configRepo.find({
+        where: { key: In([...PromptBuilderService.SECTION_KEYS]) },
+      });
+      cfg = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    } catch (e) {
+      this.logger.warn(
+        `Could not load prompt config flags, using defaults: ${(e as Error).message}`,
+      );
+    }
+
+    const on = (key: string, def = true): boolean => {
+      const v = cfg[key];
+      return typeof v === 'boolean' ? v : def;
+    };
+    const str = (key: string, def = ''): string => {
+      const v = cfg[key];
+      return typeof v === 'string' && v.trim() ? v.trim() : def;
+    };
+
+    const sections: string[] = [];
+
+    if (on('prompt.section.role')) {
+      const specialties = ctx['persona.specialties']
+        ? ` specializing in ${ctx['persona.specialties']}`
+        : '';
+      const tutorRole = ctx['scenario.tutor_role'] && ctx['scenario.tutor_role'] !== '—'
+        ? `\nYour role in this scenario: ${ctx['scenario.tutor_role']}.`
+        : '';
+      sections.push(
+        `[role]\nYou are ${ctx['persona.name']}: a ${ctx['persona.style']} English tutor${specialties}.${tutorRole}`,
+      );
+    }
+
+    if (on('prompt.section.learner')) {
+      const learner = ctx['scenario.user_role'] && ctx['scenario.user_role'] !== '—'
+        ? ctx['scenario.user_role']
+        : 'a language learner';
+      sections.push(`[learner]\n${learner}`);
+    }
+
+    if (on('prompt.section.topic')) {
+      sections.push(`[topic]\n${ctx['scenario.title']}`);
+    }
+
+    if (on('prompt.section.subtopics')) {
+      const lines: string[] = [
+        'The conversation may naturally start from any of these and can move freely between them or extend into adjacent practical content:',
+      ];
+      const objectives = ctx['scenario.objectives'];
+      if (objectives) {
+        objectives.split(', ').filter(Boolean).forEach((o) => lines.push(`- ${o}`));
+      }
+      const keyPhrases = ctx['scenario.key_phrases'];
+      if (keyPhrases) {
+        lines.push(`\nKey phrases to encourage: ${keyPhrases}`);
+      }
+      sections.push(`[subtopics]\n${lines.join('\n')}`);
+    }
+
+    if (on('prompt.section.cefr_level')) {
+      sections.push(`[cefr_level]\n${ctx['user.level_label']}`);
+    }
+
+    if (on('prompt.section.locale')) {
+      const localeLines: string[] = [];
+      const country = str('prompt.locale.country');
+      if (country) localeLines.push(`country: ${country}`);
+      const adj = str('prompt.locale.country_adjective');
+      if (adj) localeLines.push(`country_adjective: ${adj}`);
+      const audience = str('prompt.locale.learner_audience');
+      if (audience) localeLines.push(`learner_audience: ${audience}`);
+      const avoid = str('prompt.locale.avoid_cultures');
+      if (avoid) localeLines.push(`avoid_default_cultures: ${avoid}`);
+      if (localeLines.length) {
+        sections.push(`[locale]\n${localeLines.join('\n')}`);
+      }
+    }
+
+    if (on('prompt.section.avoided_topics')) {
+      const avoided = str('prompt.avoided_topics', DEFAULT_AVOIDED_TOPICS);
+      sections.push(`[avoided_topics]\n${avoided}`);
+    }
+
+    if (on('prompt.section.guidelines')) {
+      sections.push(`[guidelines]\n${this.render(DEFAULT_GUIDELINES, ctx)}`);
+    }
+
+    return sections.join('\n\n');
+  }
+
   private tutorContext(
     persona: PersonaEntity,
     scenario: ScenarioEntity | null,
@@ -101,10 +221,7 @@ export class PromptBuilderService {
     const specialties = (persona.specialties ?? []).join(', ');
     const sc = scenario;
     const objectives = sc
-      ? (sc.objectives ?? [])
-          .map((o) => en(o))
-          .filter(Boolean)
-          .join(', ')
+      ? (sc.objectives ?? []).map((o) => en(o)).filter(Boolean).join(', ')
       : '';
     const keyPhrases = sc
       ? (sc.key_phrases ?? []).map((p) => p.phrase).join(', ')
@@ -127,8 +244,6 @@ export class PromptBuilderService {
     };
   }
 
-  /// `{{group.field}}` → ctx['group.field']. Unknown keys collapse to ''.
-  /// Whitespace inside the braces is tolerated.
   private render(template: string, ctx: Record<string, string>): string {
     return template.replace(
       /\{\{\s*([\w.]+)\s*\}\}/g,
@@ -138,12 +253,9 @@ export class PromptBuilderService {
 
   private async loadTemplate(kind: PromptKind): Promise<string | null> {
     try {
-      const row = await this.templates.findOne({
-        where: { kind, is_active: true },
-      });
+      const row = await this.templates.findOne({ where: { kind, is_active: true } });
       return row?.template ?? null;
     } catch (e) {
-      // Don't let a DB hiccup take down the conversation pipeline.
       this.logger.warn(
         `Could not load prompt template '${kind}', using built-in default: ${(e as Error).message}`,
       );
@@ -157,32 +269,22 @@ function levelLabelFor(level: number): string {
   return level >= 1 && level <= 6 ? labels[level - 1] : 'A1';
 }
 
-const DEFAULT_TUTOR_SYSTEM = `You are {{persona.name}}, an English language tutor with a {{persona.style}} teaching style.
-Your specialties include: {{persona.specialties}}.
+const DEFAULT_AVOIDED_TOPICS =
+  'Stay clear of politics, religion, alcohol, dating, partisan history, violence, harm, and distress.';
 
-CURRENT SCENARIO:
-Title: {{scenario.title}}
-Setting: {{scenario.setting}}
-Your role: {{scenario.tutor_role}}
-User's role: {{scenario.user_role}}
-Objectives: {{scenario.objectives}}
-Key phrases to encourage: {{scenario.key_phrases}}
-
-USER PROFILE:
-- English level: {{user.level_label}} ({{user.level}}/6)
-- Native language: {{user.native_language}}
-
-INSTRUCTIONS:
-1. Stay in character as {{persona.name}} throughout.
-2. Adjust vocabulary and sentence complexity to level {{user.level}}/6.
-3. Respond naturally and conversationally (2-4 sentences usually).
-4. Correct grammar errors GENTLY and IMPLICITLY by modeling correct usage in your reply.
-5. Celebrate good English with encouragement appropriate to your personality.
-6. If objectives exist, naturally guide conversation toward them.
-7. Encourage use of the key phrases when appropriate.
-8. Do NOT explicitly state you are an AI unless directly asked.
-9. Do NOT break character.
-10. If the user writes in their native language, gently encourage English with a translation hint.`;
+const DEFAULT_GUIDELINES = `- Sound like a real person, not a textbook. Stay in character as {{persona.name}} throughout.
+- Respond ONLY in English, even if the learner switches to another language. Do not code-switch or quote long non-English passages.
+- If the learner addresses you in their native language, respond in English while staying in character.
+- Keep vocabulary, grammar, and sentence length at {{user.level_label}} level unless the learner demonstrates a higher level and sustains it.
+- The [learner] description is a soft hint, not a contract. If the user approaches from a different angle, roll with it — the fixed parts are your [role] and the [topic].
+- If the user tries to swap roles, gently keep your own role in one in-character sentence and continue.
+- Brief daily-life small talk is welcome — accept warmly with one short sentence and let the conversation breathe.
+- Redirect only when the learner clearly abandons the topic for a different setting or domain. One or two sentences is enough; do not lecture.
+- If the learner brings up an avoided topic, briefly acknowledge and pivot to a safe adjacent topic without lecturing.
+- When the learner makes a small mistake: at A1–A2 gently recast the correct form inside your reply; at B1 and above you may briefly explain if it helps.
+- Ask follow-up questions, share small reactions.
+- Do not use bullet lists, headings, or numbered steps in your replies.
+- Respond naturally and conversationally (2-4 sentences usually).`;
 
 const DEFAULT_GRAMMAR = `Analyze the grammar quality of these English messages from a level {{user.level}}/6 English learner.
 

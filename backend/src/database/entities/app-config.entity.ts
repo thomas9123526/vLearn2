@@ -13,6 +13,7 @@ export type AppConfigCategory =
   | 'conversation'
   | 'scenarios'
   | 'settings'
+  | 'prompts'
   | 'system';
 
 export type AppConfigValueType =
