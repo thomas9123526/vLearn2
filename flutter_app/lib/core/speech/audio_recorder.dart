@@ -134,6 +134,8 @@ class AudioRecorderService {
       _ampTimer = Timer.periodic(const Duration(milliseconds: 80), (_) async {
         if (!isRecording) return;
         final amp = await _recorder.getAmplitude();
+        // ignore: avoid_print
+        print('[AudioRecorder] amplitude: ${amp.current.toStringAsFixed(1)} dBFS');
         // amp.current is dBFS (typically -160..0). Map -60..0 dBFS → 0..1.
         final normalized = ((amp.current + 60.0) / 60.0).clamp(0.0, 1.0);
         _amplitudeCtrl.add(normalized);
