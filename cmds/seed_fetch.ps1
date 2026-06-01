@@ -6,9 +6,10 @@
 # SQLite cache without any network round-trip.
 #
 # Usage:
-#   .\cmds\seed_fetch.ps1                              # JSON only (default)
-#   .\cmds\seed_fetch.ps1 -BaseUrl http://192.168.1.50:5101
-#   .\cmds\seed_fetch.ps1 -WithImages                  # also bundle images
+#   .\cmds\seed_fetch.ps1                              # prompts for credentials
+#   .\cmds\seed_fetch.ps1 -CidUsername admin -WithImages
+#   .\cmds\seed_fetch.ps1 -Token <jwt>                 # skip login
+#   .\cmds\seed_fetch.ps1 -BaseUrl http://192.168.1.50:5101 -CidUsername admin
 #
 # After running, rebuild the Flutter app so the new assets are included:
 #   cd flutter_app
@@ -28,7 +29,15 @@ param(
     # When set, also downloads scenario images into assets/seed/images/ and
     # rewrites the image_url / background_image_url fields in the JSON so
     # Flutter can serve them from the asset bundle instead of the network.
-    [switch]$WithImages
+    [switch]$WithImages,
+
+    # Credentials for POST /api/auth/signin. Required because /scenarios and
+    # /categories are protected endpoints.
+    [string]$CidUsername,
+    [SecureString]$Password,
+
+    # Pass a pre-obtained Bearer token directly instead of logging in.
+    [string]$Token
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,12 +46,29 @@ $root     = Split-Path $PSScriptRoot -Parent
 $seedDir  = Join-Path $root "flutter_app\assets\seed"
 $imageDir = Join-Path $seedDir "images"
 
+# ─── Auth ─────────────────────────────────────────────────────────────────────
+
+if (-not $Token) {
+    if (-not $CidUsername) { $CidUsername = Read-Host "CID username" }
+    if (-not $Password)    { $Password    = Read-Host "Password" -AsSecureString }
+
+    $plainPw  = [System.Net.NetworkCredential]::new('', $Password).Password
+    $body     = @{ cidUsername = $CidUsername; password = $plainPw } | ConvertTo-Json
+    Write-Host "[seed] Signing in as '$CidUsername' ..."
+    $authResp = Invoke-RestMethod -Uri "$BaseUrl/api/auth/signin" -Method Post `
+        -ContentType 'application/json' -Body $body -ErrorAction Stop
+    $Token = $authResp.accessToken
+    Write-Host "[seed] Signed in."
+}
+
+$authHeader = @{ Authorization = "Bearer $Token" }
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function Invoke-Api([string]$Path) {
     $uri = "$BaseUrl/api$Path"
     Write-Host "[seed] GET $uri"
-    return Invoke-RestMethod -Uri $uri -Method Get -ErrorAction Stop
+    return Invoke-RestMethod -Uri $uri -Method Get -Headers $authHeader -ErrorAction Stop
 }
 
 function Save-Utf8Json([string]$Dest, $Data) {
@@ -87,7 +113,7 @@ if ($WithImages) {
 
             if (-not (Test-Path $dest)) {
                 try {
-                    Invoke-WebRequest -Uri "$BaseUrl$relUrl" -OutFile $dest -UseBasicParsing -ErrorAction Stop
+                    Invoke-WebRequest -Uri "$BaseUrl$relUrl" -OutFile $dest -Headers $authHeader -UseBasicParsing -ErrorAction Stop
                     Write-Host "  + $filename"
                     $downloaded++
                 } catch {
