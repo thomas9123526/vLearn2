@@ -13,6 +13,7 @@
 // All real business logic lives inside feature modules under src/*. This
 // file is intentionally thin.
 
+import './polyfill'; // must be first — populates globalThis.crypto for Node 18
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
