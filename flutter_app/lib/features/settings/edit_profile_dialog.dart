@@ -343,7 +343,7 @@ class _EditProfileBodyState extends ConsumerState<_EditProfileBody> {
 /// Round preview that mirrors what the rest of the app will render
 /// after upload. While [uploading] is true the spinner sits over
 /// whatever the current source is (uploaded photo > emoji).
-class _AvatarPreview extends ConsumerWidget {
+class _AvatarPreview extends ConsumerStatefulWidget {
   const _AvatarPreview({
     required this.user,
     required this.uploading,
@@ -357,12 +357,28 @@ class _AvatarPreview extends ConsumerWidget {
   final ColorScheme scheme;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final url = user.avatarUrl as String?;
+  ConsumerState<_AvatarPreview> createState() => _AvatarPreviewState();
+}
+
+class _AvatarPreviewState extends ConsumerState<_AvatarPreview> {
+  bool _imageError = false;
+
+  @override
+  void didUpdateWidget(_AvatarPreview old) {
+    super.didUpdateWidget(old);
+    // Reset error when the URL changes (e.g. after a successful upload).
+    if (old.user.avatarUrl != widget.user.avatarUrl) {
+      _imageError = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = widget.user.avatarUrl as String?;
     // avatar_url comes from the backend as `/uploads/avatars/<file>`.
     // Prepend the Dio base URL so NetworkImage can resolve it.
-    final fullUrl = (url != null && url.isNotEmpty)
-        ? _resolveAvatarUrl(ref, url)
+    final fullUrl = (!_imageError && url != null && url.isNotEmpty)
+        ? _resolveAvatarUrl(url)
         : null;
 
     return Stack(
@@ -370,16 +386,19 @@ class _AvatarPreview extends ConsumerWidget {
       children: [
         CircleAvatar(
           radius: 32,
-          backgroundColor: scheme.primaryContainer,
+          backgroundColor: widget.scheme.primaryContainer,
           backgroundImage: fullUrl != null ? NetworkImage(fullUrl) : null,
+          onBackgroundImageError: fullUrl != null
+              ? (_, _) => setState(() => _imageError = true)
+              : null,
           child: fullUrl == null
               ? Text(
-                  fallbackEmoji.isEmpty ? '🐣' : fallbackEmoji,
+                  widget.fallbackEmoji.isEmpty ? '🐣' : widget.fallbackEmoji,
                   style: const TextStyle(fontSize: 28),
                 )
               : null,
         ),
-        if (uploading)
+        if (widget.uploading)
           const SizedBox(
             width: 64,
             height: 64,
@@ -391,7 +410,7 @@ class _AvatarPreview extends ConsumerWidget {
 
   /// Joins the relative `/uploads/...` path with the configured backend
   /// origin so NetworkImage gets a fully-qualified URL.
-  String _resolveAvatarUrl(WidgetRef ref, String relative) {
+  String _resolveAvatarUrl(String relative) {
     if (relative.startsWith('http')) return relative;
     final base = (ref.read(appConfigProvider).asData?.value ?? AppConfig.defaults).backendBaseUrl;
     // strip the /vfls or /api suffix from the API base — uploads sit

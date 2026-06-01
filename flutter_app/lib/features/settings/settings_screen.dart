@@ -743,10 +743,17 @@ class _ModelStorageTile extends ConsumerWidget {
 
 /// Profile tile avatar: shows the uploaded photo (rounded circle) when
 /// avatar_url is set; falls back to the emoji avatar otherwise.
-class _UserAvatarCircle extends StatelessWidget {
+class _UserAvatarCircle extends StatefulWidget {
   const _UserAvatarCircle({required this.user});
 
   final UserProfile user;
+
+  @override
+  State<_UserAvatarCircle> createState() => _UserAvatarCircleState();
+}
+
+class _UserAvatarCircleState extends State<_UserAvatarCircle> {
+  bool _imageError = false;
 
   String? _resolveUrl(String relative) {
     if (relative.startsWith('http')) return relative;
@@ -761,15 +768,18 @@ class _UserAvatarCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final url = user.avatarUrl;
-    final fullUrl = (url != null && url.isNotEmpty) ? _resolveUrl(url) : null;
+    final url = widget.user.avatarUrl;
+    final fullUrl = (!_imageError && url != null && url.isNotEmpty) ? _resolveUrl(url) : null;
 
     return CircleAvatar(
       radius: 22,
       backgroundColor: scheme.primaryContainer,
       backgroundImage: fullUrl != null ? NetworkImage(fullUrl) : null,
+      onBackgroundImageError: fullUrl != null
+          ? (_, _) => setState(() => _imageError = true)
+          : null,
       child: fullUrl == null
-          ? Text(user.avatarEmoji, style: const TextStyle(fontSize: 20))
+          ? Text(widget.user.avatarEmoji, style: const TextStyle(fontSize: 20))
           : null,
     );
   }
