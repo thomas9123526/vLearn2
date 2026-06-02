@@ -35,6 +35,7 @@ class LayoutConfigNotifier extends AsyncNotifier<LayoutConfig> {
     'progress.skill_radar': true,
     'progress.weekly_chart': true,
     'progress.achievements': true,
+    'app.default_language': 'en',
     'conversation.mode': 'both',
     'conversation.mode_toggle': true,
     'settings.theme_selector': true,

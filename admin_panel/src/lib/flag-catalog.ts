@@ -122,6 +122,14 @@ export const FLAG_CATALOG: FlagDescriptor[] = [
   { key: 'prompt.avoided_topics',           label: 'Avoided topics text', tier: 'fine', tab: 'prompts', type: 'textarea' },
 
   // ── System (always shown last; advanced-only by default) ───────────────
+  {
+    key: 'app.default_language',
+    label: 'Default UI language (first launch)',
+    tier: 'big',
+    tab: 'system',
+    type: 'select',
+    options: ['en', 'zh', 'ru', 'ko'],
+  },
   { key: 'system.gzip_enabled', label: 'Gzip response compression', tier: 'big', tab: 'system' },
   { key: 'system.maintenance_banner', label: 'Maintenance banner', tier: 'fine', tab: 'system' },
   { key: 'system.min_app_version', label: 'Minimum app version', tier: 'fine', tab: 'system' },

@@ -22,7 +22,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 import 'package:rive/rive.dart' as rive;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'core/cache/cache_seeder.dart';
+import 'core/config/layout_config_provider.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'core/cache/cache_store.dart';
 import 'core/config/app_config.dart';
@@ -102,6 +104,27 @@ Future<void> main() async {
   } catch (_) {
     // Treat unreadable config as "use defaults" — the service itself rewrites
     // a broken file on the next save, so this never leaves the app stuck.
+  }
+  // On first install the user has no saved language preference. Fetch the
+  // admin-configured default (app.default_language) from the remote config
+  // and write it to SharedPreferences before AppSettingsNotifier loads, so
+  // the very first launch already uses the language the admin chose.
+  try {
+    await container.read(layoutConfigProvider.notifier).refresh();
+    final prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey('settings.ui_language')) {
+      const supportedLangs = {'en', 'zh', 'ru', 'ko'};
+      final lang = container
+          .read(layoutConfigProvider)
+          .valueOrNull
+          ?.get<String>('app.default_language');
+      if (lang != null && supportedLangs.contains(lang)) {
+        await prefs.setString('settings.ui_language', lang);
+      }
+    }
+  } catch (_) {
+    // First-launch language detection is best-effort; the app defaults to
+    // English if the server is unreachable on the very first boot.
   }
   // Pre-seed the local SQLite cache from bundled asset JSON files so the
   // scenario/category lists show instantly on first launch without a network
