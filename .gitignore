@@ -1,6 +1,9 @@
 # Secrets & environment
 .env
 .env.*
+
+# Machine-specific paths written by cmds\setup.ps1 — never commit
+cmds/env-local.ps1
 # ...but DO track the documented example so newcomers know what env to set
 !.env.example
 !**/.env.example

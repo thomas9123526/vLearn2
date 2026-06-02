@@ -46,6 +46,10 @@ param(
     [string]$Action = 'status'
 )
 
+# ─── load machine-specific paths if setup has been run ───────────────────────
+$_envLocal = "$PSScriptRoot\env-local.ps1"
+if (Test-Path $_envLocal) { . $_envLocal }
+
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
 # Resolve where Gradle puts its caches.
