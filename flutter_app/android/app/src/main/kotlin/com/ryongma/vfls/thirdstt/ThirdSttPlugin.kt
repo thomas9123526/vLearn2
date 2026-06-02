@@ -99,6 +99,7 @@ class ThirdSttPlugin private constructor(private val context: Context) :
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun emit(map: Map<String, Any?>) =
+    private fun emit(map: Map<String, Any?>) {
         mainHandler.post { eventSink?.success(map) }
+    }
 }
