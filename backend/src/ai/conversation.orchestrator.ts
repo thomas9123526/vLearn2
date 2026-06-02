@@ -78,9 +78,11 @@ export class ConversationOrchestrator {
       }
       return text;
     } catch (e) {
+      const err = e as AiProviderError;
       this.logger.warn(
-        `AI chat failed (${(e as AiProviderError).kind}): falling back to canned reply`,
+        `AI chat failed (${err.kind ?? 'unknown'}): ${err.message ?? String(e)} — falling back to canned reply`,
       );
+      if (err.cause) this.logger.debug(`Caused by: ${String(err.cause)}`);
       return this.fallbackReply(args.history);
     }
   }
