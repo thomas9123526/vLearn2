@@ -131,6 +131,7 @@ Write-Host '--- Writing cmds\env-local.ps1 ---'
 `$env:ANDROID_HOME        = '$sdkDir'
 `$env:GRADLE_USER_HOME    = '$gradleHome'
 `$env:PUB_CACHE           = '$pubCache'
+`$env:PATH                = '$sdkDir\platform-tools;$sdkDir\cmdline-tools\latest\bin;' + `$env:PATH
 "@ | Set-Content $ENV_LOCAL -Encoding UTF8
 # Apply immediately in this session
 $env:ANDROID_STUDIO_HOME = $studioDir
