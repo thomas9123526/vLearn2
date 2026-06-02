@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -9,24 +9,13 @@ export const metadata: Metadata = {
   description: 'Manage scenarios, users, leaderboards, and config',
 };
 
-const SUPPORTED_LOCALES = ['en', 'zh', 'ru', 'ko'] as const;
-type Locale = (typeof SUPPORTED_LOCALES)[number];
-
-async function getMessages(locale: Locale) {
-  return (await import(`../../messages/${locale}.json`)).default;
-}
-
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = cookies();
-  const raw = cookieStore.get('NEXT_LOCALE')?.value ?? 'en';
-  const locale: Locale = (SUPPORTED_LOCALES as readonly string[]).includes(raw)
-    ? (raw as Locale)
-    : 'en';
-  const messages = await getMessages(locale);
+  const locale = await getLocale();
+  const messages = await getMessages();
 
   return (
     <html lang={locale}>
