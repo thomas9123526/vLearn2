@@ -74,16 +74,7 @@ if (-not $Model)   { $Model   = 'llama3.1:70b'                }
 if (-not $ApiKey)  { $ApiKey  = $envValues['OPENAI_API_KEY']  }
 if (-not $ApiKey)  { $ApiKey  = 'not-needed'                  }
 
-# Normalize: append /v1 when the URL has no path beyond the host:port,
-# matching the same logic in OpenAICompatibleProvider.normalizeBaseUrl().
 $BaseUrl = $BaseUrl.TrimEnd('/')
-try {
-    $uri = [System.Uri]$BaseUrl
-    if ($uri.AbsolutePath -eq '/' -or $uri.AbsolutePath -eq '') {
-        $BaseUrl = "$BaseUrl/v1"
-        Write-Info "Auto-appended /v1 → $BaseUrl"
-    }
-} catch { <# not a valid URI — leave as-is #> }
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 
