@@ -139,6 +139,9 @@ $env:ANDROID_SDK_ROOT    = $sdkDir
 $env:ANDROID_HOME        = $sdkDir
 $env:GRADLE_USER_HOME    = $gradleHome
 $env:PUB_CACHE           = $pubCache
+# Remove any stale persistent user-level GRADLE_USER_HOME so VS Code
+# extensions don't bypass .vscode/settings.json with the wrong path.
+[Environment]::SetEnvironmentVariable('GRADLE_USER_HOME', $null, 'User')
 Write-Host 'Written.'
 
 # ── 2. Write .vscode\settings.json (gitignored, machine-specific) ────────────
