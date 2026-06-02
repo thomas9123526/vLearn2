@@ -9,12 +9,19 @@
 #    **/*.lock                  — stale build locks from crashed processes
 #    **/*.part / **/*.tmp       — incomplete file downloads
 #    wrapper/dists/<ver>/<hash> — zip present but not yet extracted
+#    caches/build-cache/        — stale incremental results (Nuclear only)
 #
 #  Pub cache checks:
 #    hosted/pub.dev/<pkg>/      — package dir missing pubspec.yaml (incomplete)
 #    hosted/pub.dev/**          — zero-byte .dart/.yaml/.json files
 #    hosted-hashes/pub.dev/     — zero-byte hash files
 #    Flutter built-in repair    — runs `flutter pub cache repair` when issues found
+#
+#  Flutter engine cache checks:
+#    $FLUTTER_ROOT\bin\cache\   — zero-byte engine artifacts; stamp file absent
+#
+#  Project-level checks:
+#    flutter_app\.dart_tool\    — zero-byte or missing package_config.json
 #
 #  Usage:
 #    .\cmds\repair_cache.ps1             interactive (prompt before deleting)
@@ -225,6 +232,88 @@ if (Test-Path $pubCacheDir) {
     Write-Host "Pub cache not found at $pubCacheDir — skipping." -ForegroundColor DarkGray
 }
 
+# ── scan Gradle build-cache ───────────────────────────────────────────────────
+# Only checked under -Nuclear; stale incremental results are otherwise harmless.
+if ($Nuclear) {
+    foreach ($gh in $gradleHomes) {
+        $buildCache = "$gh\caches\build-cache"
+        if (Test-Path $buildCache) {
+            Write-Host ''
+            Write-Host "=== Scanning Gradle build-cache (Nuclear): $buildCache ===" -ForegroundColor Cyan
+            Add-Bad $buildCache 'Gradle build-cache (Nuclear wipe — forces full rebuild)'
+        }
+    }
+}
+
+# ── scan Flutter engine cache ─────────────────────────────────────────────────
+$flutterRoot = $env:FLUTTER_ROOT
+if (-not $flutterRoot) {
+    $flutterCmd = Get-Command flutter -ErrorAction SilentlyContinue
+    if ($flutterCmd) {
+        # flutter -> flutter_root\bin\flutter.bat -> flutter_root
+        $flutterRoot = Split-Path (Split-Path $flutterCmd.Source)
+    }
+}
+
+if ($flutterRoot -and (Test-Path $flutterRoot)) {
+    $engineCache = "$flutterRoot\bin\cache"
+    Write-Host ''
+    Write-Host "=== Scanning Flutter engine cache: $engineCache ===" -ForegroundColor Cyan
+
+    if (Test-Path $engineCache) {
+        # Stamp file marks a completed engine download; missing = incomplete
+        $stampFile = "$engineCache\engine-dart-sdk.stamp"
+        if (-not (Test-Path $stampFile)) {
+            Add-Bad $engineCache 'Flutter engine cache missing stamp file (incomplete download)'
+        } else {
+            # Zero-byte artifacts inside the cache
+            $badArtifacts = Get-ChildItem -Path $engineCache -Recurse -File -ErrorAction SilentlyContinue |
+                            Where-Object { $_.Length -eq 0 -and $_.Extension -in '.dll','.so','.jar','.zip','.dart','.snapshot' }
+            foreach ($f in $badArtifacts) {
+                Add-Bad $f.FullName 'Zero-byte Flutter engine artifact (corrupt)'
+            }
+            if ($badArtifacts.Count -eq 0) {
+                Write-Host '  Flutter engine cache looks healthy.' -ForegroundColor Green
+            }
+        }
+    } else {
+        Write-Host '  Engine cache not yet populated — run `flutter precache` after setup.' -ForegroundColor DarkGray
+    }
+} else {
+    Write-Host ''
+    Write-Host 'Flutter not found in PATH — skipping engine cache check.' -ForegroundColor DarkGray
+}
+
+# ── scan project .dart_tool ───────────────────────────────────────────────────
+$ROOT         = Split-Path $PSScriptRoot -Parent
+$dartToolDir  = "$ROOT\flutter_app\.dart_tool"
+$dartToolBad  = $false
+
+Write-Host ''
+Write-Host "=== Scanning project .dart_tool: $dartToolDir ===" -ForegroundColor Cyan
+
+if (Test-Path $dartToolDir) {
+    $pkgConfig = "$dartToolDir\package_config.json"
+    if (-not (Test-Path $pkgConfig)) {
+        Add-Bad $dartToolDir 'package_config.json missing — run flutter pub get'
+        $dartToolBad = $true
+    } elseif ((Get-Item $pkgConfig).Length -eq 0) {
+        Add-Bad $pkgConfig 'package_config.json is zero bytes (corrupt)'
+        $dartToolBad = $true
+    } else {
+        # Validate it is parseable JSON
+        try {
+            $null = Get-Content $pkgConfig -Raw | ConvertFrom-Json -ErrorAction Stop
+            Write-Host '  .dart_tool looks healthy.' -ForegroundColor Green
+        } catch {
+            Add-Bad $pkgConfig 'package_config.json is not valid JSON (corrupt)'
+            $dartToolBad = $true
+        }
+    }
+} else {
+    Write-Host '  .dart_tool not found — run flutter pub get.' -ForegroundColor DarkGray
+}
+
 # ── summary ───────────────────────────────────────────────────────────────────
 Write-Host ''
 
@@ -268,15 +357,29 @@ foreach ($path in $toDelete) {
 Write-Host ''
 Write-Host "Gradle/pub cache: $deleted item(s) removed." -ForegroundColor Green
 
-# ── run flutter pub cache repair if pub issues were found ────────────────────
+# ── post-repair flutter commands ──────────────────────────────────────────────
+$flutterAvailable = $null -ne (Get-Command flutter -ErrorAction SilentlyContinue)
+
 if ($pubBadFound -and -not $DryRun) {
     Write-Host ''
     Write-Host '--- Running flutter pub cache repair ---'
     Write-Host '    (re-downloads and verifies all cached packages)' -ForegroundColor DarkGray
-    if (Get-Command flutter -ErrorAction SilentlyContinue) {
+    if ($flutterAvailable) {
         flutter pub cache repair
     } else {
         Write-Warning 'flutter not found in PATH — run manually: flutter pub cache repair'
+    }
+}
+
+if ($dartToolBad -and -not $DryRun) {
+    Write-Host ''
+    Write-Host '--- Running flutter pub get ---'
+    Write-Host '    (rebuilds .dart_tool/package_config.json)' -ForegroundColor DarkGray
+    if ($flutterAvailable) {
+        Push-Location "$ROOT\flutter_app"
+        try { flutter pub get } finally { Pop-Location }
+    } else {
+        Write-Warning 'flutter not found in PATH — run manually: cd flutter_app && flutter pub get'
     }
 }
 
