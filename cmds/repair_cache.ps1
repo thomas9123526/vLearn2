@@ -146,11 +146,8 @@ foreach ($gh in $gradleHomes) {
             }
         }
 
-        # ── Nuclear: wipe entire transforms + files-* dirs ───────────────────
+        # ── Nuclear: wipe entire transforms dirs ─────────────────────────────
         if ($Nuclear) {
-            $nukeTargets = Get-ChildItem -Path $transformsRoot -ErrorAction SilentlyContinue |
-                Where-Object { $_.PSIsContainer -and ($_.Name -like 'transforms' -or $_.Name -like 'files-*') }
-            # Already covered per-file above; here wipe parent dirs directly
             $transformsDirs = Get-ChildItem -Path $transformsRoot -Recurse -Directory `
                               -Filter 'transforms' -ErrorAction SilentlyContinue
             foreach ($d in $transformsDirs) {
@@ -189,7 +186,8 @@ if (Test-Path $pubCacheDir) {
     # ── 5. incomplete package downloads ──────────────────────────────────────
     $hostedDir = "$pubCacheDir\hosted\pub.dev"
     if (Test-Path $hostedDir) {
-        $pkgDirs = Get-ChildItem -Path $hostedDir -Directory -ErrorAction SilentlyContinue
+        $pkgDirs = Get-ChildItem -Path $hostedDir -Directory -ErrorAction SilentlyContinue |
+                   Where-Object { $_.Name -notmatch '^\.' }  # skip .cache and other metadata dirs
         foreach ($pkg in $pkgDirs) {
             $pubspec = "$($pkg.FullName)\pubspec.yaml"
             if (-not (Test-Path $pubspec)) {
@@ -201,15 +199,15 @@ if (Test-Path $pubCacheDir) {
             }
         }
 
-        # ── 6. zero-byte source files inside packages ─────────────────────────
-        $zeroFiles = Get-ChildItem -Path $hostedDir -Recurse -File -ErrorAction SilentlyContinue |
-                     Where-Object { $_.Length -eq 0 -and $_.Extension -in '.dart','.yaml','.json' }
-        foreach ($f in $zeroFiles) {
-            # A zero-byte pubspec.yaml was already caught at the package level above
-            if ($f.Name -ne 'pubspec.yaml') {
-                Add-Bad $f.FullName 'Zero-byte pub cache file (corrupt)'
-                $pubBadFound = $true
-            }
+        # ── 6. zero-byte Dart source files ────────────────────────────────────
+        # Only .dart files — .yaml/.json can legitimately be empty (test fixtures,
+        # blank analysis_options, etc.) so we skip those to avoid false positives.
+        $zeroDart = Get-ChildItem -Path $hostedDir -Recurse -File -Filter '*.dart' `
+                    -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Length -eq 0 }
+        foreach ($f in $zeroDart) {
+            Add-Bad $f.FullName 'Zero-byte .dart file in pub cache (corrupt)'
+            $pubBadFound = $true
         }
     }
 
@@ -267,8 +265,8 @@ if ($flutterRoot -and (Test-Path $flutterRoot)) {
             Add-Bad $engineCache 'Flutter engine cache missing stamp file (incomplete download)'
         } else {
             # Zero-byte artifacts inside the cache
-            $badArtifacts = Get-ChildItem -Path $engineCache -Recurse -File -ErrorAction SilentlyContinue |
-                            Where-Object { $_.Length -eq 0 -and $_.Extension -in '.dll','.so','.jar','.zip','.dart','.snapshot' }
+            $badArtifacts = @(Get-ChildItem -Path $engineCache -Recurse -File -ErrorAction SilentlyContinue |
+                            Where-Object { $_.Length -eq 0 -and $_.Extension -in '.dll','.so','.jar','.zip','.dart','.snapshot' })
             foreach ($f in $badArtifacts) {
                 Add-Bad $f.FullName 'Zero-byte Flutter engine artifact (corrupt)'
             }
