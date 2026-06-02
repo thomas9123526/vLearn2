@@ -144,6 +144,24 @@ switch ($Action) {
     'off' {
         Remove-Item Env:VLEARN2_ONLINE -ErrorAction SilentlyContinue
         Write-Host 'VLEARN2_ONLINE cleared (this shell; Gradle is offline-by-default)'
+
+        # Auto-install the offline init script if it is missing on this machine.
+        # This makes the "on → build → off → build" flow work on a fresh machine
+        # without needing a separate "setup" step.
+        $projRoot = Split-Path $PSScriptRoot -Parent
+        $guh      = Get-GradleUserHome
+        $initSrc  = Join-Path $projRoot 'tools\gradle\init.d\offline.init.gradle'
+        $initDst  = Join-Path $guh 'init.d\offline.init.gradle'
+        if (-not (Test-Path $initDst)) {
+            if (Test-Path $initSrc) {
+                New-Item -ItemType Directory -Force (Split-Path $initDst) | Out-Null
+                Copy-Item $initSrc $initDst -Force
+                Write-Host "  Auto-installed offline init script → $initDst"
+            } else {
+                Write-Host "  WARNING: init script source not found: $initSrc" -ForegroundColor Yellow
+                Write-Host '  Gradle will NOT enforce offline mode. Run: .\cmds\vlearn2-online.ps1 setup'
+            }
+        }
     }
     'status' {
         Write-Host '=== VLEARN2_ONLINE status ==='
