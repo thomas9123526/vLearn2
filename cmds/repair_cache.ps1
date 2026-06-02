@@ -1,16 +1,20 @@
 # ─────────────────────────────────────────────────────────────────────────────
-#  vLearn2 — Gradle cache integrity check and repair
+#  vLearn2 — Gradle + Flutter pub cache integrity check and repair
 #
-#  Scans Gradle caches for known corruption patterns and removes bad entries
-#  so the next build can regenerate them cleanly.
+#  Scans Gradle and Flutter pub caches for known corruption patterns and
+#  removes bad entries so the next build can regenerate them cleanly.
 #
-#  What it checks:
-#    transforms/*/metadata.bin  — zero-byte or unreadable = corrupt (always
-#                                 safe to delete; Gradle regenerates on demand)
-#    **/*.lock                  — stale build locks left by a crashed process
+#  Gradle checks:
+#    transforms/*/metadata.bin  — zero-byte = corrupt (safe to delete)
+#    **/*.lock                  — stale build locks from crashed processes
 #    **/*.part / **/*.tmp       — incomplete file downloads
-#    wrapper/dists/<ver>/<hash> — zip present but not yet extracted (marker
-#                                 file missing)
+#    wrapper/dists/<ver>/<hash> — zip present but not yet extracted
+#
+#  Pub cache checks:
+#    hosted/pub.dev/<pkg>/      — package dir missing pubspec.yaml (incomplete)
+#    hosted/pub.dev/**          — zero-byte .dart/.yaml/.json files
+#    hosted-hashes/pub.dev/     — zero-byte hash files
+#    Flutter built-in repair    — runs `flutter pub cache repair` when issues found
 #
 #  Usage:
 #    .\cmds\repair_cache.ps1             interactive (prompt before deleting)
@@ -167,11 +171,65 @@ foreach ($gh in $gradleHomes) {
     }
 }
 
+# ── scan pub cache ────────────────────────────────────────────────────────────
+$pubCacheDir = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
+$pubBadFound = $false
+
+if (Test-Path $pubCacheDir) {
+    Write-Host ''
+    Write-Host "=== Scanning pub cache: $pubCacheDir ===" -ForegroundColor Cyan
+
+    # ── 5. incomplete package downloads ──────────────────────────────────────
+    $hostedDir = "$pubCacheDir\hosted\pub.dev"
+    if (Test-Path $hostedDir) {
+        $pkgDirs = Get-ChildItem -Path $hostedDir -Directory -ErrorAction SilentlyContinue
+        foreach ($pkg in $pkgDirs) {
+            $pubspec = "$($pkg.FullName)\pubspec.yaml"
+            if (-not (Test-Path $pubspec)) {
+                Add-Bad $pkg.FullName 'Pub package missing pubspec.yaml (incomplete download)'
+                $pubBadFound = $true
+            } elseif ((Get-Item $pubspec -ErrorAction SilentlyContinue).Length -eq 0) {
+                Add-Bad $pkg.FullName 'Pub package has zero-byte pubspec.yaml (corrupt)'
+                $pubBadFound = $true
+            }
+        }
+
+        # ── 6. zero-byte source files inside packages ─────────────────────────
+        $zeroFiles = Get-ChildItem -Path $hostedDir -Recurse -File -ErrorAction SilentlyContinue |
+                     Where-Object { $_.Length -eq 0 -and $_.Extension -in '.dart','.yaml','.json' }
+        foreach ($f in $zeroFiles) {
+            # A zero-byte pubspec.yaml was already caught at the package level above
+            if ($f.Name -ne 'pubspec.yaml') {
+                Add-Bad $f.FullName 'Zero-byte pub cache file (corrupt)'
+                $pubBadFound = $true
+            }
+        }
+    }
+
+    # ── 7. zero-byte hash files ────────────────────────────────────────────────
+    $hashDir = "$pubCacheDir\hosted-hashes\pub.dev"
+    if (Test-Path $hashDir) {
+        $badHashes = Get-ChildItem -Path $hashDir -Recurse -File -ErrorAction SilentlyContinue |
+                     Where-Object { $_.Length -eq 0 }
+        foreach ($f in $badHashes) {
+            Add-Bad $f.FullName 'Zero-byte pub hash file (corrupt)'
+            $pubBadFound = $true
+        }
+    }
+
+    if (-not $pubBadFound) {
+        Write-Host '  Pub cache looks healthy.' -ForegroundColor Green
+    }
+} else {
+    Write-Host ''
+    Write-Host "Pub cache not found at $pubCacheDir — skipping." -ForegroundColor DarkGray
+}
+
 # ── summary ───────────────────────────────────────────────────────────────────
 Write-Host ''
 
 if ($toDelete.Count -eq 0 -and $warnings.Count -eq 0) {
-    Write-Host 'No corruption found. Cache looks healthy.' -ForegroundColor Green
+    Write-Host 'No corruption found. All caches look healthy.' -ForegroundColor Green
     exit 0
 }
 
@@ -208,5 +266,19 @@ foreach ($path in $toDelete) {
 }
 
 Write-Host ''
-Write-Host "Repaired: $deleted item(s) removed." -ForegroundColor Green
-Write-Host 'Run `flutter build apk --debug` to verify the build now succeeds.'
+Write-Host "Gradle/pub cache: $deleted item(s) removed." -ForegroundColor Green
+
+# ── run flutter pub cache repair if pub issues were found ────────────────────
+if ($pubBadFound -and -not $DryRun) {
+    Write-Host ''
+    Write-Host '--- Running flutter pub cache repair ---'
+    Write-Host '    (re-downloads and verifies all cached packages)' -ForegroundColor DarkGray
+    if (Get-Command flutter -ErrorAction SilentlyContinue) {
+        flutter pub cache repair
+    } else {
+        Write-Warning 'flutter not found in PATH — run manually: flutter pub cache repair'
+    }
+}
+
+Write-Host ''
+Write-Host 'Done. Run `flutter build apk --debug` to verify the build succeeds.'
