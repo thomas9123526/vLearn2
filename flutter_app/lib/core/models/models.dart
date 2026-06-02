@@ -70,6 +70,8 @@ class Persona {
     required this.gradientTo,
     this.gender = 'neutral',
     this.voiceId,
+    this.ttsAge,
+    this.ttsVoiceSid,
     this.riveAsset,
     this.imageUrl,
   });
@@ -89,6 +91,9 @@ class Persona {
         j['gradient_to'] as String? ?? j['gradientTo'] as String? ?? '#FFB997',
     gender: j['gender'] as String? ?? 'neutral',
     voiceId: j['voice_id'] as String? ?? j['voiceId'] as String?,
+    ttsAge: j['tts_age'] as String? ?? j['ttsAge'] as String?,
+    ttsVoiceSid: (j['tts_voice_sid'] as num?)?.toInt() ??
+        (j['ttsVoiceSid'] as num?)?.toInt(),
     riveAsset: j['rive_asset'] as String? ?? j['riveAsset'] as String?,
     imageUrl: j['image_url'] as String? ?? j['imageUrl'] as String?,
   );
@@ -102,16 +107,21 @@ class Persona {
   final String gradientFrom;
   final String gradientTo;
 
-  /// `'female' | 'male' | 'neutral'`. Drives the avatar animation set
-  /// used in tutor-mode conversation.
+  /// `'female' | 'male' | 'neutral'`. Drives avatar animation and voice selection.
   final String gender;
 
-  /// TTS voice id pointing at an entry in `manifest.tts.voices`. Null
-  /// means "use the default (first) voice".
+  /// TTS voice id (name string) from `manifest.tts.voices`. Null = use heuristic.
   final String? voiceId;
 
-  /// `.riv` filename under `assets/animations/` for the avatar. Null
-  /// means use the gender-default body animation.
+  /// Admin-assigned voice age hint: `'young' | 'adult' | 'elder' | null`.
+  /// Used as a tiebreaker when [voiceId] and [ttsVoiceSid] are both null.
+  final String? ttsAge;
+
+  /// Direct VITS speaker-index override. When set, wins over [voiceId] and
+  /// [ttsAge]. The app clamps this to the available voice count.
+  final int? ttsVoiceSid;
+
+  /// `.riv` filename under `assets/animations/`. Null = use default character.
   final String? riveAsset;
 
   final String? imageUrl;

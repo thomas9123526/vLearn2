@@ -64,10 +64,15 @@ abstract class TextToSpeechService {
   Future<void> dispose();
 
   /// Emits `true` when synthesized audio starts playing, `false` when it
-  /// stops. The Tutor-mode avatar subscribes to this to drive mouth-pulse
-  /// and emotion-state animations. Placeholder implementations return an
-  /// empty stream so subscribers don't crash when speech is unavailable.
+  /// stops. The Tutor-mode avatar subscribes to this to drive emotion-state
+  /// animations. Placeholder implementations return an empty stream.
   Stream<bool> get isSpeakingStream;
+
+  /// Emits a 0.0–1.0 loudness envelope value at ~60 fps during speech
+  /// playback, derived from the RMS of the synthesized PCM. Drives the
+  /// `amplitude` input on the emo_linear.riv Mochi state machine so the
+  /// mouth opens proportionally to voice loudness. Emits 0 when silent.
+  Stream<double> get amplitudeStream;
 }
 
 // ─── Placeholder implementations (real sherpa-onnx integration lands later) ──
@@ -123,10 +128,11 @@ class PlaceholderTtsService extends TextToSpeechService {
   @override
   Future<void> dispose() async {}
 
-  /// Placeholder has nothing to play, so the stream is empty (never emits).
-  /// Subscribers stay safe — they just never get a tick.
   @override
   Stream<bool> get isSpeakingStream => const Stream.empty();
+
+  @override
+  Stream<double> get amplitudeStream => const Stream.empty();
 }
 
 /// Picks the sherpa-onnx implementation when the model registry reports the

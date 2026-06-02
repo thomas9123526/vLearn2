@@ -8,52 +8,75 @@ import 'package:rive/rive.dart' as rive;
 import '../../../core/models/models.dart';
 import 'cartoon_face.dart';
 
-/// Visual state the tutor avatar is currently in. Drives both the body
-/// animation and the floating emotion icons around the avatar.
+/// Visual state the tutor avatar is currently in.
 enum TutorMood {
-  /// At rest, no audio playing, not listening — gentle breathing only.
+  /// At rest — gentle breathing only.
   idle,
 
-  /// Speaking back the assistant reply — mouth pulses with the TTS audio.
+  /// TTS is playing — mouth driven by amplitude from sherpa-onnx PCM.
   speaking,
 
-  /// User is recording. The tutor leans in slightly, "listening" ring
-  /// animates around the head.
+  /// User is recording — tutor leans in (Attention state).
   listening,
 
-  /// Last user turn was strong — quick smile + thumbs up cluster.
+  /// Positive moment — flash Excited then auto-return to Idle.
   praising,
 
-  /// Last user turn had clear errors — a small disappointed cluster.
-  /// Comes with the polite-correction body language.
+  /// Negative / timeout moment — flash Disappointed then auto-return to Idle.
   disappointed,
 
-  /// User has been silent for a while — gentle "go ahead, you got this"
-  /// encouragement.
+  /// User has been silent a while — encourage them to speak.
   encouraging,
 
-  /// User turn just finished and the app is awaiting the AI reply. Mic
-  /// is disabled, status pill shows a progress indicator. Visually
-  /// neutral on the current `.riv` (no `think` input yet); swap to the
-  /// dedicated state-machine input when the thinking animation ships.
+  /// Awaiting AI reply after STT — Thinking state.
   thinking,
 }
 
-/// Big tutor avatar used in Tutor (Face) mode. Combines:
-///   * a circular body filled with a Rive animation (if asset is shipped)
-///     or a gradient + name initial fallback;
+/// Mochi (emo_linear.riv) `state` input enum — must stay in sync with the rig.
+///
+/// | value | expression   | type    |
+/// |-------|-------------|---------|
+/// | 0     | Idle         | resting |
+/// | 1     | Thinking     | resting |
+/// | 2     | Speaking     | resting |
+/// | 3     | Attention    | resting |
+/// | 4     | Excited      | moment  |
+/// | 5     | Disappointed | moment  |
+///
+/// Moment states (4, 5) auto-return to Idle inside the rig after ~1.5 s.
+const _kStateIdle = 0.0;
+const _kStateThinking = 1.0;
+const _kStateSpeaking = 2.0;
+const _kStateAttention = 3.0;
+const _kStateExcited = 4.0;
+const _kStateDisappointed = 5.0;
+
+/// Big tutor avatar used in Tutor (Face) mode.
+///
+/// Combines:
+///   * a circular body filled with the emo_linear.riv Mochi animation;
 ///   * a pulsing glow ring tied to [mood];
 ///   * three floating emotion icons that fade in/out by mood.
+///
+/// [amplitude] (0.0–1.0) is the real-time loudness value from the TTS
+/// service's RMS envelope — it drives the Mochi `amplitude` input while
+/// speaking so the mouth opens proportionally to audio loudness.
 class TutorAvatar extends StatefulWidget {
   const TutorAvatar({
     required this.persona,
     required this.mood,
+    this.amplitude = 0.0,
     this.size = 240,
     super.key,
   });
 
   final Persona persona;
   final TutorMood mood;
+
+  /// 0.0 (closed) → 1.0 (wide open). Only has a visible effect when
+  /// `state == 2` (Speaking) — the Mochi rig gates the Mouth layer to
+  /// that state. Pass 0 when not speaking.
+  final double amplitude;
   final double size;
 
   @override
@@ -67,8 +90,7 @@ class _TutorAvatarState extends State<TutorAvatar>
       AnimationController(vsync: this, duration: const Duration(seconds: 3))
         ..repeat(reverse: true);
 
-  /// Fast pulse synced to TTS audio playback. Stops when not speaking so it
-  /// doesn't drain battery.
+  /// Fast pulse synced to TTS audio playback.
   late final AnimationController _pulse =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 450));
 
@@ -77,231 +99,126 @@ class _TutorAvatarState extends State<TutorAvatar>
       AnimationController(vsync: this, duration: const Duration(seconds: 4))
         ..repeat();
 
-  // ─── Rive state-machine integration ───────────────────────────────
+  // ─── emo_linear.riv / Mochi state-machine inputs ──────────────────────────
   //
-  // The character `.riv` (e.g. tutor_hiro.riv) exposes a state machine
-  // with these inputs (any may be missing on stub assets — the typed
-  // accessors return null in that case and we treat it as a no-op):
+  // State machine name: "Mochi"
   //
-  //   trigger blink       — fire to play one blink
-  //   number  emotion     — 0 neutral, 1 smile, 2 sad, 3 surprised, …
-  //   number  mouth_shape — 0 closed, 1 "A", 2 "E", 3 "I", 4 "O", 5 "U"
-  //   trigger nod         — head nod (praising)
-  //   trigger shake       — head shake (disappointed)
-  //   bool    attention   — leaning-in / listening pose
+  // Inputs:
+  //   Number  state     — 0 Idle | 1 Thinking | 2 Speaking | 3 Attention |
+  //                       4 Excited (moment) | 5 Disappointed (moment)
+  //   Number  amplitude — 0.0–1.0 mouth open amount (active only in state 2)
+  //   Trigger blink     — fire to play one blink
+  //   Number  mouth     — 0–5 viseme index (reserved, unused for now)
   //
-  // Only blink, emotion=1, and mouth_shape=1 ship in tutor_hiro.riv
-  // right now; everything else is wired here so the moment the .riv
-  // gains the missing animations no Flutter change is needed.
-  //
-  // Migrated for rive 0.14: the input types moved from `SMI*` to
-  // `*Input` and are now looked up via stateMachine.trigger/boolean/
-  // number(name) on the loaded controller (see [_onRiveLoaded]).
+  // All lookups are nullable — a null means the input isn't exported on
+  // the current asset version and the write is silently skipped.
+  rive.NumberInput? _stateInput;
+  rive.NumberInput? _amplitudeInput;
   rive.TriggerInput? _blinkInput;
-  rive.NumberInput? _emotionInput;
-  rive.NumberInput? _mouthShapeInput;
-  rive.TriggerInput? _nodInput;
-  rive.TriggerInput? _shakeInput;
-  rive.BooleanInput? _attentionInput;
 
-  /// Shared file loader for tutor_hiro.riv. Lifted to `static final` so
-  /// the asset decodes **once per app session** rather than every time
-  /// a TutorAvatar mounts — without this, leaving and re-entering the
-  /// conversation screen flashes the CartoonFace fallback for a frame
-  /// while the .riv decodes again. FileLoader caches the decoded
-  /// rive.File internally, so subsequent reads are instant.
+  /// Shared file loader — decoded once per app session, reused on every
+  /// mount so re-entering the conversation screen never flashes a blank.
   static final rive.FileLoader _fileLoader = rive.FileLoader.fromAsset(
-    'assets/animations/$_forcedRiveAsset',
+    'assets/animations/emo_linear.riv',
     riveFactory: rive.Factory.rive,
   );
 
-  /// Random natural-blink scheduler — independent of mood so the
-  /// character keeps blinking while speaking or listening too.
+  /// Natural blink scheduler — fires every 2–5 s regardless of mood.
   Timer? _blinkTimer;
   final math.Random _rng = math.Random();
-
-  /// Mouth-viseme cycler — only runs while [TutorMood.speaking]. With
-  /// only `mouth_shape == 1` built today this just toggles open/close;
-  /// when E/I/O/U ship, change [_visemeAt] to cycle 1..5.
-  Timer? _mouthTimer;
 
   @override
   void didUpdateWidget(covariant TutorAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Mood-driven controller management. We only animate what's currently
-    // visible to keep idle CPU low.
+
     if (widget.mood == TutorMood.speaking) {
       if (!_pulse.isAnimating) _pulse.repeat(reverse: true);
     } else {
       _pulse.stop();
       _pulse.value = 0;
     }
+
     if (oldWidget.mood != widget.mood) {
       _applyMoodToRive(widget.mood);
+    }
+
+    // Always sync amplitude so the mouth tracks loudness continuously.
+    if (oldWidget.amplitude != widget.amplitude) {
+      try {
+        _amplitudeInput?.value = widget.amplitude.clamp(0.0, 1.0);
+      } catch (_) {}
     }
   }
 
   @override
   void dispose() {
     _blinkTimer?.cancel();
-    _mouthTimer?.cancel();
-    // The state-machine controller is owned by the Rive artboard;
-    // disposing the artboard (which Rive does when its widget is
-    // unmounted) tears it down for us — nothing to drop here.
     _breath.dispose();
     _pulse.dispose();
     _ring.dispose();
     super.dispose();
   }
 
-  // ─── Rive helpers ─────────────────────────────────────────────────
+  // ─── Rive helpers ──────────────────────────────────────────────────────────
 
-  /// Called by [rive.RiveWidgetBuilder] once the file has loaded and the
-  /// controller has selected the default state machine. Resolves every
-  /// named input, kicks off the blink timer, and applies the current
-  /// mood so the character isn't stuck on its default pose for one
-  /// frame.
-  ///
-  /// Wrapped in a try/catch because malformed or version-mismatched
-  /// `.riv` files have been seen to throw deep inside the runtime when
-  /// the state machine is first walked. A throw here would otherwise
-  /// bubble up as an unhandled FlutterError; instead we log it and let
-  /// the animation play without state-machine wiring (default timeline
-  /// only).
   void _onRiveLoaded(rive.RiveLoaded state) {
     if (!mounted) return;
     try {
       final sm = state.controller.stateMachine;
-      // In rive 0.14 input lookup is typed: separate accessors for
-      // trigger / boolean / number return the corresponding *Input?
-      // or null if the name isn't defined on the state machine.
-      // The classic SM-input lookup API is marked `@deprecated` in
-      // rive 0.14 in favour of Data Binding, but the legacy accessors
-      // still ship and work for our use case. Migration to view-model
-      // bindings can come later — out of scope for the version bump.
       // ignore: deprecated_member_use
-      _blinkInput      = sm.trigger('blink');
+      _stateInput     = sm.number('state');
       // ignore: deprecated_member_use
-      _nodInput        = sm.trigger('nod');
+      _amplitudeInput = sm.number('amplitude');
       // ignore: deprecated_member_use
-      _shakeInput      = sm.trigger('shake');
-      // ignore: deprecated_member_use
-      _attentionInput  = sm.boolean('attention');
-      // ignore: deprecated_member_use
-      _emotionInput    = sm.number('emotion');
-      // ignore: deprecated_member_use
-      _mouthShapeInput = sm.number('mouth_shape');
+      _blinkInput     = sm.trigger('blink');
 
       AppConfig.logx(
         'rive-init',
-        '${widget.persona.id} SM "${sm.name}" — inputs: '
-            'blink=${_blinkInput != null}, '
-            'emotion=${_emotionInput != null}, '
-            'mouth_shape=${_mouthShapeInput != null}, '
-            'nod=${_nodInput != null}, '
-            'shake=${_shakeInput != null}, '
-            'attention=${_attentionInput != null}',
+        'Mochi SM "${sm.name}" — inputs: '
+            'state=${_stateInput != null}, '
+            'amplitude=${_amplitudeInput != null}, '
+            'blink=${_blinkInput != null}',
       );
 
       _scheduleNextBlink();
       _applyMoodToRive(widget.mood);
     } catch (e, st) {
-      AppConfig.logx('rive-init failed',
-          '${widget.persona.id}: $e\n$st');
-      // Drop any partially-attached inputs so writes don't fire into a
-      // half-broken state machine.
+      AppConfig.logx('rive-init failed', 'Mochi: $e\n$st');
+      _stateInput = null;
+      _amplitudeInput = null;
       _blinkInput = null;
-      _emotionInput = null;
-      _mouthShapeInput = null;
-      _nodInput = null;
-      _shakeInput = null;
-      _attentionInput = null;
     }
   }
 
-  /// Re-arms [_blinkTimer] with a random 3.5–7 s delay. Recursive — the
-  /// timer callback fires the blink and immediately schedules the next.
+  /// Blink every 2–5 s. The Mochi rig suppresses blinking in state 4
+  /// (Excited) internally, but we guard it here too just in case.
   void _scheduleNextBlink() {
     _blinkTimer?.cancel();
-    if (_blinkInput == null) return; // no blink rig — don't burn a timer
-    final ms = 3500 + _rng.nextInt(3500);
+    if (_blinkInput == null) return;
+    final ms = 2000 + _rng.nextInt(3000);
     _blinkTimer = Timer(Duration(milliseconds: ms), () {
       if (!mounted) return;
-      _blinkInput?.fire();
+      if (widget.mood != TutorMood.praising) _blinkInput?.fire();
       _scheduleNextBlink();
     });
   }
 
-  /// Viseme value to drive at the [tick]th 160 ms slot while speaking.
-  /// Currently alternates 1 ("A") and 0 (closed) to give a simple
-  /// talking mouth with the only viseme that's built. Swap for
-  /// `((tick % 5) + 1).toDouble()` once E/I/O/U ship.
-  double _visemeAt(int tick) => (tick % 2 == 0) ? 1.0 : 0.0;
-
-  void _startMouthCycle() {
-    _mouthTimer?.cancel();
-    if (_mouthShapeInput == null) return;
-    _mouthTimer = Timer.periodic(const Duration(milliseconds: 160), (t) {
-      _mouthShapeInput?.value = _visemeAt(t.tick);
-    });
-  }
-
-  void _stopMouthCycle() {
-    _mouthTimer?.cancel();
-    _mouthTimer = null;
-    _mouthShapeInput?.value = 0;
-  }
-
-  /// Translates [TutorMood] into Rive input state. Safe to call before
-  /// `_onRiveInit` has run — all the inputs are null then and nothing
-  /// happens. Also wrapped in a try/catch: the rive 0.13.x runtime can
-  /// throw on `.value =` or `.fire()` when the underlying state-machine
-  /// graph (exported by a newer editor) doesn't have a state for the
-  /// value we're pushing. A throw here would otherwise bubble up as a
-  /// Flutter framework error mid-frame; we'd rather just keep the
-  /// previous pose.
+  /// Map [TutorMood] → Mochi `state` number and push it to the rig.
   void _applyMoodToRive(TutorMood mood) {
     try {
-      switch (mood) {
-        case TutorMood.idle:
-          _emotionInput?.value = 0;
-          _attentionInput?.value = false;
-          _stopMouthCycle();
-        case TutorMood.speaking:
-          _emotionInput?.value = 1; // gentle smile while talking
-          _attentionInput?.value = false;
-          _startMouthCycle();
-        case TutorMood.listening:
-          _emotionInput?.value = 0;
-          _attentionInput?.value = true;
-          _stopMouthCycle();
-        case TutorMood.praising:
-          _emotionInput?.value = 1;
-          _nodInput?.fire();
-          _attentionInput?.value = false;
-          _stopMouthCycle();
-        case TutorMood.disappointed:
-          // tutor_hiro.riv only defines emotion states 0 and 1 today;
-          // pushing 2 has been seen to RangeError inside the runtime.
-          // Clamp to the highest known "sad-ish" state until a real
-          // sad viseme ships — gentle degradation, not a crash.
-          _emotionInput?.value = 1;
-          _shakeInput?.fire();
-          _attentionInput?.value = false;
-          _stopMouthCycle();
-        case TutorMood.encouraging:
-          _emotionInput?.value = 1;
-          _attentionInput?.value = false;
-          _stopMouthCycle();
-        case TutorMood.thinking:
-          // No dedicated `think` input on tutor_hiro.riv yet — keep the
-          // face neutral and not leaned-in. The status pill and mic
-          // spinner carry the visual cue until a thinking animation
-          // ships. Wire `sm.boolean('think')?.value = true` here when it
-          // does.
-          _emotionInput?.value = 0;
-          _attentionInput?.value = false;
-          _stopMouthCycle();
+      final stateVal = switch (mood) {
+        TutorMood.idle        => _kStateIdle,
+        TutorMood.thinking    => _kStateThinking,
+        TutorMood.speaking    => _kStateSpeaking,
+        TutorMood.listening   => _kStateAttention,
+        TutorMood.praising    => _kStateExcited,       // moment — rig auto-returns
+        TutorMood.disappointed => _kStateDisappointed, // moment — rig auto-returns
+        TutorMood.encouraging => _kStateIdle,           // no dedicated state
+      };
+      _stateInput?.value = stateVal;
+      // Reset amplitude whenever we leave Speaking so the mouth closes.
+      if (mood != TutorMood.speaking) {
+        _amplitudeInput?.value = 0.0;
       }
     } catch (e) {
       AppConfig.logx('rive-mood failed', '$mood: $e');
@@ -314,23 +231,10 @@ class _TutorAvatarState extends State<TutorAvatar>
     return Color(v);
   }
 
-  /// Single Rive asset used for every tutor, regardless of what the
-  /// backend `personas.rive_asset` column says. The DB still drives
-  /// gradient colours and the fallback letter; only the .riv binary is
-  /// pinned. Swap this constant (or revert to `widget.persona.riveAsset`)
-  /// once per-tutor Rive files are ready.
-  static const String _forcedRiveAsset = 'tutor_hiro.riv';
-
   @override
   Widget build(BuildContext context) {
     final from = _hex(widget.persona.gradientFrom);
     final to = _hex(widget.persona.gradientTo);
-    const asset = _forcedRiveAsset;
-
-    //AppConfig.logx('assets for', widget.persona.name);
-    //AppConfig.logx('assets path', '$asset (forced; DB value ignored)');
-
-
 
     return SizedBox(
       width: widget.size + 60,
@@ -392,12 +296,12 @@ class _TutorAvatarState extends State<TutorAvatar>
                   ),
                   child: ClipOval(
                     child: rive.RiveWidgetBuilder(
-                      key: ValueKey('rive-${widget.persona.id}-$asset'),
+                      key: const ValueKey('rive-mochi'),
                       fileLoader: _fileLoader,
                       onLoaded: _onRiveLoaded,
                       onFailed: (e, st) => AppConfig.logx(
                         'rive parse failed',
-                        '$asset: $e',
+                        'emo_linear.riv: $e',
                       ),
                       builder: (context, state) {
                         switch (state) {
@@ -407,13 +311,8 @@ class _TutorAvatarState extends State<TutorAvatar>
                               fit: rive.Fit.cover,
                             );
                           case rive.RiveLoading():
-                            // Briefly transparent — the parent gradient
-                            // circle stays visible — instead of flashing
-                            // CartoonFace before tutor_hiro.riv decodes.
                             return const SizedBox.expand();
                           case rive.RiveFailed():
-                            // Only show the cartoon fallback when the
-                            // .riv genuinely fails to load.
                             return CartoonFace(
                               key: ValueKey('face-${widget.persona.id}'),
                               persona: widget.persona,
@@ -429,16 +328,13 @@ class _TutorAvatarState extends State<TutorAvatar>
             },
           ),
 
-          // Floating emotion cluster around the avatar.
+          // Floating emotion cluster.
           ..._emoticonsFor(widget.mood, widget.size),
         ],
       ),
     );
   }
 
-  /// Tiny set of floating emoji that fade in/out depending on mood. Kept
-  /// deliberately small — three icons max — so the avatar doesn't turn into
-  /// a slot machine.
   List<Widget> _emoticonsFor(TutorMood mood, double size) {
     final items = switch (mood) {
       TutorMood.praising => const [

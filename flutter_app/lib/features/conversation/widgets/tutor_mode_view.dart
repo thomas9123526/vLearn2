@@ -44,9 +44,12 @@ class TutorModeView extends ConsumerStatefulWidget {
 
 class _TutorModeViewState extends ConsumerState<TutorModeView> {
   TutorMood _mood = TutorMood.idle;
+  double _amplitude = 0.0;
   String? _idleSuggestion;
   Timer? _idleTimer;
+  Timer? _disappointedTimer;
   StreamSubscription<bool>? _ttsSub;
+  StreamSubscription<double>? _ampSub;
   String? _lastSpokenId;
 
   @override
@@ -55,7 +58,14 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     final tts = ref.read(ttsServiceProvider);
     _ttsSub = tts.isSpeakingStream.listen((bool isSpeaking) {
       if (!mounted) return;
-      setState(() => _mood = isSpeaking ? TutorMood.speaking : TutorMood.idle);
+      setState(() {
+        _mood = isSpeaking ? TutorMood.speaking : TutorMood.idle;
+        if (!isSpeaking) _amplitude = 0.0;
+      });
+    });
+    _ampSub = tts.amplitudeStream.listen((double amp) {
+      if (!mounted) return;
+      setState(() => _amplitude = amp);
     });
     _resetIdleTimer();
   }
@@ -70,7 +80,9 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
   @override
   void dispose() {
     _idleTimer?.cancel();
+    _disappointedTimer?.cancel();
     _ttsSub?.cancel();
+    _ampSub?.cancel();
     super.dispose();
   }
 
@@ -83,18 +95,35 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
 
   void _resetIdleTimer() {
     _idleTimer?.cancel();
+    _disappointedTimer?.cancel();
     _idleSuggestion = null;
     if (widget.messages.isEmpty) return;
     if (widget.messages.last.role != 'assistant') return;
-    _idleTimer = Timer(const Duration(seconds: 20), _fetchIdleSuggestion);
+    // After 20 s of inactivity: show encouraging suggestion.
+    _idleTimer = Timer(const Duration(seconds: 20), _onIdleTimeout);
   }
 
-  Future<void> _fetchIdleSuggestion() async {
+  Future<void> _onIdleTimeout() async {
     if (!mounted) return;
     setState(() => _mood = TutorMood.encouraging);
     final s = await widget.onIdleSuggestion();
     if (!mounted) return;
     setState(() => _idleSuggestion = s);
+    // After 15 more seconds still no reply: flash disappointed then back to idle.
+    _disappointedTimer = Timer(const Duration(seconds: 15), _onDisappointedTimeout);
+  }
+
+  void _onDisappointedTimeout() {
+    if (!mounted) return;
+    setState(() {
+      _mood = TutorMood.disappointed;
+      _idleSuggestion = null;
+    });
+    // Mochi rig auto-returns to Idle visually after ~1.5 s;
+    // sync Flutter mood after the same delay.
+    Future<void>.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _mood = TutorMood.idle);
+    });
   }
 
   void _maybeSpeakLatestAssistantReply() {
@@ -106,11 +135,7 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
 
     if (!ref.read(speechReadyProvider)) return;
     final tts = ref.read(ttsServiceProvider);
-    final voiceId = widget.persona.voiceId ??
-        _pickVoiceForGender(
-          tts.capabilities.availableVoices,
-          widget.persona.gender,
-        );
+    final voiceId = _pickVoice(tts.capabilities.availableVoices, widget.persona);
     final preview = last.content.length > 80
         ? '${last.content.substring(0, 80)}…'
         : last.content;
@@ -121,14 +146,44 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     });
   }
 
-  /// Pick the best available voice for a given gender string ('female', 'male', 'neutral').
-  /// Falls back to the first voice if no gender-matching voice is found.
-  String _pickVoiceForGender(List<String> voices, String gender) {
+  /// Select the TTS voice for a persona, in priority order:
+  ///   1. Direct SID override (`ttsVoiceSid`) → voices[sid]
+  ///   2. Named voice id (`voiceId`) if it exists in the manifest
+  ///   3. Gender + age heuristic on voice name fragments
+  ///   4. First available voice
+  String _pickVoice(List<String> voices, Persona persona) {
     if (voices.isEmpty) return '';
-    // Common female/male name fragments used in piper/vits voice IDs.
+
+    // 1. Direct SID override.
+    if (persona.ttsVoiceSid != null) {
+      final idx = persona.ttsVoiceSid!.clamp(0, voices.length - 1);
+      return voices[idx];
+    }
+
+    // 2. Named voice id.
+    if (persona.voiceId != null && voices.contains(persona.voiceId)) {
+      return persona.voiceId!;
+    }
+
+    // 3. Gender + age heuristic.
     const femaleHints = ['amy', 'jenny', 'linda', 'sarah', 'lisa', 'emma', 'aria'];
     const maleHints   = ['alan', 'james', 'john', 'ryan', 'guy', 'davis', 'tony'];
-    final hints = gender == 'female' ? femaleHints : gender == 'male' ? maleHints : const <String>[];
+    const youngHints  = ['jenny', 'amy', 'aria', 'ryan'];
+    const elderHints  = ['davis', 'alan', 'linda'];
+
+    List<String> hints = [];
+    if (persona.gender == 'female') hints = femaleHints;
+    if (persona.gender == 'male')   hints = maleHints;
+
+    // Narrow by age if set.
+    if (persona.ttsAge == 'young' && hints.isNotEmpty) {
+      hints = hints.where((h) => youngHints.contains(h)).toList();
+      if (hints.isEmpty) hints = youngHints; // fallback to age-only hints
+    } else if (persona.ttsAge == 'elder' && hints.isNotEmpty) {
+      hints = hints.where((h) => elderHints.contains(h)).toList();
+      if (hints.isEmpty) hints = elderHints;
+    }
+
     if (hints.isNotEmpty) {
       final match = voices.firstWhere(
         (v) => hints.any((h) => v.toLowerCase().contains(h)),
@@ -136,6 +191,8 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
       );
       if (match.isNotEmpty) return match;
     }
+
+    // 4. First voice.
     return voices.first;
   }
 
@@ -267,6 +324,7 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
                   child: _AvatarStage(
                     persona: widget.persona,
                     mood: _mood,
+                    amplitude: _amplitude,
                   ),
                 ),
                 _SpeechStrip(
@@ -377,10 +435,15 @@ class _TutorTopBar extends StatelessWidget {
 
 /// Avatar fills whatever vertical space remains — no fixed height %.
 class _AvatarStage extends StatelessWidget {
-  const _AvatarStage({required this.persona, required this.mood});
+  const _AvatarStage({
+    required this.persona,
+    required this.mood,
+    required this.amplitude,
+  });
 
   final Persona persona;
   final TutorMood mood;
+  final double amplitude;
 
   @override
   Widget build(BuildContext context) {
@@ -419,6 +482,7 @@ class _AvatarStage extends StatelessWidget {
                     key: ValueKey(persona.id),
                     persona: persona,
                     mood: mood,
+                    amplitude: amplitude,
                     size: avatarSize,
                   );
                 },

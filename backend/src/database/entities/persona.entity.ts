@@ -65,4 +65,20 @@ export class PersonaEntity {
    */
   @Column({ type: 'varchar', length: 100, nullable: true })
   voice_id!: string | null;
+
+  /**
+   * Perceived age group of the tutor's voice. Used as a hint when
+   * `voice_id` is null so the Flutter app can pick a matching speaker SID
+   * from the VITS model. One of 'young' | 'adult' | 'elder' | null.
+   */
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  tts_age!: 'young' | 'adult' | 'elder' | null;
+
+  /**
+   * Direct speaker-index (SID) override for the on-device VITS model.
+   * Wins over `voice_id` + `tts_age` heuristics when set. Useful for
+   * admins who know the exact speaker index in their model bundle.
+   */
+  @Column({ type: 'smallint', nullable: true })
+  tts_voice_sid!: number | null;
 }
