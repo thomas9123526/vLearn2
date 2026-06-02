@@ -170,11 +170,9 @@ final ttsServiceProvider = Provider<TextToSpeechService>((ref) {
 /// ```
 final streamingSttServiceProvider = Provider<StreamingSttService?>((ref) {
   // TODO: load SpeechConfig from assets/speech_config.json and expose as a
-  // provider. For now, construct ThirdSttService directly when the engine
-  // enum is set to thirdStt at compile time.
-  //
-  // To activate: change the const below to SttEngine.thirdStt.
-  const engine = SttEngine.sherpaOnnxStreaming;
+  // provider. For now, the engine is selected at compile time.
+  // Set to SttEngine.sherpaOnnxStreaming (or sherpaOnnxWhisper) in production.
+  const engine = SttEngine.thirdStt; // fake engine for testing
   if (engine == SttEngine.thirdStt) {
     final svc = ThirdSttService();
     ref.onDispose(svc.dispose);
