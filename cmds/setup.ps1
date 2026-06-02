@@ -150,13 +150,8 @@ Write-Host '--- Writing .vscode\settings.json (Gradle user home for VS Code exte
 $vscodeDir      = "$ROOT\.vscode"
 $vscodeSettings = "$vscodeDir\settings.json"
 New-Item -ItemType Directory -Force -Path $vscodeDir | Out-Null
-$gradleEscaped = $gradleHome -replace '\\', '\\\\'
-@"
-{
-  "java.import.gradle.user.home": "$gradleEscaped",
-  "gradle.gradleUserHome": "$gradleEscaped"
-}
-"@ | Set-Content $vscodeSettings -Encoding UTF8
+@{ 'java.import.gradle.user.home' = $gradleHome; 'gradle.gradleUserHome' = $gradleHome } |
+    ConvertTo-Json | Set-Content $vscodeSettings -Encoding UTF8
 Write-Host "Written: $vscodeSettings"
 
 # ── 3. Generate flutter_app\android\local.properties ─────────────────────────
