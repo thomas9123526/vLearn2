@@ -8,10 +8,12 @@
 #    1. Auto-detects Android Studio, Java, SDK, Gradle, pub-cache paths
 #    2. Prompts to confirm or override each
 #    3. Saves to cmds\env-local.ps1  (gitignored, machine-specific)
-#    4. Generates flutter_app\android\local.properties  (sdk.dir)
-#    5. Runs `flutter config --android-studio-dir` so flutter doctor is happy
-#    6. Seeds the vendored Gradle wrapper zip into the Gradle dists cache
-#    7. Installs the offline Gradle init script
+#    4. Writes .vscode\settings.json  (gitignored) so VS Code Java/Gradle
+#       extensions use the same GRADLE_USER_HOME as env-local.ps1
+#    5. Generates flutter_app\android\local.properties  (sdk.dir)
+#    6. Runs `flutter config --android-studio-dir` so flutter doctor is happy
+#    7. Seeds the vendored Gradle wrapper zip into the Gradle dists cache
+#    8. Installs the offline Gradle init script
 #
 #  Re-run any time to reset paths.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -139,7 +141,22 @@ $env:GRADLE_USER_HOME    = $gradleHome
 $env:PUB_CACHE           = $pubCache
 Write-Host 'Written.'
 
-# ── 2. Generate flutter_app\android\local.properties ─────────────────────────
+# ── 2. Write .vscode\settings.json (gitignored, machine-specific) ────────────
+Write-Host ''
+Write-Host '--- Writing .vscode\settings.json (Gradle user home for VS Code extensions) ---'
+$vscodeDir      = "$ROOT\.vscode"
+$vscodeSettings = "$vscodeDir\settings.json"
+New-Item -ItemType Directory -Force -Path $vscodeDir | Out-Null
+$gradleEscaped = $gradleHome -replace '\\', '\\\\'
+@"
+{
+  "java.import.gradle.user.home": "$gradleEscaped",
+  "gradle.gradleUserHome": "$gradleEscaped"
+}
+"@ | Set-Content $vscodeSettings -Encoding UTF8
+Write-Host "Written: $vscodeSettings"
+
+# ── 3. Generate flutter_app\android\local.properties ─────────────────────────
 Write-Host ''
 Write-Host '--- Generating flutter_app\android\local.properties ---'
 $localProps = "$ROOT\flutter_app\android\local.properties"
@@ -147,7 +164,7 @@ $sdkEscaped = $sdkDir -replace '\\', '\\'
 "sdk.dir=$sdkEscaped" | Set-Content $localProps -Encoding UTF8
 Write-Host "Written: $localProps"
 
-# ── 3. Register Android Studio with Flutter ───────────────────────────────────
+# ── 4. Register Android Studio with Flutter ───────────────────────────────────
 Write-Host ''
 Write-Host '--- Registering Android Studio with Flutter ---'
 if (Get-Command flutter -ErrorAction SilentlyContinue) {
@@ -158,7 +175,7 @@ if (Get-Command flutter -ErrorAction SilentlyContinue) {
     Write-Warning 'Add Flutter to PATH, then run: flutter config --android-studio-dir="$studioDir"'
 }
 
-# ── 4. Seed Gradle wrapper dists cache ───────────────────────────────────────
+# ── 5. Seed Gradle wrapper dists cache ───────────────────────────────────────
 Write-Host ''
 Write-Host '--- Seeding Gradle wrapper dists cache ---'
 if (-not (Test-Path $VENDORED_ZIP)) {
@@ -176,7 +193,7 @@ if (-not (Test-Path $VENDORED_ZIP)) {
     }
 }
 
-# ── 5. Install offline Gradle init script ────────────────────────────────────
+# ── 6. Install offline Gradle init script ────────────────────────────────────
 Write-Host ''
 Write-Host '--- Installing offline Gradle init script ---'
 $initSrc  = "$ROOT\tools\gradle\init.d\offline.init.gradle"
