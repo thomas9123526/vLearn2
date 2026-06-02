@@ -97,8 +97,10 @@ try {
                               -TimeoutSec $TimeoutSec -Method Get
     $sw.Stop()
 
+    # Wrap in @() so a single-item response stays an array (PowerShell unwraps
+    # single-element collections to a bare object, breaking .Count / -contains).
     $ids = @()
-    if ($resp.data) { $ids = $resp.data | ForEach-Object { $_.id } }
+    if ($resp.data) { $ids = @($resp.data | ForEach-Object { $_.id }) }
 
     Write-Ok "Server responded in $($sw.ElapsedMilliseconds) ms"
     if ($ids.Count -gt 0) {
