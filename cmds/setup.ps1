@@ -2,14 +2,16 @@
 #  vLearn2 — First-time machine setup / path reset
 #
 #  Run once after `git pull` on a new machine, or any time you want to change
-#  where the Android SDK, Gradle cache, or pub cache lives.
+#  tool paths.
 #
 #  Steps performed:
-#    1. Prompts for Android SDK, Gradle cache, and pub-cache paths
-#    2. Saves answers to cmds\env-local.ps1  (gitignored, machine-specific)
-#    3. Generates flutter_app\android\local.properties  (sdk.dir)
-#    4. Seeds the vendored Gradle wrapper zip into the Gradle dists cache
-#    5. Installs the offline Gradle init script
+#    1. Auto-detects Android Studio, Java, SDK, Gradle, pub-cache paths
+#    2. Prompts to confirm or override each
+#    3. Saves to cmds\env-local.ps1  (gitignored, machine-specific)
+#    4. Generates flutter_app\android\local.properties  (sdk.dir)
+#    5. Runs `flutter config --android-studio-dir` so flutter doctor is happy
+#    6. Seeds the vendored Gradle wrapper zip into the Gradle dists cache
+#    7. Installs the offline Gradle init script
 #
 #  Re-run any time to reset paths.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -29,10 +31,19 @@ $VENDORED_ZIP     = "$ROOT\tools\gradle\$GRADLE_ZIP_NAME"
 function Ask-Path {
     param([string]$Label, [string]$Default)
     Write-Host "  $Label"
-    Write-Host "  Current : $Default" -ForegroundColor DarkGray
+    Write-Host "  Detected: $Default" -ForegroundColor DarkGray
     $ans = Read-Host "  New value (Enter to keep)"
     if ([string]::IsNullOrWhiteSpace($ans)) { return $Default }
     return $ans.Trim().TrimEnd('\')
+}
+
+# Try a list of candidate paths and return the first that exists.
+function Find-First {
+    param([string[]]$Candidates)
+    foreach ($c in $Candidates) {
+        if ($c -and (Test-Path $c)) { return $c }
+    }
+    return $null
 }
 
 # ── load existing env-local.ps1 so defaults reflect prior choices ─────────────
@@ -41,33 +52,68 @@ if (Test-Path $ENV_LOCAL) {
     . $ENV_LOCAL
 }
 
-# ── resolve defaults ──────────────────────────────────────────────────────────
-$defaultSdk = if ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } `
-              elseif ($env:ANDROID_HOME)  { $env:ANDROID_HOME }     `
-              else                        { 'C:\Android\Sdk' }
+# ── auto-detect Android Studio ────────────────────────────────────────────────
+$defaultStudio = Find-First @(
+    $env:ANDROID_STUDIO_HOME,
+    'C:\Program Files\Android\Android Studio',
+    'C:\Android\Android Studio',
+    'D:\Android Studio',
+    'E:\Android Studio',
+    'E:\vm_share\Android Studio',
+    'E:\vm_share\AndroidStudio'
+)
+if (-not $defaultStudio) { $defaultStudio = 'C:\Program Files\Android\Android Studio' }
 
+# ── auto-detect JAVA_HOME: prefer JDK bundled in Android Studio ───────────────
+$defaultJava = Find-First @(
+    $env:JAVA_HOME,
+    "$defaultStudio\jbr",   # Android Studio >= Flamingo
+    "$defaultStudio\jre",   # older Android Studio
+    'C:\Program Files\Java\jdk-17',
+    'C:\Program Files\Eclipse Adoptium\jdk-17*',
+    'C:\Program Files\Microsoft\jdk-17*'
+)
+if (-not $defaultJava) { $defaultJava = "$defaultStudio\jbr" }
+
+# ── auto-detect Android SDK ───────────────────────────────────────────────────
+$defaultSdk = Find-First @(
+    $env:ANDROID_SDK_ROOT,
+    $env:ANDROID_HOME,
+    'C:\Users\aaa\AppData\Local\Android\Sdk',
+    "$env:LOCALAPPDATA\Android\Sdk",
+    'E:\vm_share\Sdk',
+    'C:\Android\Sdk'
+)
+if (-not $defaultSdk) { $defaultSdk = "$env:LOCALAPPDATA\Android\Sdk" }
+
+# ── auto-detect Gradle cache ──────────────────────────────────────────────────
 $defaultGradle = if ($env:GRADLE_USER_HOME) { $env:GRADLE_USER_HOME } `
                  else                        { "$env:USERPROFILE\.gradle" }
 
+# ── auto-detect pub cache ─────────────────────────────────────────────────────
 $defaultPub = if ($env:PUB_CACHE) { $env:PUB_CACHE } `
               else                 { "$env:LOCALAPPDATA\Pub\Cache" }
 
 # ── interactive prompts ───────────────────────────────────────────────────────
 Write-Host ''
 Write-Host '=== vLearn2 machine setup ===' -ForegroundColor Cyan
-Write-Host 'Press Enter to keep the current value, or type a new absolute path.'
+Write-Host 'Press Enter to keep the detected value, or type a new absolute path.'
 Write-Host ''
 
-$sdkDir     = Ask-Path 'Android SDK dir  (ANDROID_SDK_ROOT)' $defaultSdk
-$gradleHome = Ask-Path 'Gradle cache dir (GRADLE_USER_HOME)' $defaultGradle
-$pubCache   = Ask-Path 'Pub cache dir    (PUB_CACHE)'        $defaultPub
+$studioDir  = Ask-Path 'Android Studio dir  (ANDROID_STUDIO_HOME)' $defaultStudio
+$javaHome   = Ask-Path 'Java / JDK dir      (JAVA_HOME)'           $defaultJava
+$sdkDir     = Ask-Path 'Android SDK dir     (ANDROID_SDK_ROOT)'    $defaultSdk
+$gradleHome = Ask-Path 'Gradle cache dir    (GRADLE_USER_HOME)'    $defaultGradle
+$pubCache   = Ask-Path 'Pub cache dir       (PUB_CACHE)'           $defaultPub
 
 # ── confirm ───────────────────────────────────────────────────────────────────
 Write-Host ''
 Write-Host 'Will configure:' -ForegroundColor Cyan
-Write-Host "  ANDROID_SDK_ROOT = $sdkDir"
-Write-Host "  GRADLE_USER_HOME = $gradleHome"
-Write-Host "  PUB_CACHE        = $pubCache"
+Write-Host "  ANDROID_STUDIO_HOME = $studioDir"
+Write-Host "  JAVA_HOME           = $javaHome"
+Write-Host "  ANDROID_SDK_ROOT    = $sdkDir"
+Write-Host "  GRADLE_USER_HOME    = $gradleHome"
+Write-Host "  PUB_CACHE           = $pubCache"
 Write-Host ''
 $ok = Read-Host 'Proceed? [Y/n]'
 if ($ok -match '^[Nn]') { Write-Host 'Aborted.'; exit 0 }
@@ -77,16 +123,20 @@ Write-Host ''
 Write-Host '--- Writing cmds\env-local.ps1 ---'
 @"
 # Machine-specific paths — generated by cmds\setup.ps1.  DO NOT commit.
-`$env:ANDROID_SDK_ROOT = '$sdkDir'
-`$env:ANDROID_HOME     = '$sdkDir'
-`$env:GRADLE_USER_HOME = '$gradleHome'
-`$env:PUB_CACHE        = '$pubCache'
+`$env:ANDROID_STUDIO_HOME = '$studioDir'
+`$env:JAVA_HOME           = '$javaHome'
+`$env:ANDROID_SDK_ROOT    = '$sdkDir'
+`$env:ANDROID_HOME        = '$sdkDir'
+`$env:GRADLE_USER_HOME    = '$gradleHome'
+`$env:PUB_CACHE           = '$pubCache'
 "@ | Set-Content $ENV_LOCAL -Encoding UTF8
 # Apply immediately in this session
-$env:ANDROID_SDK_ROOT = $sdkDir
-$env:ANDROID_HOME     = $sdkDir
-$env:GRADLE_USER_HOME = $gradleHome
-$env:PUB_CACHE        = $pubCache
+$env:ANDROID_STUDIO_HOME = $studioDir
+$env:JAVA_HOME           = $javaHome
+$env:ANDROID_SDK_ROOT    = $sdkDir
+$env:ANDROID_HOME        = $sdkDir
+$env:GRADLE_USER_HOME    = $gradleHome
+$env:PUB_CACHE           = $pubCache
 Write-Host 'Written.'
 
 # ── 2. Generate flutter_app\android\local.properties ─────────────────────────
@@ -97,7 +147,18 @@ $sdkEscaped = $sdkDir -replace '\\', '\\'
 "sdk.dir=$sdkEscaped" | Set-Content $localProps -Encoding UTF8
 Write-Host "Written: $localProps"
 
-# ── 3. Seed Gradle wrapper dists cache ───────────────────────────────────────
+# ── 3. Register Android Studio with Flutter ───────────────────────────────────
+Write-Host ''
+Write-Host '--- Registering Android Studio with Flutter ---'
+if (Get-Command flutter -ErrorAction SilentlyContinue) {
+    flutter config --android-studio-dir="$studioDir" 2>&1 | Write-Host
+    Write-Host 'Done.'
+} else {
+    Write-Warning 'flutter not found in PATH — skipping flutter config.'
+    Write-Warning 'Add Flutter to PATH, then run: flutter config --android-studio-dir="$studioDir"'
+}
+
+# ── 4. Seed Gradle wrapper dists cache ───────────────────────────────────────
 Write-Host ''
 Write-Host '--- Seeding Gradle wrapper dists cache ---'
 if (-not (Test-Path $VENDORED_ZIP)) {
@@ -115,7 +176,7 @@ if (-not (Test-Path $VENDORED_ZIP)) {
     }
 }
 
-# ── 4. Install offline Gradle init script ────────────────────────────────────
+# ── 5. Install offline Gradle init script ────────────────────────────────────
 Write-Host ''
 Write-Host '--- Installing offline Gradle init script ---'
 $initSrc  = "$ROOT\tools\gradle\init.d\offline.init.gradle"
@@ -134,8 +195,9 @@ Write-Host '=== Setup complete ===' -ForegroundColor Green
 Write-Host ''
 Write-Host '  Paths are active in this shell session.'
 Write-Host '  To reload them in a NEW shell, run:'
-Write-Host "      . cmds\env-local.ps1" -ForegroundColor Yellow
+Write-Host '      . cmds\env-local.ps1' -ForegroundColor Yellow
 Write-Host ''
-Write-Host '  Build offline:  flutter build apk --debug'
-Write-Host '  Go online:      cmds\vlearn2-online.ps1 on'
-Write-Host '  Go offline:     cmds\vlearn2-online.ps1 off'
+Write-Host '  Run flutter doctor:  flutter doctor'
+Write-Host '  Build offline:       flutter build apk --debug'
+Write-Host '  Go online:           cmds\vlearn2-online.ps1 on'
+Write-Host '  Go offline:          cmds\vlearn2-online.ps1 off'
