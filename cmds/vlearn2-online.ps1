@@ -48,11 +48,11 @@ param(
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
-# Resolve where gradlew.bat will put its caches.
-# Priority: GRADLE_USER_HOME env var → default D:\android\.gradle
+# Resolve where Gradle puts its caches.
+# Priority: GRADLE_USER_HOME env var → %USERPROFILE%\.gradle (Gradle's own default)
 function Get-GradleUserHome {
     $guh = $env:GRADLE_USER_HOME
-    if ([string]::IsNullOrEmpty($guh)) { $guh = 'D:\android\.gradle' }
+    if ([string]::IsNullOrEmpty($guh)) { $guh = "$env:USERPROFILE\.gradle" }
     return $guh
 }
 

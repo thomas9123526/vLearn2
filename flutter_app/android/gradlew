@@ -60,8 +60,10 @@ cd "`dirname \"$PRG\"`/" >/dev/null
 APP_HOME="`pwd -P`"
 cd "$SAVED" >/dev/null
 
-# Keep Gradle caches on D: drive instead of the default vm_share path.
-export GRADLE_USER_HOME="D:/android/.gradle"
+# Honour GRADLE_USER_HOME if already set; otherwise let Gradle use its default (~/.gradle).
+if [ -z "$GRADLE_USER_HOME" ]; then
+    export GRADLE_USER_HOME="$HOME/.gradle"
+fi
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 

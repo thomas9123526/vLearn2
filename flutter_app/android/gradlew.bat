@@ -16,10 +16,6 @@ if "%DIRNAME%" == "" set DIRNAME=.
 set APP_BASE_NAME=%~n0
 set APP_HOME=%DIRNAME%
 
-@rem Keep Gradle caches off the network share for build speed.
-@rem Honour GRADLE_USER_HOME if already set in the environment so the path
-@rem stays portable when the project is moved to another machine.
-if "%GRADLE_USER_HOME%" == "" set GRADLE_USER_HOME=D:\android\.gradle
 
 @rem Find java.exe
 if defined JAVA_HOME goto findJavaFromJavaHome

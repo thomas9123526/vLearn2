@@ -54,12 +54,8 @@ build/
 **/ios/Runner/GeneratedPluginRegistrant.*
 **/android/.gradle
 **/android/captures/
-**/android/gradlew
-**/android/gradlew.bat
-**/android/local.properties
 **/android/**/GeneratedPluginRegistrant.java
 **/android/**/gradle-wrapper.jar
-**/android/key.properties
 **/windows/flutter/generated_plugin_registrant.*
 **/windows/flutter/generated_plugins.cmake
 **/linux/flutter/generated_plugin_registrant.*
