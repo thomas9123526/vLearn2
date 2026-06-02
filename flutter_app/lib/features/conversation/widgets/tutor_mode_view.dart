@@ -56,6 +56,9 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
   void initState() {
     super.initState();
     final tts = ref.read(ttsServiceProvider);
+    // Snapshot current state — broadcast stream only emits on changes, so a
+    // widget mounted mid-TTS would never receive the "started" event.
+    if (tts.isSpeaking) _mood = TutorMood.speaking;
     _ttsSub = tts.isSpeakingStream.listen((bool isSpeaking) {
       if (!mounted) return;
       setState(() {

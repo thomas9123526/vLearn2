@@ -335,7 +335,9 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
   @override
   void initState() {
     super.initState();
-    _ttsSub = ref.read(ttsServiceProvider).isSpeakingStream.listen((speaking) {
+    final tts = ref.read(ttsServiceProvider);
+    _ttsSpeaking = tts.isSpeaking;
+    _ttsSub = tts.isSpeakingStream.listen((speaking) {
       if (mounted) setState(() => _ttsSpeaking = speaking);
     });
   }

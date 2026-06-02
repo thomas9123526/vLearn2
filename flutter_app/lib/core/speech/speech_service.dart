@@ -68,6 +68,11 @@ abstract class TextToSpeechService {
   /// animations. Placeholder implementations return an empty stream.
   Stream<bool> get isSpeakingStream;
 
+  /// Synchronous snapshot of the current speaking state. Use this to
+  /// initialise UI that mounts mid-speech, since [isSpeakingStream] only
+  /// emits on changes and a late subscriber would miss the current state.
+  bool get isSpeaking;
+
   /// Emits a 0.0–1.0 loudness envelope value at ~60 fps during speech
   /// playback, derived from the RMS of the synthesized PCM. Drives the
   /// `amplitude` input on the emo_linear.riv Mochi state machine so the
@@ -130,6 +135,9 @@ class PlaceholderTtsService extends TextToSpeechService {
 
   @override
   Stream<bool> get isSpeakingStream => const Stream.empty();
+
+  @override
+  bool get isSpeaking => false;
 
   @override
   Stream<double> get amplitudeStream => const Stream.empty();
