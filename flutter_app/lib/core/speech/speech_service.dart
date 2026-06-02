@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../storage/model_registry.dart';
 import 'sherpa_onnx_stt.dart';
 import 'sherpa_onnx_tts.dart';
+import 'speech_config.dart';
+import 'streaming_stt_service.dart';
+import 'third_stt_service.dart';
 
 class SttResult {
   const SttResult({
@@ -147,6 +150,37 @@ final ttsServiceProvider = Provider<TextToSpeechService>((ref) {
     return SherpaOnnxTtsService(registry: ref.read(modelRegistryProvider));
   }
   return PlaceholderTtsService();
+});
+
+/// Provides a [StreamingSttService] for the third-party AAR engine.
+///
+/// Returns null when [SpeechConfig.sttEngine] is not [SttEngine.thirdStt].
+/// The caller must call [StreamingSttService.configure] before [start].
+/// Call [StreamingSttService.dispose] in ref.onDispose.
+///
+/// Example:
+/// ```dart
+/// final svc = ref.watch(streamingSttServiceProvider);
+/// if (svc != null) {
+///   ref.onDispose(svc.dispose);
+///   await svc.configure({'modelPath': '/data/.../model', 'sampleRate': 16000});
+///   await svc.start();
+///   svc.events.listen((e) { … });
+/// }
+/// ```
+final streamingSttServiceProvider = Provider<StreamingSttService?>((ref) {
+  // TODO: load SpeechConfig from assets/speech_config.json and expose as a
+  // provider. For now, construct ThirdSttService directly when the engine
+  // enum is set to thirdStt at compile time.
+  //
+  // To activate: change the const below to SttEngine.thirdStt.
+  const engine = SttEngine.sherpaOnnxStreaming;
+  if (engine == SttEngine.thirdStt) {
+    final svc = ThirdSttService();
+    ref.onDispose(svc.dispose);
+    return svc;
+  }
+  return null;
 });
 
 /// `true` when the on-disk model bundle passed manifest + SHA-256 checks.
