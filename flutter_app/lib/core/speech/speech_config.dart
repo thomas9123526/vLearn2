@@ -63,7 +63,12 @@ enum SttEngine {
 
   /// Batch Whisper via sherpa-onnx. Highest accuracy, ~0.5 s lag after speech.
   sherpaOnnxWhisper,
-  // Future: whisperCpp, moonshine, parakeet
+
+  /// AAR-wrapped third-party native engine (.so via JNI).
+  /// The library owns its own audio loop; Flutter communicates via
+  /// MethodChannel('vlearn/thirdstt') + EventChannel('vlearn/thirdstt/events').
+  /// Configure via the "thirdStt" block in speech_config.json.
+  thirdStt,
 }
 
 enum QuantizationMode {
@@ -108,6 +113,8 @@ class SpeechConfig {
     switch (s) {
       case 'sherpaOnnxWhisper':
         return SttEngine.sherpaOnnxWhisper;
+      case 'thirdStt':
+        return SttEngine.thirdStt;
       default:
         return SttEngine.sherpaOnnxStreaming;
     }
@@ -127,6 +134,8 @@ class SpeechConfig {
         return 'sherpa-onnx streaming (Zipformer)';
       case SttEngine.sherpaOnnxWhisper:
         return 'sherpa-onnx Whisper (batch)';
+      case SttEngine.thirdStt:
+        return 'Third-party native engine (AAR)';
     }
   }
 
