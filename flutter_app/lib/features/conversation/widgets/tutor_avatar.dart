@@ -119,7 +119,7 @@ class _TutorAvatarState extends State<TutorAvatar>
   /// Shared file loader — decoded once per app session, reused on every
   /// mount so re-entering the conversation screen never flashes a blank.
   static final rive.FileLoader _fileLoader = rive.FileLoader.fromAsset(
-    'assets/animations/emo_linear.riv',
+    'assets/animations/emoticon_linear/emo_linear.riv',
     riveFactory: rive.Factory.rive,
   );
 

@@ -155,6 +155,7 @@ flutter:
     - assets/wordlists/
     - assets/images/
     - assets/animations/
+    - assets/animations/emoticon_linear/
     - assets/seed/scenarios.json
     - assets/seed/categories.json
     - assets/icons/
