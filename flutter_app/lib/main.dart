@@ -23,6 +23,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 import 'package:rive/rive.dart' as rive;
 import 'core/cache/cache_seeder.dart';
+import 'l10n/generated/app_localizations.dart';
 import 'core/cache/cache_store.dart';
 import 'core/config/app_config.dart';
 import 'core/license/license_state_provider.dart';
@@ -187,8 +188,11 @@ class VLearn2App extends ConsumerWidget {
       supportedLocales: const [
         Locale('en'),
         Locale('zh'),
+        Locale('ru'),
+        Locale('ko'),
       ],
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
