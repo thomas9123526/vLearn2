@@ -31,22 +31,28 @@ export class OpenAICompatibleProvider extends AiProvider {
 
   constructor(config: ConfigService) {
     super();
-    const baseURL = config.get<string>('OPENAI_BASE_URL');
-    if (!baseURL) {
+    const rawUrl = config.get<string>('OPENAI_BASE_URL');
+    if (!rawUrl) {
       this.logger.warn(
         'OPENAI_BASE_URL not set — OpenAICompatibleProvider will throw on use.',
       );
     }
+    // Normalize: ensure baseURL ends with /v1 so the OpenAI SDK appends paths
+    // like /chat/completions correctly whether the user wrote the URL with or
+    // without the /v1 suffix.
+    const baseURL = this.normalizeBaseUrl(rawUrl ?? 'http://localhost:11434/v1');
+
     this.timeoutMs = parseInt(config.get<string>('AI_TIMEOUT_MS') ?? '60000', 10);
     // Set AI_DISABLE_THINKING=true for Qwen3/DeepSeek reasoning models to stop
     // them spending all tokens inside <think>…</think> with no actual reply.
     this.disableThinking = config.get<string>('AI_DISABLE_THINKING') === 'true';
 
     this.client = new OpenAI({
-      baseURL: baseURL ?? 'http://localhost:11434/v1',
+      baseURL,
       apiKey: config.get<string>('OPENAI_API_KEY') ?? 'not-needed',
       timeout: this.timeoutMs,
     });
+    this.logger.log(`AI base URL: ${baseURL}`);
     this.name = config.get<string>('AI_PROVIDER_LABEL') ?? 'openai-compatible';
     this.chatModel = config.get<string>('AI_CHAT_MODEL') ?? 'llama3.1:70b';
     this.analysisModel =
@@ -169,6 +175,21 @@ export class OpenAICompatibleProvider extends AiProvider {
       .map((l) => l.trim())
       .filter(Boolean);
     return lines.length > 0 ? lines[lines.length - 1] : stripped;
+  }
+
+  /** Append /v1 when the URL has no path beyond the host:port. */
+  private normalizeBaseUrl(url: string): string {
+    const trimmed = url.replace(/\/+$/, ''); // strip trailing slashes
+    try {
+      const parsed = new URL(trimmed);
+      // pathname is '/' when only host[:port] was given, or a bare path with no version
+      if (parsed.pathname === '/' || parsed.pathname === '') {
+        return `${trimmed}/v1`;
+      }
+    } catch {
+      // not a valid URL — return as-is and let the OpenAI client fail loudly
+    }
+    return trimmed;
   }
 
   private translateError(e: unknown): AiProviderError {
