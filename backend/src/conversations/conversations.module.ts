@@ -108,6 +108,15 @@ class ConversationsController {
   suggest(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.svc.suggestNextLine(user.sub, id);
   }
+
+  @Get('sessions/:id/score')
+  @ApiOperation({
+    summary:
+      'Get the AI evaluation score for a completed session. Returns 404 while evaluation is still running — poll until 200.',
+  })
+  score(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.svc.getSessionScore(user.sub, id);
+  }
 }
 
 @Module({

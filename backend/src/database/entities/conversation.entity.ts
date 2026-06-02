@@ -137,6 +137,12 @@ export class SessionScoreEntity {
   @Column({ type: 'jsonb', nullable: true })
   evaluator_versions!: Record<string, string> | null;
 
+  @Column({ type: 'varchar', length: 3, nullable: true })
+  cefr_estimate!: string | null;
+
+  @Column({ type: 'smallint', nullable: true })
+  topic_adherence_score!: number | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   computed_at!: Date;
 }
