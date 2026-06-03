@@ -26,7 +26,9 @@ if (-not (Test-Path $src)) {
 }
 
 # Locate the rive_native package in the pub cache.
-$pubCacheBase = Join-Path $env:LOCALAPPDATA "Pub\Cache\hosted\pub.dev"
+# Honour $env:PUB_CACHE if set (e.g. VMware has it pointing to C:\pub-Cache).
+$pubCacheRoot = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { Join-Path $env:LOCALAPPDATA "Pub\Cache" }
+$pubCacheBase = Join-Path $pubCacheRoot "hosted\pub.dev"
 $riveDirs = Get-ChildItem $pubCacheBase -Directory -Filter "rive_native-*" -ErrorAction SilentlyContinue
 if (-not $riveDirs) {
     Write-Host "[rive] ERROR: rive_native not found in pub cache at $pubCacheBase"
