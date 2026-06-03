@@ -41,6 +41,7 @@ const emptyToNull = ({ value }: { value: unknown }) =>
 import * as fs from 'fs';
 import * as path from 'path';
 import { PersonaEntity } from '../database/entities/persona.entity';
+import { AppConfigEntity } from '../database/entities/app-config.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
@@ -177,19 +178,18 @@ export class AdminPersonasController {
   constructor(
     @InjectRepository(PersonaEntity)
     private readonly personas: Repository<PersonaEntity>,
+    @InjectRepository(AppConfigEntity)
+    private readonly appConfig: Repository<AppConfigEntity>,
     private readonly audit: AdminAuditLogService,
     private readonly dataSource: DataSource,
   ) {}
 
   @Get('tts/voices')
   @RequirePermission('personas.edit')
-  @ApiOperation({ summary: 'List available TTS voice IDs from TTS_VOICE_IDS env var' })
-  getTtsVoices(): { voices: string[] } {
-    const raw = process.env.TTS_VOICE_IDS ?? '';
-    const voices = raw
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
+  @ApiOperation({ summary: 'List available TTS voice IDs from app config (tts.voice_ids)' })
+  async getTtsVoices(): Promise<{ voices: string[] }> {
+    const row = await this.appConfig.findOne({ where: { key: 'tts.voice_ids' } });
+    const voices = Array.isArray(row?.value) ? (row.value as string[]) : [];
     return { voices };
   }
 

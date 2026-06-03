@@ -13,6 +13,7 @@ import { CategoryEntity } from '../database/entities/category.entity';
 import { ConversationSessionEntity } from '../database/entities/conversation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
+import { AppConfigEntity } from '../database/entities/app-config.entity';
 import { PromptTemplateEntity } from '../database/entities/prompt-template.entity';
 import { UserReportEntity } from '../database/entities/user-report.entity';
 import { AdminPermissionsService } from './permissions/admin-permissions.service';
@@ -45,6 +46,7 @@ import { AuthModule } from '../auth/auth.module';
       ConversationSessionEntity,
       ScenarioEntity,
       PersonaEntity,
+      AppConfigEntity,
       PromptTemplateEntity,
       UserReportEntity,
       // Needed by admin users password-reset to revoke active user sessions

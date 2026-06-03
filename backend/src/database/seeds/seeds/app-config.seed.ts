@@ -480,6 +480,16 @@ const CATALOG: ConfigSeed[] = [
     description: 'Server compresses responses larger than the threshold',
     is_visible_to_app: true,
   },
+  {
+    key: 'tts.voice_ids',
+    value: ['en_VCTK-amy', 'en_VCTK-james'],
+    value_type: 'array',
+    category: 'system',
+    description:
+      'Available TTS voice IDs shown in the admin tutor edit dropdown. ' +
+      'Must match the voices list in manifest.json (same names, same order = same speaker SIDs).',
+    is_visible_to_app: false,
+  },
 ];
 
 export async function seedAppConfig(ds: DataSource): Promise<void> {
