@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -176,6 +176,12 @@ export default function ConfigPage() {
   );
 }
 
+const MODE_LABELS: Record<string, string> = {
+  tutor: 'Tutor',
+  message: 'Message',
+  both: 'Both',
+};
+
 function FlagRow({
   descriptor,
   entry,
@@ -187,21 +193,30 @@ function FlagRow({
   canEdit: boolean;
   onChange: (next: unknown) => void;
 }) {
-  // If the catalog references a key the backend doesn't know about yet,
-  // we render a placeholder row that prompts a seed run.
   const missing = !entry;
-  const isBool = entry?.value_type === 'boolean';
+  const isSelect = descriptor.type === 'select';
+  const isText = descriptor.type === 'text';
+  const isTextarea = descriptor.type === 'textarea';
+  const isBool = !isSelect && !isText && !isTextarea && entry?.value_type === 'boolean';
+
+  const isTextLike = isText || isTextarea;
+  // Local draft for text/textarea fields — saves on blur.
+  const [draft, setDraft] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  const displayValue = draft ?? (isTextLike ? String(entry?.value ?? '') : '');
+
+  const textClasses =
+    'w-full rounded-md border border-border bg-background px-2 py-1 text-sm ' +
+    'focus:outline-none focus:ring-1 focus:ring-primary ' +
+    (!canEdit ? 'cursor-not-allowed opacity-50' : '');
+
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className={`gap-3 px-4 py-3 ${isTextLike ? 'space-y-2' : 'flex items-center'}`}>
       <div className="flex-1">
         <div className="text-sm font-medium">{descriptor.label}</div>
-        <div className="font-mono text-xs text-muted-foreground">
-          {descriptor.key}
-        </div>
+        <div className="font-mono text-xs text-muted-foreground">{descriptor.key}</div>
         {entry?.description && (
-          <div className="text-xs text-muted-foreground">
-            {entry.description}
-          </div>
+          <div className="text-xs text-muted-foreground">{entry.description}</div>
         )}
         {missing && (
           <div className="text-xs text-amber-700">
@@ -209,9 +224,61 @@ function FlagRow({
           </div>
         )}
       </div>
-      <div className="w-28 text-right">
+
+      {/* Value control */}
+      <div className={isTextLike ? '' : 'text-right'}>
         {missing ? (
           <span className="text-xs text-muted-foreground">—</span>
+        ) : isSelect ? (
+          <div className="flex gap-1">
+            {(descriptor.options ?? []).map((opt) => (
+              <button
+                key={opt}
+                disabled={!canEdit}
+                onClick={() => onChange(opt)}
+                className={
+                  'rounded-full border px-3 py-1 text-xs transition ' +
+                  (entry!.value === opt
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border hover:bg-muted') +
+                  (!canEdit ? ' cursor-not-allowed opacity-50' : ' cursor-pointer')
+                }
+              >
+                {MODE_LABELS[opt] ?? opt}
+              </button>
+            ))}
+          </div>
+        ) : isTextarea ? (
+          <textarea
+            ref={inputRef as React.Ref<HTMLTextAreaElement>}
+            rows={4}
+            disabled={!canEdit}
+            value={displayValue}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => {
+              if (draft !== null && draft !== String(entry!.value)) {
+                onChange(draft);
+              }
+              setDraft(null);
+            }}
+            className={textClasses + ' resize-y'}
+          />
+        ) : isText ? (
+          <input
+            ref={inputRef as React.Ref<HTMLInputElement>}
+            type="text"
+            disabled={!canEdit}
+            value={displayValue}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => {
+              if (draft !== null && draft !== String(entry!.value)) {
+                onChange(draft);
+              }
+              setDraft(null);
+            }}
+            onKeyDown={(e) => { if (e.key === 'Enter') inputRef.current?.blur(); }}
+            className={textClasses}
+          />
         ) : isBool ? (
           <input
             type="checkbox"

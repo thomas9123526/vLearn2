@@ -1,0 +1,13 @@
+In the admin  panel, I want put configuration in http://localhost:4101/vAdmin/config/ page.
+
+So three options 
+Tutor Mode,
+Message Mode,
+Both Mode.
+
+The admin should choose one at least. the default is Both Mode.
+If the admin check message mode then the application should only show message mode conversation screen. There's no toggle button.
+If the admin check Tutor mode then the application should only show Tutor mode character screen. There's no toggle button.
+If the admin check Both mode, the application should show both along with the toggle button.
+
+------pushed

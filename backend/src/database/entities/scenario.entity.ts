@@ -98,7 +98,19 @@ export class ScenarioEntity {
   image_storage_key!: string | null;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
+  background_image_url!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  background_image_storage_key!: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
   image_alt_text!: string | null;
+
+  /** Scenario-specific system prompt override. When set, this is sent to the
+   *  AI provider instead of the globally assembled cch_prompt template.
+   *  Supports {{placeholder}} substitution. Null = use global template. */
+  @Column({ type: 'text', nullable: true })
+  custom_prompt!: string | null;
 
   @Column({ type: 'uuid', nullable: true })
   author_id!: string | null;

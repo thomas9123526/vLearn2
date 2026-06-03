@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/errors/polite_error.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/cached_providers.dart';
@@ -22,6 +23,7 @@ class HomeScreen extends ConsumerWidget {
     final progress = ref.watch(progressSummaryProvider);
     final locale = ref.watch(localeProvider).languageCode;
     final scheme = Theme.of(context).colorScheme;
+    final isLoading = scenarios.refreshing || progress.refreshing;
 
     return Scaffold(
       appBar: AppBar(
@@ -33,6 +35,20 @@ class HomeScreen extends ConsumerWidget {
           ),
           SizedBox(width: 4),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(3),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: isLoading
+                ? LinearProgressIndicator(
+                    key: const ValueKey('loading'),
+                    minHeight: 3,
+                    backgroundColor: Colors.transparent,
+                    color: scheme.primary,
+                  )
+                : const SizedBox.shrink(key: ValueKey('idle')),
+          ),
+        ),
       ),
       body: SafeArea(
         child: RefreshIndicator(
@@ -72,13 +88,9 @@ class HomeScreen extends ConsumerWidget {
                 child: Row(
                   children: [
                     Text(
-                      'Recommended scenarios',
+                      AppLocalizations.of(context).homeRecommended,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                     ),
-                    if (scenarios.refreshing && scenarios.hasValue) ...[
-                      const SizedBox(width: 10),
-                      const RefreshingDot(size: 13),
-                    ],
                   ],
                 ),
               ),
@@ -123,8 +135,9 @@ class _Greeting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final hour = DateTime.now().hour;
-    final greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    final greet = hour < 12 ? l10n.homeGreetingMorning : hour < 18 ? l10n.homeGreetingAfternoon : l10n.homeGreetingEvening;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -164,9 +177,11 @@ class _StreakAndXp extends StatelessWidget {
               const Text('🔥', style: TextStyle(fontSize: 24)),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  '${user.streakDays} day streak',
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                child: Builder(
+                  builder: (ctx) => Text(
+                    AppLocalizations.of(ctx).homeStreakDays(user.streakDays),
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
               Text(
@@ -233,11 +248,11 @@ class _QuickStats extends StatelessWidget {
         const SizedBox(height: 4),
         Row(
           children: [
-            _Stat(value: '$sessions', label: 'Sessions', icon: Icons.chat_bubble_outline),
+            _Stat(value: '$sessions', label: AppLocalizations.of(context).homeStatSessions, icon: Icons.chat_bubble_outline),
             const SizedBox(width: 8),
-            _Stat(value: '$minutes', label: 'Minutes', icon: Icons.timer_outlined),
+            _Stat(value: '$minutes', label: AppLocalizations.of(context).homeStatMinutes, icon: Icons.timer_outlined),
             const SizedBox(width: 8),
-            _Stat(value: '$scenarios', label: 'Topics', icon: Icons.map_outlined),
+            _Stat(value: '$scenarios', label: AppLocalizations.of(context).homeStatTopics, icon: Icons.map_outlined),
           ],
         ),
       ],

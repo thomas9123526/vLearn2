@@ -1,0 +1,11 @@
+I want calculate network transport bytes per user.
+On Users tab on the admin panel, http://localhost:4101/vAdmin/users/, I want put 'reset password' and 'block' action in one button likst 'Actions' per user. when admin click 'Actions' then drop downlist shows for 'reset password' and 'block'.
+I want put one more action for view details.
+If click view details, I want show full information and plus 4 fields.
+
+Byte Uploaded(Android): the bytes transported from the android app.
+Byte Uploaded(Windows): the bytes transported from the windows application.
+Byte Download(Android): the bytes transported from the backend api to the android application.
+Byte Download(Windows): the bytes transported from the backend api to the windows application.
+
+------pushed

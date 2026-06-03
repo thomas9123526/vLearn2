@@ -22,7 +22,7 @@ class TutorModeView extends ConsumerStatefulWidget {
     required this.turnCount,
     required this.onSendText,
     required this.onIdleSuggestion,
-    required this.onSwitchToChat,
+    this.onSwitchToChat,
     required this.onEnd,
     required this.ending,
     super.key,
@@ -34,7 +34,7 @@ class TutorModeView extends ConsumerStatefulWidget {
   final int turnCount;
   final Future<void> Function(String text) onSendText;
   final Future<String?> Function() onIdleSuggestion;
-  final VoidCallback onSwitchToChat;
+  final VoidCallback? onSwitchToChat;
   final VoidCallback onEnd;
   final bool ending;
 
@@ -44,18 +44,31 @@ class TutorModeView extends ConsumerStatefulWidget {
 
 class _TutorModeViewState extends ConsumerState<TutorModeView> {
   TutorMood _mood = TutorMood.idle;
+  double _amplitude = 0.0;
   String? _idleSuggestion;
   Timer? _idleTimer;
+  Timer? _disappointedTimer;
   StreamSubscription<bool>? _ttsSub;
+  StreamSubscription<double>? _ampSub;
   String? _lastSpokenId;
 
   @override
   void initState() {
     super.initState();
     final tts = ref.read(ttsServiceProvider);
+    // Snapshot current state — broadcast stream only emits on changes, so a
+    // widget mounted mid-TTS would never receive the "started" event.
+    if (tts.isSpeaking) _mood = TutorMood.speaking;
     _ttsSub = tts.isSpeakingStream.listen((bool isSpeaking) {
       if (!mounted) return;
-      setState(() => _mood = isSpeaking ? TutorMood.speaking : TutorMood.idle);
+      setState(() {
+        _mood = isSpeaking ? TutorMood.speaking : TutorMood.idle;
+        if (!isSpeaking) _amplitude = 0.0;
+      });
+    });
+    _ampSub = tts.amplitudeStream.listen((double amp) {
+      if (!mounted) return;
+      setState(() => _amplitude = amp);
     });
     _resetIdleTimer();
   }
@@ -70,7 +83,9 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
   @override
   void dispose() {
     _idleTimer?.cancel();
+    _disappointedTimer?.cancel();
     _ttsSub?.cancel();
+    _ampSub?.cancel();
     super.dispose();
   }
 
@@ -83,18 +98,35 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
 
   void _resetIdleTimer() {
     _idleTimer?.cancel();
+    _disappointedTimer?.cancel();
     _idleSuggestion = null;
     if (widget.messages.isEmpty) return;
     if (widget.messages.last.role != 'assistant') return;
-    _idleTimer = Timer(const Duration(seconds: 20), _fetchIdleSuggestion);
+    // After 20 s of inactivity: show encouraging suggestion.
+    _idleTimer = Timer(const Duration(seconds: 20), _onIdleTimeout);
   }
 
-  Future<void> _fetchIdleSuggestion() async {
+  Future<void> _onIdleTimeout() async {
     if (!mounted) return;
     setState(() => _mood = TutorMood.encouraging);
     final s = await widget.onIdleSuggestion();
     if (!mounted) return;
     setState(() => _idleSuggestion = s);
+    // After 15 more seconds still no reply: flash disappointed then back to idle.
+    _disappointedTimer = Timer(const Duration(seconds: 15), _onDisappointedTimeout);
+  }
+
+  void _onDisappointedTimeout() {
+    if (!mounted) return;
+    setState(() {
+      _mood = TutorMood.disappointed;
+      _idleSuggestion = null;
+    });
+    // Mochi rig auto-returns to Idle visually after ~1.5 s;
+    // sync Flutter mood after the same delay.
+    Future<void>.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _mood = TutorMood.idle);
+    });
   }
 
   void _maybeSpeakLatestAssistantReply() {
@@ -106,10 +138,7 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
 
     if (!ref.read(speechReadyProvider)) return;
     final tts = ref.read(ttsServiceProvider);
-    final voiceId = widget.persona.voiceId ??
-        (tts.capabilities.availableVoices.isNotEmpty
-            ? tts.capabilities.availableVoices.first
-            : '');
+    final voiceId = _pickVoice(tts.capabilities.availableVoices, widget.persona);
     final preview = last.content.length > 80
         ? '${last.content.substring(0, 80)}…'
         : last.content;
@@ -118,6 +147,56 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
       debugPrint('[tts] failed: $e');
       logRawError('tutor_mode.tts', e, st);
     });
+  }
+
+  /// Select the TTS voice for a persona, in priority order:
+  ///   1. Direct SID override (`ttsVoiceSid`) → voices[sid]
+  ///   2. Named voice id (`voiceId`) if it exists in the manifest
+  ///   3. Gender + age heuristic on voice name fragments
+  ///   4. First available voice
+  String _pickVoice(List<String> voices, Persona persona) {
+    if (voices.isEmpty) return '';
+
+    // 1. Direct SID override.
+    if (persona.ttsVoiceSid != null) {
+      final idx = persona.ttsVoiceSid!.clamp(0, voices.length - 1);
+      return voices[idx];
+    }
+
+    // 2. Named voice id.
+    if (persona.voiceId != null && voices.contains(persona.voiceId)) {
+      return persona.voiceId!;
+    }
+
+    // 3. Gender + age heuristic.
+    const femaleHints = ['amy', 'jenny', 'linda', 'sarah', 'lisa', 'emma', 'aria'];
+    const maleHints   = ['alan', 'james', 'john', 'ryan', 'guy', 'davis', 'tony'];
+    const youngHints  = ['jenny', 'amy', 'aria', 'ryan'];
+    const elderHints  = ['davis', 'alan', 'linda'];
+
+    List<String> hints = [];
+    if (persona.gender == 'female') hints = femaleHints;
+    if (persona.gender == 'male')   hints = maleHints;
+
+    // Narrow by age if set.
+    if (persona.ttsAge == 'young' && hints.isNotEmpty) {
+      hints = hints.where((h) => youngHints.contains(h)).toList();
+      if (hints.isEmpty) hints = youngHints; // fallback to age-only hints
+    } else if (persona.ttsAge == 'elder' && hints.isNotEmpty) {
+      hints = hints.where((h) => elderHints.contains(h)).toList();
+      if (hints.isEmpty) hints = elderHints;
+    }
+
+    if (hints.isNotEmpty) {
+      final match = voices.firstWhere(
+        (v) => hints.any((h) => v.toLowerCase().contains(h)),
+        orElse: () => '',
+      );
+      if (match.isNotEmpty) return match;
+    }
+
+    // 4. First voice.
+    return voices.first;
   }
 
   bool get _tutorSpeaking =>
@@ -248,6 +327,7 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
                   child: _AvatarStage(
                     persona: widget.persona,
                     mood: _mood,
+                    amplitude: _amplitude,
                   ),
                 ),
                 _SpeechStrip(
@@ -292,14 +372,14 @@ class _TutorTopBar extends StatelessWidget {
     required this.turnCount,
     required this.ending,
     required this.onBack,
-    required this.onSwitchToChat,
+    this.onSwitchToChat,
     required this.onEnd,
   });
 
   final int turnCount;
   final bool ending;
   final VoidCallback onBack;
-  final VoidCallback onSwitchToChat;
+  final VoidCallback? onSwitchToChat;
   final VoidCallback onEnd;
 
   @override
@@ -326,11 +406,12 @@ class _TutorTopBar extends StatelessWidget {
                       ),
                 ),
               ),
-              IconButton(
-                tooltip: 'Chat mode (typing)',
-                icon: const Icon(Icons.chat_bubble_outline),
-                onPressed: onSwitchToChat,
-              ),
+              if (onSwitchToChat != null)
+                IconButton(
+                  tooltip: 'Chat mode (typing)',
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  onPressed: onSwitchToChat,
+                ),
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: TextButton(
@@ -357,68 +438,72 @@ class _TutorTopBar extends StatelessWidget {
 
 /// Avatar fills whatever vertical space remains — no fixed height %.
 class _AvatarStage extends StatelessWidget {
-  const _AvatarStage({required this.persona, required this.mood});
+  const _AvatarStage({
+    required this.persona,
+    required this.mood,
+    required this.amplitude,
+  });
 
   final Persona persona;
   final TutorMood mood;
+  final double amplitude;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Reserve room for the name + status pill + spacing below the avatar
-        // so the Column never overflows its slot on shorter screens.
-        const reservedBelow = 12.0 + 30.0 + 8.0 + 36.0;
-        final availableHeight =
-            (constraints.maxHeight - reservedBelow).clamp(0.0, double.infinity);
-        final side = math.min(constraints.maxWidth, availableHeight);
-        final avatarSize = (side * 0.72).clamp(96.0, 280.0);
+    final statusLabel = switch (mood) {
+      TutorMood.listening => 'Listening…',
+      TutorMood.speaking => 'Speaking…',
+      TutorMood.thinking => 'Thinking…',
+      TutorMood.encouraging => 'Your turn',
+      _ => 'Tap the mic below to speak',
+    };
 
-        final statusLabel = switch (mood) {
-          TutorMood.listening => 'Listening…',
-          TutorMood.speaking => 'Speaking…',
-          TutorMood.thinking => 'Thinking…',
-          TutorMood.encouraging => 'Your turn',
-          _ => 'Tap the mic below to speak',
-        };
-
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                scheme.primary.withValues(alpha: 0.06),
-                scheme.surface,
-              ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            scheme.primary.withValues(alpha: 0.06),
+            scheme.surface,
+          ],
+        ),
+      ),
+      // Fill the full Expanded slot. Avatar gets the flexible top portion;
+      // name + pill sit below at their natural height and can never overflow.
+      child: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final side = math.min(constraints.maxWidth, constraints.maxHeight);
+                  final avatarSize = (side * 0.85).clamp(96.0, 280.0);
+                  return TutorAvatar(
+                    key: ValueKey(persona.id),
+                    persona: persona,
+                    mood: mood,
+                    amplitude: amplitude,
+                    size: avatarSize,
+                  );
+                },
+              ),
             ),
           ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TutorAvatar(
-                  key: ValueKey(persona.id),
-                  persona: persona,
-                  mood: mood,
-                  size: avatarSize,
+          const SizedBox(height: 12),
+          Text(
+            persona.name,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  persona.name,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                _StatusPill(label: statusLabel, mood: mood),
-              ],
-            ),
           ),
-        );
-      },
+          const SizedBox(height: 8),
+          _StatusPill(label: statusLabel, mood: mood),
+          const SizedBox(height: 12),
+        ],
+      ),
     );
   }
 }

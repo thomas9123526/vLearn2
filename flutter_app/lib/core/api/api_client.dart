@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -100,9 +102,14 @@ final apiClientProvider = Provider<Dio>((ref) {
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: Duration(seconds: config.requestTimeout),
-      headers: const {
+      headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'X-Platform': Platform.isAndroid
+            ? 'android'
+            : Platform.isWindows
+                ? 'windows'
+                : Platform.operatingSystem,
       },
     ),
   );

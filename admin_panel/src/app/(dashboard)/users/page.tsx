@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ban, KeyRound, RotateCcw, Search } from 'lucide-react';
+import { Ban, ChevronDown, Eye, KeyRound, RotateCcw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
@@ -21,8 +22,6 @@ interface UserRow {
   xp_total: number;
   current_level: number;
   streak_days: number;
-  // Last platform the user activated a license from. Null until they
-  // pass through /license/verify on a build that reports it.
   license_platform:
     | 'android'
     | 'windows'
@@ -34,6 +33,22 @@ interface UserRow {
     | null;
   license_valid_until: string | null;
   created_at: string;
+}
+
+interface UserDetail extends UserRow {
+  avatar_url: string | null;
+  avatar_emoji: string;
+  native_language: string;
+  ui_language: string;
+  active_theme: string;
+  onboarding_done: boolean;
+  last_active_date: string | null;
+  network_stats: {
+    android_bytes_uploaded: number;
+    android_bytes_downloaded: number;
+    windows_bytes_uploaded: number;
+    windows_bytes_downloaded: number;
+  };
 }
 
 interface UserListResp {
@@ -50,6 +65,7 @@ export default function UsersPage() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<string>('');
   const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<UserListResp>({
     queryKey: ['admin-users', q, status],
@@ -61,9 +77,6 @@ export default function UsersPage() {
     },
   });
 
-  // Whether the License feature is turned on system-wide. When off
-  // we drop the Platform / License columns from the table — the
-  // admin doesn't care about license state when there is no licensing.
   const { data: licenseEnabled } = useQuery<boolean>({
     queryKey: ['admin-config-license-enabled'],
     queryFn: async () => {
@@ -115,7 +128,6 @@ export default function UsersPage() {
         <table className="w-full text-sm">
           <thead className="border-b border-border bg-muted/50">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">Email</th>
               <th className="px-4 py-2 text-left font-medium">Name</th>
               <th className="px-4 py-2 text-left font-medium">Status</th>
               {showLicense && (
@@ -124,7 +136,6 @@ export default function UsersPage() {
                   <th className="px-4 py-2 text-left font-medium">License</th>
                 </>
               )}
-              <th className="px-4 py-2 text-right font-medium">XP</th>
               <th className="px-4 py-2 text-right font-medium">Streak</th>
               <th className="px-4 py-2"></th>
             </tr>
@@ -132,7 +143,6 @@ export default function UsersPage() {
           <tbody>
             {(data?.items ?? []).map((u) => (
               <tr key={u.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-2">{u.email}</td>
                 <td className="px-4 py-2">{u.display_name}</td>
                 <td className="px-4 py-2">
                   <StatusPill status={u.status} />
@@ -150,43 +160,23 @@ export default function UsersPage() {
                     </td>
                   </>
                 )}
-                <td className="px-4 py-2 text-right tabular-nums">{u.xp_total}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{u.streak_days}</td>
                 <td className="px-4 py-2 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {canResetPassword && u.status !== 'deleted' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setResetTarget(u)}
-                      >
-                        <KeyRound className="h-4 w-4" /> Reset Password
-                      </Button>
-                    )}
-                    {canSuspend && u.status === 'active' && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => {
-                          const reason = prompt('Reason for suspension?') ?? '';
-                          if (reason !== null) suspend.mutate({ id: u.id, reason });
-                        }}
-                      >
-                        <Ban className="h-4 w-4" /> Block
-                      </Button>
-                    )}
-                    {canSuspend && u.status === 'suspended' && (
-                      <Button size="sm" variant="outline" onClick={() => restore.mutate(u.id)}>
-                        <RotateCcw className="h-4 w-4" /> Restore
-                      </Button>
-                    )}
-                  </div>
+                  <ActionsMenu
+                    user={u}
+                    canSuspend={canSuspend}
+                    canResetPassword={canResetPassword}
+                    onViewDetails={() => setDetailUserId(u.id)}
+                    onResetPassword={() => setResetTarget(u)}
+                    suspend={suspend}
+                    restore={restore}
+                  />
                 </td>
               </tr>
             ))}
             {(data?.items ?? []).length === 0 && !isLoading && (
               <tr>
-                <td colSpan={showLicense ? 8 : 6} className="px-4 py-6 text-center text-muted-foreground">
+                <td colSpan={showLicense ? 6 : 4} className="px-4 py-6 text-center text-muted-foreground">
                   No users.
                 </td>
               </tr>
@@ -195,20 +185,243 @@ export default function UsersPage() {
         </table>
       </Card>
 
-      <ResetPasswordDialog
-        target={resetTarget}
-        onClose={() => setResetTarget(null)}
-      />
+      <ResetPasswordDialog target={resetTarget} onClose={() => setResetTarget(null)} />
+      <UserDetailsModal userId={detailUserId} onClose={() => setDetailUserId(null)} />
     </div>
   );
 }
 
-// Default placed in both password inputs when the reset dialog opens.
-// The admin is expected to overwrite this with something they will
-// actually tell the user; keeping the same string for both fields means
-// they can hit Reset immediately to issue a known-good password without
-// retyping. Length is fine (10 > 6 min); make sure it ALSO satisfies the
-// SignUpDto regex if you ever pivot to letting users reuse it.
+// ─── Actions dropdown ────────────────────────────────────────────────────────
+
+function ActionsMenu({
+  user,
+  canSuspend,
+  canResetPassword,
+  onViewDetails,
+  onResetPassword,
+  suspend,
+  restore,
+}: {
+  user: UserRow;
+  canSuspend: boolean;
+  canResetPassword: boolean;
+  onViewDetails: () => void;
+  onResetPassword: () => void;
+  suspend: { mutate: (args: { id: string; reason: string }) => void };
+  restore: { mutate: (id: string) => void };
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        btnRef.current && !btnRef.current.contains(e.target as Node)
+      ) setOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  function handleToggle() {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.right - 176 }); // 176px = w-44
+    }
+    setOpen((v) => !v);
+  }
+
+  return (
+    <div className="relative inline-block">
+      <Button ref={btnRef} size="sm" variant="outline" onClick={handleToggle}>
+        Actions <ChevronDown className="ml-1 h-3 w-3" />
+      </Button>
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="w-44 rounded-md border border-border bg-background shadow-md"
+        >
+          <MenuItem icon={<Eye className="h-4 w-4" />} onClick={() => { setOpen(false); onViewDetails(); }}>
+            View details
+          </MenuItem>
+          {canResetPassword && user.status !== 'deleted' && (
+            <MenuItem icon={<KeyRound className="h-4 w-4" />} onClick={() => { setOpen(false); onResetPassword(); }}>
+              Reset password
+            </MenuItem>
+          )}
+          {canSuspend && user.status === 'active' && (
+            <MenuItem
+              icon={<Ban className="h-4 w-4" />}
+              danger
+              onClick={() => {
+                setOpen(false);
+                const reason = prompt('Reason for suspension?') ?? '';
+                if (reason !== null) suspend.mutate({ id: user.id, reason });
+              }}
+            >
+              Block
+            </MenuItem>
+          )}
+          {canSuspend && user.status === 'suspended' && (
+            <MenuItem icon={<RotateCcw className="h-4 w-4" />} onClick={() => { setOpen(false); restore.mutate(user.id); }}>
+              Restore
+            </MenuItem>
+          )}
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+function MenuItem({
+  icon,
+  children,
+  danger,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted ${danger ? 'text-destructive' : ''}`}
+      onClick={onClick}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
+// ─── User details modal ──────────────────────────────────────────────────────
+
+function UserDetailsModal({ userId, onClose }: { userId: string | null; onClose: () => void }) {
+  const { data, isLoading } = useQuery<UserDetail>({
+    queryKey: ['admin-user-detail', userId],
+    queryFn: () => api<UserDetail>(`/admin/users/${userId}`),
+    enabled: !!userId,
+  });
+
+  return (
+    <Dialog
+      open={!!userId}
+      onClose={onClose}
+      title="User details"
+      size="lg"
+      footer={<Button onClick={onClose}>Close</Button>}
+    >
+      {isLoading || !data ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <div className="space-y-5 text-sm">
+          {/* ── Avatar ── */}
+          <div className="flex items-center gap-3">
+            {data.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={data.avatar_url}
+                alt={data.display_name}
+                className="h-16 w-16 rounded-full object-cover border border-border"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-3xl border border-border">
+                {data.avatar_emoji}
+              </div>
+            )}
+            <div>
+              <p className="font-medium">{data.display_name}</p>
+              <p className="text-xs text-muted-foreground">{data.email}</p>
+            </div>
+          </div>
+
+          {/* ── Identity ── */}
+          <Section title="Identity">
+            <Row label="ID"         value={data.id} mono />
+            <Row label="Email"      value={data.email} />
+            <Row label="Name"       value={data.display_name} />
+            <Row label="Status"     value={<StatusPill status={data.status} />} />
+            {data.suspended_reason && (
+              <Row label="Suspend reason" value={data.suspended_reason} />
+            )}
+            {data.suspended_until && (
+              <Row label="Suspended until" value={new Date(data.suspended_until).toLocaleString()} />
+            )}
+            <Row label="Joined" value={new Date(data.created_at).toLocaleString()} />
+            {data.last_active_date && (
+              <Row label="Last active" value={new Date(data.last_active_date).toLocaleDateString()} />
+            )}
+          </Section>
+
+          {/* ── Progress ── */}
+          <Section title="Progress">
+            <Row label="Level"      value={String(data.current_level)} />
+            <Row label="XP total"   value={data.xp_total.toLocaleString()} />
+            <Row label="Streak"     value={`${data.streak_days} days`} />
+            <Row label="Onboarding" value={data.onboarding_done ? 'Complete' : 'Pending'} />
+          </Section>
+
+          {/* ── Preferences ── */}
+          <Section title="Preferences">
+            <Row label="Native language" value={data.native_language} />
+            <Row label="UI language"     value={data.ui_language} />
+            <Row label="Theme"           value={data.active_theme} />
+          </Section>
+
+          {/* ── License ── */}
+          <Section title="License">
+            <Row label="Platform"     value={<PlatformPill platform={data.license_platform} />} />
+            <Row label="Valid until"  value={data.license_valid_until ? new Date(data.license_valid_until).toLocaleDateString() : '—'} />
+          </Section>
+
+          {/* ── Network traffic ── */}
+          <Section title="Network traffic">
+            <Row label="Bytes uploaded (Android)"   value={fmtBytes(data.network_stats.android_bytes_uploaded)} />
+            <Row label="Bytes downloaded (Android)" value={fmtBytes(data.network_stats.android_bytes_downloaded)} />
+            <Row label="Bytes uploaded (Windows)"   value={fmtBytes(data.network_stats.windows_bytes_uploaded)} />
+            <Row label="Bytes downloaded (Windows)" value={fmtBytes(data.network_stats.windows_bytes_downloaded)} />
+          </Section>
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      <div className="rounded-md border border-border divide-y divide-border">{children}</div>
+    </div>
+  );
+}
+
+function Row({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex items-start gap-4 px-3 py-2">
+      <span className="w-40 shrink-0 text-muted-foreground">{label}</span>
+      <span className={mono ? 'font-mono text-xs break-all' : ''}>{value}</span>
+    </div>
+  );
+}
+
+function fmtBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  if (bytes < 1_024) return `${bytes} B`;
+  if (bytes < 1_048_576) return `${(bytes / 1_024).toFixed(1)} KB`;
+  if (bytes < 1_073_741_824) return `${(bytes / 1_048_576).toFixed(2)} MB`;
+  return `${(bytes / 1_073_741_824).toFixed(2)} GB`;
+}
+
+// ─── Reset password dialog ───────────────────────────────────────────────────
+
 const DEFAULT_RESET_PASSWORD = '1234567890';
 
 function ResetPasswordDialog({
@@ -230,14 +443,10 @@ function ResetPasswordDialog({
         body: { newPassword },
       }),
     onSuccess: () => setDone(true),
-    onError: (e: Error) =>
-      setError(e.message || 'Reset failed. Please try again.'),
+    onError: (e: Error) => setError(e.message || 'Reset failed. Please try again.'),
   });
 
-  // Reset form state whenever a different user is selected (or dialog closes).
   const targetId = target?.id ?? null;
-  // useEffect would import another hook; doing it inline via key on Dialog
-  // is cleaner — see `key={targetId ?? 'closed'}` below.
 
   if (!target) return null;
 
@@ -261,42 +470,19 @@ function ResetPasswordDialog({
       size="sm"
       footer={
         done ? (
-          <Button
-            onClick={() => {
-              setPassword(DEFAULT_RESET_PASSWORD);
-              setConfirm(DEFAULT_RESET_PASSWORD);
-              setError(null);
-              setDone(false);
-              onClose();
-            }}
-          >
+          <Button onClick={() => { setPassword(DEFAULT_RESET_PASSWORD); setConfirm(DEFAULT_RESET_PASSWORD); setError(null); setDone(false); onClose(); }}>
             Close
           </Button>
         ) : (
           <>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setPassword(DEFAULT_RESET_PASSWORD);
-                setConfirm(DEFAULT_RESET_PASSWORD);
-                setError(null);
-                onClose();
-              }}
-              disabled={submit.isPending}
-            >
+            <Button variant="outline" onClick={() => { setPassword(DEFAULT_RESET_PASSWORD); setConfirm(DEFAULT_RESET_PASSWORD); setError(null); onClose(); }} disabled={submit.isPending}>
               Cancel
             </Button>
             <Button
               onClick={() => {
                 setError(null);
-                if (password.length < 6) {
-                  setError('Password must be at least 6 characters.');
-                  return;
-                }
-                if (password !== confirm) {
-                  setError('Passwords do not match.');
-                  return;
-                }
+                if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+                if (password !== confirm) { setError('Passwords do not match.'); return; }
                 submit.mutate({ id: target.id, newPassword: password });
               }}
               disabled={submit.isPending}
@@ -309,37 +495,21 @@ function ResetPasswordDialog({
     >
       {done ? (
         <p className="text-sm">
-          Tell the user their new password through a channel they trust
-          (phone, in-person, secure messenger). It is <strong>not</strong>{' '}
-          shown again here.
+          Tell the user their new password through a channel they trust (phone, in-person, secure messenger).
+          It is <strong>not</strong> shown again here.
         </p>
       ) : (
         <div className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="reset-pw">New password</Label>
-            <Input
-              id="reset-pw"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min 6 characters"
-              autoComplete="new-password"
-            />
+            <Input id="reset-pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min 6 characters" autoComplete="new-password" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="reset-pw2">Confirm</Label>
-            <Input
-              id="reset-pw2"
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              autoComplete="new-password"
-            />
+            <Input id="reset-pw2" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
           </div>
           {error && (
-            <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </p>
+            <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
           )}
         </div>
       )}
@@ -347,72 +517,31 @@ function ResetPasswordDialog({
   );
 }
 
+// ─── Pill components ─────────────────────────────────────────────────────────
+
 function StatusPill({ status }: { status: UserRow['status'] }) {
   const classes =
-    status === 'active'
-      ? 'bg-green-100 text-green-800'
-      : status === 'suspended'
-        ? 'bg-red-100 text-red-800'
-        : 'bg-zinc-100 text-zinc-700';
-  return (
-    <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${classes}`}>
-      {status}
-    </span>
-  );
+    status === 'active' ? 'bg-green-100 text-green-800' :
+    status === 'suspended' ? 'bg-red-100 text-red-800' :
+    'bg-zinc-100 text-zinc-700';
+  return <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${classes}`}>{status}</span>;
 }
 
 function LicensePill({ validUntil }: { validUntil: string | null }) {
-  if (!validUntil) {
-    return <span className="text-xs text-muted-foreground">Not activated</span>;
-  }
-  const expiry = new Date(validUntil);
-  const now = new Date();
-  const daysMs = 86_400_000;
-  const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / daysMs);
-
-  if (daysLeft < 0) {
-    return (
-      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">
-        Expired
-      </span>
-    );
-  }
-  // 36500 days ~ 100 years. KeyGenerator emits exactly that for
-  // "permanent" mode, so the threshold of 10000 days is a safe
-  // "treat as forever" cutoff.
-  if (daysLeft > 10_000) {
-    return (
-      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-800">
-        Permanent
-      </span>
-    );
-  }
-  const tone =
-    daysLeft <= 7
-      ? 'bg-amber-100 text-amber-800'
-      : 'bg-green-100 text-green-800';
-  return (
-    <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${tone}`}>
-      Active · {daysLeft}d
-    </span>
-  );
+  if (!validUntil) return <span className="text-xs text-muted-foreground">Not activated</span>;
+  const daysLeft = Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86_400_000);
+  if (daysLeft < 0) return <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">Expired</span>;
+  if (daysLeft > 10_000) return <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-800">Permanent</span>;
+  const tone = daysLeft <= 7 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800';
+  return <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${tone}`}>Active · {daysLeft}d</span>;
 }
 
 function PlatformPill({ platform }: { platform: UserRow['license_platform'] }) {
-  if (!platform) {
-    return <span className="text-xs text-muted-foreground">—</span>;
-  }
+  if (!platform) return <span className="text-xs text-muted-foreground">—</span>;
   const classes =
-    platform === 'android'
-      ? 'bg-emerald-100 text-emerald-800'
-      : platform === 'windows'
-        ? 'bg-sky-100 text-sky-800'
-        : platform === 'ios' || platform === 'macos'
-          ? 'bg-zinc-100 text-zinc-800'
-          : 'bg-amber-100 text-amber-800';
-  return (
-    <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium capitalize ${classes}`}>
-      {platform}
-    </span>
-  );
+    platform === 'android' ? 'bg-emerald-100 text-emerald-800' :
+    platform === 'windows' ? 'bg-sky-100 text-sky-800' :
+    platform === 'ios' || platform === 'macos' ? 'bg-zinc-100 text-zinc-800' :
+    'bg-amber-100 text-amber-800';
+  return <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium capitalize ${classes}`}>{platform}</span>;
 }

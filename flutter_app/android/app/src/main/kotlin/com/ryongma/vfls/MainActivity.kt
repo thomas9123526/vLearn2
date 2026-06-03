@@ -8,6 +8,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.Result
+import com.ryongma.vfls.thirdstt.ThirdSttPlugin
 
 class MainActivity : FlutterActivity() {
 
@@ -18,6 +19,9 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // ── Third-party STT plugin ───────────────────────────────────────────
+        ThirdSttPlugin.register(flutterEngine.dartExecutor.binaryMessenger, applicationContext)
 
         // ── Machine ID channel ───────────────────────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.vlearn2/machine_id")
@@ -60,6 +64,29 @@ class MainActivity : FlutterActivity() {
                             intent.putExtra(QRScanActivity.EXTRA_QR_PNG, dir)
                             @Suppress("DEPRECATION")
                             startActivityForResult(intent, QR_PNG_REQUEST_CODE)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // ── App install check channel ────────────────────────────────────────
+        // "isInstalled" → returns true if the given packageName is installed.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.vlearn2/app_check")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isInstalled" -> {
+                        val packageName = call.argument<String>("packageName")
+                        if (packageName.isNullOrBlank()) {
+                            result.error("BAD_ARG", "packageName is required", null)
+                        } else {
+                            try {
+                                @Suppress("DEPRECATION")
+                                packageManager.getPackageInfo(packageName, 0)
+                                result.success(true)
+                            } catch (e: Exception) {
+                                result.success(false)
+                            }
                         }
                     }
                     else -> result.notImplemented()

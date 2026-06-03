@@ -12,7 +12,7 @@ const PERSONAS = [
     gradient_to: '#FF6B47',
     rive_asset: 'persona_maya.riv',
     gender: 'female' as const,
-    voice_id: 'en_US-amy',
+    voice_id: 'en_VCTK-amy',
   },
   {
     slug: 'leo',
@@ -24,7 +24,7 @@ const PERSONAS = [
     gradient_to: '#5DBE9C',
     rive_asset: 'persona_leo.riv',
     gender: 'male' as const,
-    voice_id: 'en_GB-alan',
+    voice_id: 'en_VCTK-james',
   },
   {
     slug: 'sofia',
@@ -36,7 +36,7 @@ const PERSONAS = [
     gradient_to: '#7C6BE6',
     rive_asset: 'persona_sofia.riv',
     gender: 'female' as const,
-    voice_id: 'en_GB-jenny',
+    voice_id: 'en_VCTK-amy',
   },
   {
     slug: 'theo',
@@ -48,7 +48,7 @@ const PERSONAS = [
     gradient_to: '#4F4C7E',
     rive_asset: 'persona_theo.riv',
     gender: 'male' as const,
-    voice_id: 'en_AU-james',
+    voice_id: 'en_VCTK-james',
   },
 ];
 

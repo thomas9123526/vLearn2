@@ -62,11 +62,29 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM ── 2. Install the offline init script into %GRADLE_USER_HOME%\init.d\ ──
+REM ── 2. Seed the wrapper dists cache so gradlew never tries to download ──
 :install_init
-set "INIT_SRC=%ROOT%\tools\gradle\init.d\offline.init.gradle"
 set "GRADLE_HOME=%GRADLE_USER_HOME%"
 if "%GRADLE_HOME%"=="" set "GRADLE_HOME=%USERPROFILE%\.gradle"
+
+set "DISTS_DIR=%GRADLE_HOME%\wrapper\dists\gradle-%GRADLE_VERSION%-%GRADLE_VARIANT%\6umpftuah39kegplpls29ixk"
+if not exist "%DISTS_DIR%\gradle-%GRADLE_VERSION%-%GRADLE_VARIANT%.zip" (
+    echo.
+    echo --- Seeding Gradle wrapper dists cache ---
+    echo Dest: %DISTS_DIR%
+    if not exist "%DISTS_DIR%" mkdir "%DISTS_DIR%"
+    copy /Y "%ZIP%" "%DISTS_DIR%\gradle-%GRADLE_VERSION%-%GRADLE_VARIANT%.zip" >nul
+    if errorlevel 1 (
+        echo [ERROR] Failed to copy zip to wrapper dists cache.
+        exit /b 1
+    )
+    echo Seeded.
+) else (
+    echo Wrapper dists cache already seeded — skipping.
+)
+
+REM ── 3. Install the offline init script into %GRADLE_HOME%\init.d\ ──
+set "INIT_SRC=%ROOT%\tools\gradle\init.d\offline.init.gradle"
 set "INIT_DEST=%GRADLE_HOME%\init.d\offline.init.gradle"
 
 if not exist "%INIT_SRC%" (
@@ -87,6 +105,32 @@ if errorlevel 1 (
 )
 echo Installed. Every Gradle invocation now defaults to --offline.
 echo To opt out for one shell: set VLEARN2_ONLINE=1
+
+REM ── 4. Generate flutter_app\android\local.properties from env vars ─────────
+:gen_local_props
+set "LOCAL_PROPS=%ROOT%\flutter_app\android\local.properties"
+
+REM Resolve Android SDK dir: ANDROID_SDK_ROOT → ANDROID_HOME → skip
+set "SDK_DIR=%ANDROID_SDK_ROOT%"
+if "%SDK_DIR%"=="" set "SDK_DIR=%ANDROID_HOME%"
+if "%SDK_DIR%"=="" (
+    echo.
+    echo [WARN] ANDROID_SDK_ROOT and ANDROID_HOME are not set.
+    echo        local.properties will not be (re)generated — set one of these vars and re-run.
+    goto :done
+)
+
+echo.
+echo --- Generating local.properties ---
+echo SDK source: %SDK_DIR%
+echo Dest:       %LOCAL_PROPS%
+
+REM Escape backslashes for the Java properties format (\ → \\)
+set "SDK_ESC=%SDK_DIR:\=\\%"
+(
+    echo sdk.dir=%SDK_ESC%
+) > "%LOCAL_PROPS%"
+echo Generated.
 
 :done
 echo.

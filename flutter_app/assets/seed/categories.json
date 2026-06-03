@@ -1,0 +1,54 @@
+﻿[
+  {
+    "id": "f7aed11c-87b2-4272-91f7-a2a132c49d6d",
+    "slug": "travel",
+    "title": {
+      "en": "Travel",
+      "ko": "여행",
+      "zh": "旅行"
+    },
+    "description": null,
+    "order_index": 10,
+    "is_active": true,
+    "created_at": "2026-05-20T13:13:59.729Z"
+  },
+  {
+    "id": "27308c70-545d-40c3-b52d-c52f3ba7ac83",
+    "slug": "business",
+    "title": {
+      "en": "Business",
+      "ko": "비즈니스",
+      "zh": "商务"
+    },
+    "description": null,
+    "order_index": 20,
+    "is_active": true,
+    "created_at": "2026-05-20T13:13:59.729Z"
+  },
+  {
+    "id": "f48ed28e-150f-4f10-842a-d4211ec02fc2",
+    "slug": "social",
+    "title": {
+      "en": "Social",
+      "ko": "소셜",
+      "zh": "社交"
+    },
+    "description": null,
+    "order_index": 30,
+    "is_active": true,
+    "created_at": "2026-05-20T13:13:59.729Z"
+  },
+  {
+    "id": "fecfed6c-5025-4945-816d-40b5672aad12",
+    "slug": "daily",
+    "title": {
+      "en": "Daily",
+      "ko": "일상",
+      "zh": "日常"
+    },
+    "description": null,
+    "order_index": 40,
+    "is_active": true,
+    "created_at": "2026-05-20T13:13:59.729Z"
+  }
+]

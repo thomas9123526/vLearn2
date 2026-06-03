@@ -23,9 +23,47 @@ final _historyProvider =
 class ConversationHistoryScreen extends ConsumerWidget {
   const ConversationHistoryScreen({super.key});
 
+  Future<void> _confirmClearAll(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear all history?'),
+        content: const Text(
+          'Every conversation, transcript, and score will be permanently removed. '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Clear all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(conversationsApiProvider).deleteAllSessions();
+      ref.invalidate(_historyProvider);
+    } on Exception catch (e, st) {
+      if (context.mounted) {
+        showPoliteErrorSnack(context, e,
+            tag: 'history.clear_all', stack: st);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(_historyProvider);
+    final hasSessions = history.valueOrNull?.isNotEmpty == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -33,6 +71,14 @@ class ConversationHistoryScreen extends ConsumerWidget {
         // (sidebar item on desktop, bottom-nav tab on mobile).
         automaticallyImplyLeading: false,
         title: const Text('Conversation history'),
+        actions: [
+          if (hasSessions)
+            IconButton(
+              tooltip: 'Clear all history',
+              icon: const Icon(Icons.delete_sweep_outlined),
+              onPressed: () => _confirmClearAll(context, ref),
+            ),
+        ],
       ),
       body: history.when(
         loading: () => const Center(child: CircularProgressIndicator()),

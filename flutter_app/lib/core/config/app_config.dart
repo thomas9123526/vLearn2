@@ -233,8 +233,19 @@ class ConfigFileService {
       }
     }
 
-    // No permission yet — write to app-scoped storage. Next launch (after the
-    // user grants MANAGE_EXTERNAL_STORAGE in Settings) will migrate this file.
+    // No write permission yet (MANAGE_EXTERNAL_STORAGE opens the Settings
+    // page and returns immediately, so it may not be granted on this launch).
+    // If the admin pre-placed the config at the public path, reading it does
+    // not require MANAGE_EXTERNAL_STORAGE — try it before falling back to the
+    // app-scoped path so the first-launch config is never silently replaced
+    // with defaults.
+    final publicFile = File(p.join(publicDir.path, _fileName));
+    if (publicFile.existsSync()) {
+      return publicFile;
+    }
+
+    // No permission, no pre-placed file — write to app-scoped storage.
+    // Next launch after the user grants MANAGE_EXTERNAL_STORAGE will migrate.
     if (!fallbackDir.existsSync()) {
       fallbackDir.createSync(recursive: true);
     }
@@ -255,9 +266,19 @@ class ConfigFileService {
     try {
       final raw = await file.readAsString();
       final jsonStr = _decodeContent(raw.trim());
-      final j = jsonDecode(jsonStr) as Map<String, dynamic>;
+      // Try strict parse first; if it fails, retry after converting unescaped
+      // backslashes to forward slashes (common when the file was hand-edited
+      // on Windows — e.g. "model": "D:\Pending\sherpa_2023").
+      Map<String, dynamic> j;
+      try {
+        j = jsonDecode(jsonStr) as Map<String, dynamic>;
+      } catch (_) {
+        j = jsonDecode(_fixBackslashes(jsonStr)) as Map<String, dynamic>;
+      }
       return AppConfig.fromJson(j, configDir: file.parent.path);
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[app_config] parse failed — overwriting with defaults. '
+          'path=${file.path} error=$e\n$st');
       await write(AppConfig.defaults, file: file);
       return AppConfig.defaults;
     }
@@ -282,6 +303,11 @@ class ConfigFileService {
   /// old config isn't silently reset to defaults. A JSON object always
   /// starts with '{' — not a base64 character — so base64Decode
   /// reliably throws on plain JSON and we fall back to the raw text.
+  /// Replaces unescaped backslashes with forward slashes so hand-edited
+  /// Windows paths (e.g. `D:\Pending\sherpa_2023`) don't break jsonDecode.
+  static String _fixBackslashes(String json) =>
+      json.replaceAllMapped(RegExp(r'\\(?!["\\/bfnrtu])'), (_) => '/');
+
   static String _decodeContent(String raw) {
     try {
       return utf8.decode(base64Decode(raw));

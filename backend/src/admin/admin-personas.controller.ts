@@ -28,9 +28,11 @@ import {
   IsBoolean,
   IsHexColor,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   Length,
+  Min,
 } from 'class-validator';
 
 /** Treat empty form strings as null so @IsOptional skips @Length on PATCH. */
@@ -84,6 +86,17 @@ class CreatePersonaDto {
   @IsOptional()
   @IsIn(['female', 'male', 'neutral'])
   gender?: 'female' | 'male' | 'neutral';
+  @ApiProperty({ required: false, enum: ['young', 'adult', 'elder'] })
+  @Transform(emptyToNull)
+  @IsOptional()
+  @IsIn(['young', 'adult', 'elder'])
+  tts_age?: 'young' | 'adult' | 'elder' | null;
+  @ApiProperty({ required: false })
+  @Transform(({ value }) => (value === '' || value === undefined || value === null) ? null : Number(value))
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  tts_voice_sid?: number | null;
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
@@ -139,16 +152,27 @@ class UpdatePersonaDto {
   @IsOptional()
   @IsIn(['female', 'male', 'neutral'])
   gender?: 'female' | 'male' | 'neutral';
+  @ApiProperty({ required: false, enum: ['young', 'adult', 'elder'] })
+  @Transform(emptyToNull)
+  @IsOptional()
+  @IsIn(['young', 'adult', 'elder'])
+  tts_age?: 'young' | 'adult' | 'elder' | null;
+  @ApiProperty({ required: false })
+  @Transform(({ value }) => (value === '' || value === undefined || value === null) ? null : Number(value))
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  tts_voice_sid?: number | null;
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
 }
 
-@ApiTags('Admin / Personas')
+@ApiTags('Admin / Teachers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionGuard)
-@Controller('admin/personas')
+@Controller('admin/teachers')
 export class AdminPersonasController {
   constructor(
     @InjectRepository(PersonaEntity)
@@ -156,6 +180,18 @@ export class AdminPersonasController {
     private readonly audit: AdminAuditLogService,
     private readonly dataSource: DataSource,
   ) {}
+
+  @Get('tts/voices')
+  @RequirePermission('personas.edit')
+  @ApiOperation({ summary: 'List available TTS voice IDs from TTS_VOICE_IDS env var' })
+  getTtsVoices(): { voices: string[] } {
+    const raw = process.env.TTS_VOICE_IDS ?? '';
+    const voices = raw
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    return { voices };
+  }
 
   @Get()
   @RequirePermission('personas.edit')

@@ -24,6 +24,8 @@ import { ScenarioEntity } from './scenario.entity';
 import { UploadedFileEntity } from './uploaded-file.entity';
 import { UserEntity } from './user.entity';
 import { UserInfoEntity } from './user-info.entity';
+import { UserNetworkStatsEntity } from './user-network-stats.entity';
+import { UserReportEntity } from './user-report.entity';
 import { PromptTemplateEntity } from './prompt-template.entity';
 
 export {
@@ -52,6 +54,8 @@ export {
   UploadedFileEntity,
   UserEntity,
   UserInfoEntity,
+  UserNetworkStatsEntity,
+  UserReportEntity,
   PromptTemplateEntity,
 };
 
@@ -81,5 +85,7 @@ export const ALL_ENTITIES = [
   UploadedFileEntity,
   UserEntity,
   UserInfoEntity,
+  UserNetworkStatsEntity,
+  UserReportEntity,
   PromptTemplateEntity,
 ];

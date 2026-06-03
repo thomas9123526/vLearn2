@@ -37,20 +37,34 @@ final _activeSessionProvider =
 /// Intermediate "brief" between picking a topic on the scenarios screen and
 /// actually starting the conversation. Matches design_handoff_freetalk
 /// `screens.md` §5 — header, hero card, roles, twist, objectives,
-/// persona pairing, sticky bottom dock.
-class ScenarioBriefScreen extends ConsumerWidget {
+/// persona pairing, level picker, sticky bottom dock.
+class ScenarioBriefScreen extends ConsumerStatefulWidget {
   const ScenarioBriefScreen({required this.scenarioId, super.key});
 
   final String scenarioId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scenarioAsync = ref.watch(_scenarioProvider(scenarioId));
+  ConsumerState<ScenarioBriefScreen> createState() => _ScenarioBriefScreenState();
+}
+
+class _ScenarioBriefScreenState extends ConsumerState<ScenarioBriefScreen> {
+  /// The CEFR level chosen by the user (1–6). Null until the user profile
+  /// loads; defaults to the user's current level on first render.
+  int? _selectedLevel;
+
+  @override
+  Widget build(BuildContext context) {
+    final scenarioAsync = ref.watch(_scenarioProvider(widget.scenarioId));
     final personasAsync = ref.watch(_personasProvider);
-    final activeSessionAsync = ref.watch(_activeSessionProvider(scenarioId));
+    final activeSessionAsync = ref.watch(_activeSessionProvider(widget.scenarioId));
     final locale = ref.watch(localeProvider).languageCode;
     final scheme = Theme.of(context).colorScheme;
     final user = ref.watch(authProvider).user;
+    final uploadsOrigin = _resolveUploadsOrigin();
+
+    // Seed the picker with the user's current level on first load.
+    final currentLevel = user?.currentLevel ?? 1;
+    _selectedLevel ??= currentLevel;
 
     final activeSession = activeSessionAsync.asData?.value;
 
@@ -79,7 +93,7 @@ class ScenarioBriefScreen extends ConsumerWidget {
           return PoliteErrorCenter(
             error: e,
             context: ErrorContext.loadDetail,
-            onRetry: () => ref.invalidate(_scenarioProvider(scenarioId)),
+            onRetry: () => ref.invalidate(_scenarioProvider(widget.scenarioId)),
           );
         },
         data: (scenario) {
@@ -105,7 +119,7 @@ class ScenarioBriefScreen extends ConsumerWidget {
                 _ContinueBanner(session: activeSession),
                 const SizedBox(height: 16),
               ],
-              _HeroCard(scenario: scenario, locale: locale),
+              _HeroCard(scenario: scenario, locale: locale, uploadsOrigin: uploadsOrigin),
               const SizedBox(height: 20),
               _RolesRow(scenario: scenario, persona: activePersona),
               const SizedBox(height: 20),
@@ -124,6 +138,16 @@ class ScenarioBriefScreen extends ConsumerWidget {
                 scheme: scheme,
                 onChange: () => pickActivePersona(context, ref),
               ),
+              if (activeSession == null) ...[
+                const SizedBox(height: 20),
+                const _SectionHeader(text: 'Difficulty level'),
+                const SizedBox(height: 8),
+                _LevelPicker(
+                  currentLevel: currentLevel,
+                  selectedLevel: _selectedLevel ?? currentLevel,
+                  onChanged: (int lvl) => setState(() => _selectedLevel = lvl),
+                ),
+              ],
             ],
           );
         },
@@ -140,7 +164,7 @@ class ScenarioBriefScreen extends ConsumerWidget {
                       AppRoute.conversation(activeSession.id),
                     ),
                     onStartFresh: () =>
-                        _startFresh(context, ref, scenario, activeSession),
+                        _startFresh(context, scenario, activeSession),
                   )
                 : Row(
                     children: [
@@ -154,7 +178,7 @@ class ScenarioBriefScreen extends ConsumerWidget {
                       Expanded(
                         flex: 2,
                         child: FilledButton.icon(
-                          onPressed: () => _startSession(context, ref, scenario),
+                          onPressed: () => _startSession(context, scenario),
                           icon: const Icon(Icons.play_arrow),
                           label: Text(
                               'Start speaking (${scenario.estimatedMinutes}m)'),
@@ -169,9 +193,21 @@ class ScenarioBriefScreen extends ConsumerWidget {
     );
   }
 
+  /// Computes the origin that /uploads/... paths should be resolved against.
+  /// Uses the actual loaded config (or env override), not the hardcoded defaults.
+  String _resolveUploadsOrigin() {
+    const envOverride = String.fromEnvironment('API_BASE_URL');
+    final config = ref.read(appConfigProvider).asData?.value ?? AppConfig.defaults;
+    final base = envOverride.isNotEmpty ? envOverride : config.backendBaseUrl;
+    String strip(String s, String suffix) {
+      final i = s.indexOf(suffix);
+      return i > 0 ? s.substring(0, i) : s;
+    }
+    return strip(strip(base, '/api'), '/vfls');
+  }
+
   Future<void> _startFresh(
     BuildContext context,
-    WidgetRef ref,
     Scenario scenario,
     ConversationSession activeSession,
   ) async {
@@ -179,19 +215,18 @@ class ScenarioBriefScreen extends ConsumerWidget {
       await ref
           .read(conversationsApiProvider)
           .endSession(activeSession.id, status: 'abandoned');
-      ref.invalidate(_activeSessionProvider(scenarioId));
+      ref.invalidate(_activeSessionProvider(widget.scenarioId));
     } catch (_) {
       // If abandon fails, proceed anyway — the session will stay active on the
       // server but the user wanted to start fresh.
     }
     if (context.mounted) {
-      await _startSession(context, ref, scenario);
+      await _startSession(context, scenario);
     }
   }
 
   Future<void> _startSession(
     BuildContext context,
-    WidgetRef ref,
     Scenario scenario,
   ) async {
     final user = ref.read(authProvider).user;
@@ -210,11 +245,13 @@ class ScenarioBriefScreen extends ConsumerWidget {
       personaId = personas.first.id;
     }
     final mode = ref.read(defaultConversationModeProvider);
+    final chosenLevel = _selectedLevel ?? (user.currentLevel);
     try {
       final session = await ref.read(conversationsApiProvider).startSession(
             personaId: personaId,
             scenarioId: scenario.id,
             mode: mode,
+            cefrLevel: chosenLevel,
           );
       final sessionId = session['id'] as String;
       if (context.mounted) {
@@ -339,9 +376,14 @@ class _ContinueDock extends StatelessWidget {
 }
 
 class _HeroCard extends StatelessWidget {
-  const _HeroCard({required this.scenario, required this.locale});
+  const _HeroCard({
+    required this.scenario,
+    required this.locale,
+    required this.uploadsOrigin,
+  });
   final Scenario scenario;
   final String locale;
+  final String uploadsOrigin;
 
   @override
   Widget build(BuildContext context) {
@@ -355,14 +397,21 @@ class _HeroCard extends StatelessWidget {
     // origin — Dio's baseUrl is /vfls/api on prod, but the static
     // mount lives at the server root, so we strip the suffix here.
     final imageUrl = scenario.imageUrl;
+    final bgImageUrl = scenario.backgroundImageUrl;
+    final hasHero = imageUrl != null && imageUrl.isNotEmpty;
+    final hasBg = bgImageUrl != null && bgImageUrl.isNotEmpty;
+    final cardRadius = BorderRadius.vertical(
+      top: hasHero ? Radius.zero : const Radius.circular(20),
+      bottom: const Radius.circular(20),
+    );
     return Column(
       children: [
-        if (imageUrl != null && imageUrl.isNotEmpty)
+        if (hasHero)
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             child: AspectRatio(
               aspectRatio: 16 / 9,
-              child: Image.network(
+              child: _imageWidget(
                 _resolveScenarioImage(imageUrl),
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => Container(
@@ -371,21 +420,31 @@ class _HeroCard extends StatelessWidget {
               ),
             ),
           ),
-        Container(
+        DecoratedBox(
+          decoration: BoxDecoration(
+            // Background image sits behind the gradient overlay.
+            image: hasBg
+                ? DecorationImage(
+                    image: _imageProvider(_resolveScenarioImage(bgImageUrl)),
+                    fit: BoxFit.cover,
+                    onError: (_, _) {},
+                  )
+                : null,
+            borderRadius: cardRadius,
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.3)),
+          ),
+          child: Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [scheme.primaryContainer, scheme.surfaceContainerHighest],
+          colors: [
+            scheme.primaryContainer.withValues(alpha: hasBg ? 0.82 : 1.0),
+            scheme.surfaceContainerHighest.withValues(alpha: hasBg ? 0.82 : 1.0),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.vertical(
-          top: imageUrl != null && imageUrl.isNotEmpty
-              ? Radius.zero
-              : const Radius.circular(20),
-          bottom: const Radius.circular(20),
-        ),
-        border: Border.all(color: scheme.outline.withValues(alpha: 0.3)),
+        borderRadius: cardRadius,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,24 +495,38 @@ class _HeroCard extends StatelessWidget {
         ],
       ),
     ),
+        ),
       ],
     );
   }
 
-  /// `/uploads/...` is mounted at the server root, not behind /api or
-  /// /vfls. Strip whichever suffix the configured backendBaseUrl has
-  /// before joining.
+  /// Resolves a stored image URL to one the image widgets can load.
+  /// - `http(s)://...`    → returned as-is (absolute network URL)
+  /// - `asset:...`        → returned as-is (handled by [_imageProvider] / [_imageWidget])
+  /// - `/uploads/...`     → prepends uploadsOrigin (relative backend path)
   String _resolveScenarioImage(String relative) {
-    if (relative.startsWith('http')) return relative;
-    final base = AppConfig.defaults.backendBaseUrl;
-    final cut1 = _stripSuffix(base, '/api');
-    final cut2 = _stripSuffix(cut1, '/vfls');
-    return '$cut2$relative';
+    if (relative.startsWith('http') || relative.startsWith('asset:')) {
+      return relative;
+    }
+    return '$uploadsOrigin$relative';
   }
 
-  String _stripSuffix(String s, String suffix) {
-    final i = s.indexOf(suffix);
-    return i > 0 ? s.substring(0, i) : s;
+  /// Returns the correct [ImageProvider] for both network and asset URLs.
+  ImageProvider _imageProvider(String url) {
+    if (url.startsWith('asset:')) return AssetImage(url.substring(6));
+    return NetworkImage(url);
+  }
+
+  /// Returns an [Image] widget for both network and asset URLs.
+  Widget _imageWidget(
+    String url, {
+    required BoxFit fit,
+    required Widget Function(BuildContext, Object, StackTrace?) errorBuilder,
+  }) {
+    if (url.startsWith('asset:')) {
+      return Image.asset(url.substring(6), fit: fit, errorBuilder: errorBuilder);
+    }
+    return Image.network(url, fit: fit, errorBuilder: errorBuilder);
   }
 }
 
@@ -878,6 +951,115 @@ class _SectionHeader extends StatelessWidget {
         letterSpacing: 1.4,
         color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+}
+
+/// Three-pill selector showing the user's current level flanked by ±1.
+/// The selected pill is highlighted; the "your level" chip marks the default.
+class _LevelPicker extends StatelessWidget {
+  const _LevelPicker({
+    required this.currentLevel,
+    required this.selectedLevel,
+    required this.onChanged,
+  });
+
+  final int currentLevel;
+  final int selectedLevel;
+  final ValueChanged<int> onChanged;
+
+  static const _labels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final levels = [
+      if (currentLevel > 1) currentLevel - 1,
+      currentLevel,
+      if (currentLevel < 6) currentLevel + 1,
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          for (final level in levels) ...[
+            if (level != levels.first) const SizedBox(width: 8),
+            Expanded(child: _LevelPill(level: level, label: _labels[level - 1],
+                isSelected: level == selectedLevel,
+                isCurrent: level == currentLevel,
+                onTap: () => onChanged(level),
+                scheme: scheme)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LevelPill extends StatelessWidget {
+  const _LevelPill({
+    required this.level,
+    required this.label,
+    required this.isSelected,
+    required this.isCurrent,
+    required this.onTap,
+    required this.scheme,
+  });
+
+  final int level;
+  final String label;
+  final bool isSelected;
+  final bool isCurrent;
+  final VoidCallback onTap;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? scheme.primary : scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? scheme.primary : scheme.outline.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'EditorialMono',
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? scheme.onPrimary : scheme.onSurface,
+              ),
+            ),
+            if (isCurrent) ...[
+              const SizedBox(height: 4),
+              Text(
+                'your level',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isSelected
+                      ? scheme.onPrimary.withValues(alpha: 0.8)
+                      : scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

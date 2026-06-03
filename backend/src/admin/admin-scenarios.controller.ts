@@ -55,7 +55,7 @@ class CreateScenarioDto {
   @ApiProperty() @IsString() slug!: string;
   /** Category slug — resolved server-side to category_id. Must reference an active row in vl_categories. */
   @ApiProperty() @IsString() category!: string;
-  @ApiProperty() @IsInt() @Min(1) @Max(5) difficulty!: number;
+  @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(1) @Max(5) difficulty?: number;
   @ApiProperty({ type: I18nTextDto })
   @ValidateNested()
   @Type(() => I18nTextDto)
@@ -142,6 +142,12 @@ class UpdateScenarioDto {
   @IsInt()
   @Min(0)
   xp_reward?: number;
+
+  /** Scenario-specific system prompt. Empty string or null clears the override. */
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsString()
+  custom_prompt?: string | null;
 }
 
 /**
@@ -164,11 +170,16 @@ export class AdminScenariosController {
 
   @Get()
   @RequirePermission('scenarios.view')
-  async list(@Query('status') status?: string, @Query('q') q?: string) {
+  async list(
+    @Query('status') status?: string,
+    @Query('q') q?: string,
+    @Query('category') category?: string,
+  ) {
     const qb = this.scenarios
       .createQueryBuilder('s')
       .orderBy('s.created_at', 'DESC');
     if (status) qb.andWhere('s.status = :s', { s: status });
+    if (category) qb.andWhere('s.category = :category', { category });
     if (q) qb.andWhere(`s.title ->> 'en' ILIKE :q`, { q: `%${q}%` });
     return qb.getMany();
   }
@@ -197,7 +208,7 @@ export class AdminScenariosController {
         slug: dto.slug,
         category: cat.slug,
         category_id: cat.id,
-        difficulty: dto.difficulty,
+        difficulty: dto.difficulty ?? 5,
         title: dto.title,
         description: dto.description,
         scene_description: dto.scene_description,
@@ -361,6 +372,48 @@ export class AdminScenariosController {
     @UploadedFile()
     file: { originalname: string; buffer: Buffer; mimetype: string },
   ) {
+    return this.uploadScenarioImage(
+      user,
+      id,
+      file,
+      'image_storage_key',
+      'image_url',
+      'scenario.upload_image',
+      (id, ext) => `${id}.${ext}`,
+    );
+  }
+
+  @Post(':id/background-image')
+  @RequirePermission('scenarios.upload_image')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
+  async uploadBackgroundImage(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @UploadedFile()
+    file: { originalname: string; buffer: Buffer; mimetype: string },
+  ) {
+    return this.uploadScenarioImage(
+      user,
+      id,
+      file,
+      'background_image_storage_key',
+      'background_image_url',
+      'scenario.upload_background_image',
+      (id, ext) => `${id}.background.${ext}`,
+    );
+  }
+
+  private async uploadScenarioImage(
+    user: JwtPayload,
+    id: string,
+    file: { originalname: string; buffer: Buffer; mimetype: string },
+    storageKeyField: 'image_storage_key' | 'background_image_storage_key',
+    urlField: 'image_url' | 'background_image_url',
+    auditAction: string,
+    filenameFn: (id: string, ext: string) => string,
+  ) {
     if (!file) throw new BadRequestException({ i18nKey: 'upload.no_file' });
     if (!/^image\/(jpe?g|png|webp)$/.test(file.mimetype)) {
       throw new BadRequestException({ i18nKey: 'upload.bad_mime' });
@@ -369,29 +422,30 @@ export class AdminScenariosController {
     const dir = path.join(uploadsDir, 'scenarios');
     fs.mkdirSync(dir, { recursive: true });
     const ext = (file.originalname.split('.').pop() ?? 'jpg').toLowerCase();
-    const filename = `${id}.${ext}`;
+    const filename = filenameFn(id, ext);
+    const relPath = path.posix.join('scenarios', filename);
     const abs = path.join(dir, filename);
     fs.writeFileSync(abs, file.buffer);
 
     return this.dataSource.transaction(async (em) => {
       const repo = em.getRepository(ScenarioEntity);
       const s = await this.findById(id, em);
-      const oldKey = s.image_storage_key;
-      s.image_storage_key = path.posix.join('scenarios', filename);
-      s.image_url = `/uploads/${s.image_storage_key}`;
-      await repo.save(s);
+      const oldKey = (s as unknown as Record<string, unknown>)[storageKeyField];
+      (s as unknown as Record<string, unknown>)[storageKeyField] = relPath;
+      (s as unknown as Record<string, unknown>)[urlField] = `/uploads/${relPath}`;
+      const saved = await repo.save(s);
       await this.audit.record(
         {
           actorId: user.sub,
-          action: 'scenario.upload_image',
+          action: auditAction,
           targetType: 'scenario',
           targetId: id,
-          oldValue: { image_storage_key: oldKey },
-          newValue: { image_storage_key: s.image_storage_key },
+          oldValue: { [storageKeyField]: oldKey },
+          newValue: { [storageKeyField]: relPath },
         },
         em,
       );
-      return { image_url: s.image_url };
+      return { [urlField]: `/uploads/${relPath}` };
     });
   }
 

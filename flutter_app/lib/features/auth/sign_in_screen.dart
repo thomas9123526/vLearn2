@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/auth_api.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../core/auth/remembered_credentials.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/providers/auth_provider.dart';
@@ -114,6 +115,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final auth = ref.watch(authProvider);
     final isLoading = auth.status == AuthStatus.checking;
     final scheme = Theme.of(context).colorScheme;
@@ -153,7 +155,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 Icon(Icons.school_rounded, size: 64, color: scheme.primary),
                 const SizedBox(height: 16),
                 Text(
-                  'Welcome back',
+                  l10n.welcomeBack,
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -223,7 +225,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 TextFormField(
                   controller: _passwordCtrl,
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: l10n.password,
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
@@ -249,7 +251,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                             ? null
                             : () => setState(() => _rememberMe = !_rememberMe),
                         child: Text(
-                          'Save my account',
+                          l10n.signInRememberMe,
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
@@ -269,12 +271,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text('Sign in'),
+                      : Text(l10n.signIn),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: isLoading ? null : () => context.push(AppRoute.signUp),
-                  child: const Text("Don't have an account? Sign up"),
+                  child: Text(l10n.dontHaveAccount),
                 ),
               ],
             ),
