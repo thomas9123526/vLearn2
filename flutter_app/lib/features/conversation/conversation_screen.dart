@@ -279,6 +279,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             onSendVoiceText: _send,
             readOnly: readOnly,
             status: d.session.status,
+            personaId: d.session.personaId,
           );
         },
       ),
@@ -301,6 +302,7 @@ class _ChatModeBody extends ConsumerStatefulWidget {
     required this.onSendVoiceText,
     this.readOnly = false,
     this.status,
+    required this.personaId,
   });
 
   final ScrollController scroll;
@@ -310,6 +312,7 @@ class _ChatModeBody extends ConsumerStatefulWidget {
   final ColorScheme scheme;
   final TextEditingController input;
   final VoidCallback onSend;
+  final String personaId;
 
   /// Called with the transcribed text when voice input completes and
   /// passes the content guard. Bypasses the text field.
@@ -365,8 +368,12 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
     _lastSpokenId = last.id;
     if (!ref.read(speechReadyProvider)) return;
     final tts = ref.read(ttsServiceProvider);
-    final voices = tts.capabilities.availableVoices;
-    final voiceId = voices.isNotEmpty ? voices.first : '';
+    final persona = ref.read(personaByIdProvider(widget.personaId)).valueOrNull;
+    final voiceId = persona != null
+        ? pickVoiceForPersona(tts.capabilities.availableVoices, persona)
+        : (tts.capabilities.availableVoices.isNotEmpty
+            ? tts.capabilities.availableVoices.first
+            : '');
     tts.speak(last.content, voiceId: voiceId).catchError((Object e, StackTrace st) {
       logRawError('chat_mode.tts', e, st);
     });
