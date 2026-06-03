@@ -181,6 +181,18 @@ export class AdminPersonasController {
     private readonly dataSource: DataSource,
   ) {}
 
+  @Get('tts/voices')
+  @RequirePermission('personas.edit')
+  @ApiOperation({ summary: 'List available TTS voice IDs from TTS_VOICE_IDS env var' })
+  getTtsVoices(): { voices: string[] } {
+    const raw = process.env.TTS_VOICE_IDS ?? '';
+    const voices = raw
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    return { voices };
+  }
+
   @Get()
   @RequirePermission('personas.edit')
   @ApiOperation({ summary: 'List all personas (including inactive)' })

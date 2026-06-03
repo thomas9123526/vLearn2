@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { forwardRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -41,6 +42,13 @@ export default function NewTeacherPage() {
   const router = useRouter();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const { data: voicesData } = useQuery<{ voices: string[] }>({
+    queryKey: ['admin-tts-voices'],
+    queryFn: () => api('/admin/teachers/tts/voices'),
+    staleTime: Infinity,
+  });
+  const availableVoices = voicesData?.voices ?? [];
   const {
     register,
     handleSubmit,
@@ -143,12 +151,28 @@ export default function NewTeacherPage() {
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field
-              id="voice_id"
-              label="TTS voice id (name)"
-              placeholder="en_US-amy"
-              {...register('voice_id')}
-            />
+            <div>
+              <Label htmlFor="voice_id">TTS voice id</Label>
+              {availableVoices.length > 0 ? (
+                <select
+                  id="voice_id"
+                  className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                  {...register('voice_id')}
+                >
+                  <option value="">— unset (use gender heuristic) —</option>
+                  {availableVoices.map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              ) : (
+                <Input id="voice_id" placeholder="en_VCTK-amy" {...register('voice_id')} />
+              )}
+              {availableVoices.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Set TTS_VOICE_IDS on the backend to enable dropdown.
+                </p>
+              )}
+            </div>
             <Field
               id="rive_asset"
               label="Rive asset filename"

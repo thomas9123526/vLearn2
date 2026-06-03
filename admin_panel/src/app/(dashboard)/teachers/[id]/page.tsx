@@ -56,6 +56,13 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
     queryFn: () => api(`/admin/teachers/${id}`),
   });
 
+  const { data: voicesData } = useQuery<{ voices: string[] }>({
+    queryKey: ['admin-tts-voices'],
+    queryFn: () => api('/admin/teachers/tts/voices'),
+    staleTime: Infinity,
+  });
+  const availableVoices = voicesData?.voices ?? [];
+
   const { register, handleSubmit, reset, formState: { isSubmitting, errors } } =
     useForm<FormValues>({ resolver: zodResolver(schema) });
 
@@ -185,7 +192,28 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field id="voice_id" label="TTS voice id (name)" {...register('voice_id')} placeholder="en_US-amy" />
+              <div>
+                <Label htmlFor="voice_id">TTS voice id</Label>
+                {availableVoices.length > 0 ? (
+                  <select
+                    id="voice_id"
+                    className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                    {...register('voice_id')}
+                  >
+                    <option value="">— unset (use gender heuristic) —</option>
+                    {availableVoices.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input id="voice_id" {...register('voice_id')} placeholder="en_VCTK-amy" />
+                )}
+                {availableVoices.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Set TTS_VOICE_IDS on the backend to enable dropdown.
+                  </p>
+                )}
+              </div>
               <Field id="rive_asset" label="Rive asset" {...register('rive_asset')} />
             </div>
             <div className="grid grid-cols-2 gap-3">
