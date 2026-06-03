@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart' as rive;
 
@@ -54,7 +56,12 @@ class PersonaAvatar extends StatelessWidget {
             ? rive.RiveWidgetBuilder(
                 fileLoader: rive.FileLoader.fromAsset(
                   riveAsset!,
-                  riveFactory: rive.Factory.rive,
+                  // On Windows (VMware dev) the native Rive renderer crashes
+                  // against the virtual GPU; fall back to the Flutter/Skia
+                  // renderer which is software-safe. See tutor_avatar.dart.
+                  riveFactory: Platform.isWindows
+                      ? rive.Factory.flutter
+                      : rive.Factory.rive,
                 ),
                 builder: (context, state) {
                   switch (state) {
