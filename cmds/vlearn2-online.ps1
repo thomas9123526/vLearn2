@@ -1,5 +1,5 @@
-# ─────────────────────────────────────────────────────────────────────────
-# vLearn2 — Toggle / check the VLEARN2_ONLINE env var. PowerShell version.
+# -------------------------------------------------------------------------
+# vLearn2 - Toggle / check the VLEARN2_ONLINE env var. PowerShell version.
 #
 # Subcommands:
 #   on            Set VLEARN2_ONLINE=1 in this shell (network allowed).
@@ -27,17 +27,17 @@
 #   .\cmds\vlearn2-online.ps1 setup
 #
 # New-machine workflow (separate .gradle / pub-cache / SDK on each machine):
-#   1. .\cmds\vlearn2-online.ps1 setup    ← one-time bootstrap (no internet needed
+#   1. .\cmds\vlearn2-online.ps1 setup    <- one-time bootstrap (no internet needed
 #                                            if tools\gradle\gradle-8.14-all.zip exists)
-#   2. .\cmds\vlearn2-online.ps1 on       ← allow network
-#   3. flutter pub get                    ← populate pub cache
-#   4. flutter build apk --debug          ← first online build (warms Gradle/Maven cache)
-#   5. .\cmds\vlearn2-online.ps1 off      ← from now on, offline
+#   2. .\cmds\vlearn2-online.ps1 on       <- allow network
+#   3. flutter pub get                    <- populate pub cache
+#   4. flutter build apk --debug          <- first online build (warms Gradle/Maven cache)
+#   5. .\cmds\vlearn2-online.ps1 off      <- from now on, offline
 #
 # Execution-policy note: if PS refuses to run this with "running scripts
 # is disabled", set a one-time per-user policy:
 #   Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 
 [CmdletBinding()]
 param(
@@ -46,14 +46,14 @@ param(
     [string]$Action = 'status'
 )
 
-# ─── load machine-specific paths if setup has been run ───────────────────────
+# --- load machine-specific paths if setup has been run -----------------------
 $_envLocal = "$PSScriptRoot\env-local.ps1"
 if (Test-Path $_envLocal) { . $_envLocal }
 
-# ─── helpers ──────────────────────────────────────────────────────────────────
+# --- helpers ------------------------------------------------------------------
 
 # Resolve where Gradle puts its caches.
-# Priority: GRADLE_USER_HOME env var → %USERPROFILE%\.gradle (Gradle's own default)
+# Priority: GRADLE_USER_HOME env var -> %USERPROFILE%\.gradle (Gradle's own default)
 function Get-GradleUserHome {
     $guh = $env:GRADLE_USER_HOME
     if ([string]::IsNullOrEmpty($guh)) { $guh = "$env:USERPROFILE\.gradle" }
@@ -68,7 +68,7 @@ $GRADLE_DIST_HASH = '8l65ni0eyj9p0ymy87kcfq9el'
 $GRADLE_DIST_NAME = 'gradle-8.14-all'
 $GRADLE_DIST_DIR  = 'gradle-8.14'  # top-level dir inside the zip
 
-# ─── setup helper ─────────────────────────────────────────────────────────────
+# --- setup helper -------------------------------------------------------------
 
 function Invoke-Setup {
     $projRoot  = Split-Path $PSScriptRoot -Parent
@@ -85,17 +85,17 @@ function Invoke-Setup {
     Write-Host "  Project root     : $projRoot"
     Write-Host ''
 
-    # 1. Offline init script ───────────────────────────────────────────────────
+    # 1. Offline init script ---------------------------------------------------
     Write-Host '[1/3] Offline init script'
     if (-not (Test-Path $initSrc)) {
         Write-Host "  ERROR: source not found: $initSrc" -ForegroundColor Red
     } else {
         New-Item -ItemType Directory -Force (Split-Path $initDst) | Out-Null
         Copy-Item $initSrc $initDst -Force
-        Write-Host "  Installed → $initDst" -ForegroundColor Green
+        Write-Host "  Installed -> $initDst" -ForegroundColor Green
     }
 
-    # 2. Gradle distribution ───────────────────────────────────────────────────
+    # 2. Gradle distribution ---------------------------------------------------
     Write-Host '[2/3] Gradle distribution'
     if (Test-Path $okMarker) {
         Write-Host "  Already installed (found $okMarker). Skipping." -ForegroundColor DarkGray
@@ -105,22 +105,22 @@ function Invoke-Setup {
         Write-Host "    curl -fL -o `"$localZip`" https://services.gradle.org/distributions/gradle-8.14-all.zip"
     } else {
         $zipSize = (Get-Item $localZip).Length
-        Write-Host "  Extracting $([math]::Round($zipSize/1MB, 0)) MB → $distBase ..."
+        Write-Host "  Extracting $([math]::Round($zipSize/1MB, 0)) MB -> $distBase ..."
         New-Item -ItemType Directory -Force $distBase | Out-Null
         Expand-Archive -Path $localZip -DestinationPath $distBase -Force
         # Create the markers the wrapper expects
         '' | Set-Content -NoNewline (Join-Path $distBase "$GRADLE_DIST_NAME.zip.ok")
         '' | Set-Content -NoNewline (Join-Path $distBase "$GRADLE_DIST_NAME.zip.lck")
-        Write-Host "  Extracted → $distBase\$GRADLE_DIST_DIR" -ForegroundColor Green
-        Write-Host "  Created   → $okMarker"                  -ForegroundColor Green
+        Write-Host "  Extracted -> $distBase\$GRADLE_DIST_DIR" -ForegroundColor Green
+        Write-Host "  Created   -> $okMarker"                  -ForegroundColor Green
     }
 
-    # 3. Reminder for pub cache ────────────────────────────────────────────────
+    # 3. Reminder for pub cache ------------------------------------------------
     Write-Host '[3/3] Flutter pub cache'
     $pubCache = $env:PUB_CACHE
     if ([string]::IsNullOrEmpty($pubCache)) { $pubCache = "$env:APPDATA\Pub\Cache" }
     if (Test-Path (Join-Path $pubCache 'hosted')) {
-        Write-Host "  pub cache present at $pubCache — looks populated." -ForegroundColor DarkGray
+        Write-Host "  pub cache present at $pubCache - looks populated." -ForegroundColor DarkGray
     } else {
         Write-Host "  pub cache empty or missing ($pubCache)." -ForegroundColor Yellow
         Write-Host "  Run while online:"
@@ -138,7 +138,7 @@ function Invoke-Setup {
     Write-Host ''
 }
 
-# ─── main switch ──────────────────────────────────────────────────────────────
+# --- main switch --------------------------------------------------------------
 
 switch ($Action) {
     'on' {
@@ -150,7 +150,7 @@ switch ($Action) {
         Write-Host 'VLEARN2_ONLINE cleared (this shell; Gradle is offline-by-default)'
 
         # Auto-install the offline init script if it is missing on this machine.
-        # This makes the "on → build → off → build" flow work on a fresh machine
+        # This makes the "on -> build -> off -> build" flow work on a fresh machine
         # without needing a separate "setup" step.
         $projRoot = Split-Path $PSScriptRoot -Parent
         $guh      = Get-GradleUserHome
@@ -160,7 +160,7 @@ switch ($Action) {
             if (Test-Path $initSrc) {
                 New-Item -ItemType Directory -Force (Split-Path $initDst) | Out-Null
                 Copy-Item $initSrc $initDst -Force
-                Write-Host "  Auto-installed offline init script → $initDst"
+                Write-Host "  Auto-installed offline init script -> $initDst"
             } else {
                 Write-Host "  WARNING: init script source not found: $initSrc" -ForegroundColor Yellow
                 Write-Host '  Gradle will NOT enforce offline mode. Run: .\cmds\vlearn2-online.ps1 setup'
@@ -190,8 +190,8 @@ switch ($Action) {
         $distOk = Test-Path (Join-Path $guh "wrapper\dists\$GRADLE_DIST_NAME\$GRADLE_DIST_HASH\$GRADLE_DIST_NAME.zip.ok")
         Write-Host ''
         Write-Host "GRADLE_USER_HOME:  $guh"
-        Write-Host "Init script:       $(if ($initOk) {'installed'} else {'MISSING — run setup'})"
-        Write-Host "Gradle dist:       $(if ($distOk) {'installed'} else {'MISSING — run setup'})"
+        Write-Host "Init script:       $(if ($initOk) {'installed'} else {'MISSING - run setup'})"
+        Write-Host "Gradle dist:       $(if ($distOk) {'installed'} else {'MISSING - run setup'})"
     }
     'persist-on' {
         [Environment]::SetEnvironmentVariable('VLEARN2_ONLINE', '1', 'User')

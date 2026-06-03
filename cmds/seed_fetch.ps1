@@ -1,5 +1,5 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# vLearn2 — Fetch backend seed data for bundling inside the app.
+# -----------------------------------------------------------------------------
+# vLearn2 - Fetch backend seed data for bundling inside the app.
 #
 # Fetches scenarios and categories from the backend and writes them to
 # flutter_app/assets/seed/ so the app's first launch can populate its local
@@ -19,11 +19,11 @@
 # The seed is only used on first launch. Once the app has done a live
 # network fetch, it writes fresh data to SQLite and the seed is skipped
 # on every subsequent launch.
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 [CmdletBinding()]
 param(
-    # Backend base URL — no trailing slash, no /api suffix.
+    # Backend base URL - no trailing slash, no /api suffix.
     [string]$BaseUrl = "http://localhost:5101",
 
     # When set, also downloads scenario images into assets/seed/images/ and
@@ -46,7 +46,7 @@ $root     = Split-Path $PSScriptRoot -Parent
 $seedDir  = Join-Path $root "flutter_app\assets\seed"
 $imageDir = Join-Path $seedDir "images"
 
-# ─── Auth ─────────────────────────────────────────────────────────────────────
+# --- Auth ---------------------------------------------------------------------
 
 if (-not $Token) {
     if (-not $CidUsername) { $CidUsername = Read-Host "CID username" }
@@ -63,7 +63,7 @@ if (-not $Token) {
 
 $authHeader = @{ Authorization = "Bearer $Token" }
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# --- Helpers ------------------------------------------------------------------
 
 function Invoke-Api([string]$Path) {
     $uri = "$BaseUrl/api$Path"
@@ -80,21 +80,21 @@ function Get-LineCount([string]$File) {
     return ([System.IO.File]::ReadAllLines($File)).Count
 }
 
-# ─── Create output directories ────────────────────────────────────────────────
+# --- Create output directories ------------------------------------------------
 
 New-Item -ItemType Directory -Force -Path $seedDir  | Out-Null
 if ($WithImages) {
     New-Item -ItemType Directory -Force -Path $imageDir | Out-Null
 }
 
-# ─── Fetch data from the backend ──────────────────────────────────────────────
+# --- Fetch data from the backend ----------------------------------------------
 
 $scenarios  = Invoke-Api "/scenarios"
 $categories = Invoke-Api "/categories"
 
 Write-Host "[seed] Received $($scenarios.Count) scenario(s), $($categories.Count) categorie(s)."
 
-# ─── Download images (optional) ───────────────────────────────────────────────
+# --- Download images (optional) -----------------------------------------------
 
 if ($WithImages) {
     Write-Host "[seed] Downloading images ..."
@@ -139,7 +139,7 @@ if ($WithImages) {
     Write-Host "      - assets/seed/images/"
 }
 
-# ─── Write JSON seed files ────────────────────────────────────────────────────
+# --- Write JSON seed files ----------------------------------------------------
 
 $scenariosPath  = Join-Path $seedDir "scenarios.json"
 $categoriesPath = Join-Path $seedDir "categories.json"

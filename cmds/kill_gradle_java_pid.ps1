@@ -1,5 +1,5 @@
-# ─────────────────────────────────────────────────────────────────────────────
-#  vLearn2 — Kill all Java processes related to Gradle or OpenJDK
+# -----------------------------------------------------------------------------
+#  vLearn2 - Kill all Java processes related to Gradle or OpenJDK
 #
 #  Finds every java.exe whose command line matches any of the patterns below
 #  and kills it. This covers:
@@ -11,7 +11,7 @@
 #
 #  Usage:
 #    .\cmds\kill_gradle_java_pid.ps1
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 $patterns = @('*gradle*', '*openjdk*', '*jdk*', '*jre*')
 
