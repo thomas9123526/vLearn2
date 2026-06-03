@@ -45,6 +45,14 @@ function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
 endfunction()
 
+# Pre-seed nuget.exe for offline builds. audioplayers_windows uses
+# FetchContent to download nuget.exe; setting this cache variable makes CMake
+# use the local directory instead of hitting the network.
+# Place nuget.exe at flutter_app/windows/nuget/nuget.exe on offline machines.
+set(FETCHCONTENT_SOURCE_DIR_NUGET
+    "${CMAKE_CURRENT_SOURCE_DIR}/nuget"
+    CACHE STRING "Local nuget directory (offline build bypass)" FORCE)
+
 # Flutter library and tool build rules.
 set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})

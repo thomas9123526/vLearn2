@@ -122,3 +122,6 @@ pubspec.lock
 
 # Git sync bundles
 gitBundle/
+
+# Local nuget.exe for offline Windows builds (not committed — place manually)
+flutter_app/windows/nuget/
