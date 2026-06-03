@@ -2,7 +2,10 @@
 # vLearn2 - Create a git bundle for syncing to VMware.
 #
 # Creates a single .bundle file containing all commits from $BaseHash to HEAD.
-# Copy the file to the VMware machine, then run:
+# The HEAD hash is saved to gitBundle\.last_hash automatically, so the next
+# run picks it up as the new base without needing -BaseHash.
+#
+# Copy the bundle file to the VMware machine, then run:
 #
 #   git pull vlearn_update.bundle HEAD
 #
@@ -10,19 +13,17 @@
 #   .\cmds\make_bundle.ps1
 #   .\cmds\make_bundle.ps1 -BaseHash abc1234
 #   .\cmds\make_bundle.ps1 -BaseHash abc1234 -Out C:\transfer\my.bundle
-#
-# Default base hash is the shared starting point between local and VMware.
-# If you do repeated syncs, pass the hash of the last bundle's HEAD as the
-# new base so the bundle stays small.
 # -----------------------------------------------------------------------------
 
 [CmdletBinding()]
 param(
-    [string]$BaseHash = "681e709e0ca3745d5db5ebe56e383ecc7e4ec4de",
+    [string]$BaseHash = "",
     [string]$Out = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+$FallbackHash = "681e709e0ca3745d5db5ebe56e383ecc7e4ec4de"
 
 # Resolve output path
 $root = Split-Path $PSScriptRoot -Parent
@@ -34,7 +35,19 @@ if ($Out -eq "") {
     $Out = Join-Path $bundleDir "vlearn_update.bundle"
 }
 
-Write-Host "[bundle] Base hash : $BaseHash"
+# Resolve base hash: param > saved last hash > fallback
+$lastHashFile = Join-Path $bundleDir ".last_hash"
+if ($BaseHash -eq "") {
+    if (Test-Path $lastHashFile) {
+        $BaseHash = (Get-Content $lastHashFile -Raw).Trim()
+        Write-Host "[bundle] Base hash : $BaseHash  (from .last_hash)"
+    } else {
+        $BaseHash = $FallbackHash
+        Write-Host "[bundle] Base hash : $BaseHash  (fallback default)"
+    }
+} else {
+    Write-Host "[bundle] Base hash : $BaseHash  (explicit)"
+}
 Write-Host "[bundle] Output    : $Out"
 
 # Verify git is available
@@ -68,16 +81,17 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# Save HEAD hash so the next run uses it as the base automatically
+$head = git rev-parse HEAD
+$head | Set-Content -Path $lastHashFile -NoNewline -Encoding ASCII
+
 # Show file size
 $sizeMB = [math]::Round((Get-Item $Out).Length / 1MB, 2)
 Write-Host ""
 Write-Host "[bundle] Done. $Out ($sizeMB MB)"
+Write-Host "[bundle] Saved HEAD $head to .last_hash"
 Write-Host ""
 Write-Host "--- Apply on VMware ---"
 Write-Host "1. Copy $Out to VMware gitBundle\ folder."
 Write-Host "2. Inside the project folder on VMware, run:"
 Write-Host "     .\cmds\apply_bundle.ps1"
-Write-Host ""
-Write-Host "--- Next bundle (use last applied HEAD as new base) ---"
-$head = git rev-parse HEAD
-Write-Host "     .\cmds\make_bundle.ps1 -BaseHash $head"
