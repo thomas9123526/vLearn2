@@ -37,9 +37,9 @@ if (-not $riveDirs) {
 }
 
 foreach ($riveDir in $riveDirs) {
+    # 1. Copy the prebuilt DLLs / libs into the pub-cache package folder.
     $dst = Join-Path $riveDir.FullName "windows\bin\lib"
-    Write-Host "[rive] Installing into $dst ..."
-
+    Write-Host "[rive] Installing libs into $dst ..."
     foreach ($config in @("debug", "release")) {
         $dstConfig = Join-Path $dst $config
         if (-not (Test-Path $dstConfig)) {
@@ -49,7 +49,72 @@ foreach ($riveDir in $riveDirs) {
         Copy-Item "$srcConfig\*" $dstConfig -Force
         Write-Host "[rive]   $config -> copied"
     }
+
+    # 2. Patch CMakeLists.txt to skip 'dart run rive_native:setup' when the
+    #    DLLs are already present.  Without this patch the dart run command
+    #    tries to fetch pub.dev security advisories and fails on the air-gapped
+    #    VM even though all the files are already in place.
+    $cmake = Join-Path $riveDir.FullName "windows\CMakeLists.txt"
+    if (Test-Path $cmake) {
+        $content = Get-Content $cmake -Raw
+        $marker  = "# [vlearn2-offline-patch]"
+        if ($content -notmatch [regex]::Escape($marker)) {
+            $oldBlock = @'
+execute_process(
+  COMMAND cmd.exe /C "${DART_EXECUTABLE} run rive_native:setup --verbose -p windows"
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/../"
+  RESULT_VARIABLE result
+  OUTPUT_VARIABLE output
+  ERROR_VARIABLE error
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_STRIP_TRAILING_WHITESPACE
+)
+
+message(STATUS "rive_native setup output: ${output}")
+if(NOT error STREQUAL "")
+  message(WARNING "rive_native setup error: ${error}")
+endif()
+
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "rive_native: Failed to run setup command. Exit code: ${result}")
+endif()
+'@
+            $newBlock = @'
+# [vlearn2-offline-patch] Skip dart run when prebuilt DLLs are already present.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/bin/lib/release/rive_native.dll")
+  message(STATUS "rive_native: prebuilt libs found - skipping network setup.")
+else()
+  execute_process(
+    COMMAND cmd.exe /C "${DART_EXECUTABLE} run rive_native:setup --verbose -p windows"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/../"
+    RESULT_VARIABLE result
+    OUTPUT_VARIABLE output
+    ERROR_VARIABLE error
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_STRIP_TRAILING_WHITESPACE
+  )
+  message(STATUS "rive_native setup output: ${output}")
+  if(NOT error STREQUAL "")
+    message(WARNING "rive_native setup error: ${error}")
+  endif()
+  if(NOT result EQUAL 0)
+    message(FATAL_ERROR "rive_native: Failed to run setup command. Exit code: ${result}")
+  endif()
+endif()
+'@
+            if ($content -match [regex]::Escape($oldBlock.Trim())) {
+                $patched = $content.Replace($oldBlock.Trim(), $newBlock.Trim())
+                Set-Content $cmake $patched -NoNewline -Encoding UTF8
+                Write-Host "[rive]   CMakeLists.txt patched (offline guard added)"
+            } else {
+                Write-Host "[rive]   WARNING: CMakeLists.txt layout unexpected - patch skipped."
+                Write-Host "         Build may still fail. Check $cmake manually."
+            }
+        } else {
+            Write-Host "[rive]   CMakeLists.txt already patched - skipping."
+        }
+    }
 }
 
 Write-Host ""
-Write-Host "[rive] Done. You can now run 'flutter build windows' without internet access."
+Write-Host "[rive] Done. You can now run 'flutter run' or 'flutter build windows' offline."
