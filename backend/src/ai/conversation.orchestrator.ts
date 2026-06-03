@@ -72,6 +72,7 @@ export class ConversationOrchestrator {
         enablePromptCache: this.ai.capabilities.supportsPromptCache,
       });
       const text = res.content.trim();
+      this.logger.log(`\n${'─'.repeat(60)}\nAI REPLY\n${'─'.repeat(60)}\n${text}\n${'─'.repeat(60)}`);
       if (!text) {
         this.logger.warn('AI chat returned empty text; using canned reply');
         return this.fallbackReply(args.history);
