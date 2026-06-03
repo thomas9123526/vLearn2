@@ -1,0 +1,6 @@
+cd C:\project\vLearn2\flutter_app
+flutter build apk --debug
+flutter build apk --release
+C:\project\vLearn2\cmds\build_apk_per_abi.bat release
+flutter build windows --debug
+flutter build windows --release

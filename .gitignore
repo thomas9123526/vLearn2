@@ -4,6 +4,8 @@
 
 # Machine-specific paths written by cmds\setup.ps1 — never commit
 cmds/env-local.ps1
+# Build/run logs written by cmds\run_build_test_step.ps1
+cmds/logs/
 # ...but DO track the documented example so newcomers know what env to set
 !.env.example
 !**/.env.example
