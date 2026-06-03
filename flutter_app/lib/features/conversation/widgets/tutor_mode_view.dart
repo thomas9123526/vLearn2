@@ -138,6 +138,9 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
 
     if (!ref.read(speechReadyProvider)) return;
     final tts = ref.read(ttsServiceProvider);
+    debugPrint('[tts] persona=${widget.persona.name} voiceId=${widget.persona.voiceId} '
+        'ttsVoiceSid=${widget.persona.ttsVoiceSid} gender=${widget.persona.gender} '
+        'voices=${tts.capabilities.availableVoices.length}');
     final voiceId = _pickVoice(tts.capabilities.availableVoices, widget.persona);
     final preview = last.content.length > 80
         ? '${last.content.substring(0, 80)}…'
