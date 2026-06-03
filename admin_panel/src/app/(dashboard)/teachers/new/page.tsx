@@ -25,6 +25,8 @@ const schema = z.object({
   gender: z.enum(['female', 'male', 'neutral']).default('neutral'),
   voice_id: z.string().optional(),
   rive_asset: z.string().optional(),
+  tts_age: z.enum(['young', 'adult', 'elder', '']).optional(),
+  tts_voice_sid: z.string().optional(),
   gradient_from: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, 'Must be a 6-digit hex color like #FF6B47'),
@@ -61,6 +63,8 @@ export default function NewTeacherPage() {
           ...values,
           voice_id: values.voice_id?.trim() || null,
           rive_asset: values.rive_asset?.trim() || null,
+          tts_age: values.tts_age?.trim() || null,
+          tts_voice_sid: values.tts_voice_sid?.trim() ? parseInt(values.tts_voice_sid, 10) : null,
           specialties: values.specialties
             .split(',')
             .map((s) => s.trim())
@@ -116,16 +120,39 @@ export default function NewTeacherPage() {
                 <option value="male">male</option>
               </select>
             </div>
+            <div>
+              <Label htmlFor="tts_age">Voice age</Label>
+              <select
+                id="tts_age"
+                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                {...register('tts_age')}
+              >
+                <option value="">— unset —</option>
+                <option value="young">young</option>
+                <option value="adult">adult</option>
+                <option value="elder">elder</option>
+              </select>
+            </div>
+            <Field
+              id="tts_voice_sid"
+              label="Voice SID (direct)"
+              type="number"
+              min={0}
+              placeholder="0"
+              {...register('tts_voice_sid')}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <Field
               id="voice_id"
-              label="TTS voice id"
+              label="TTS voice id (name)"
               placeholder="en_US-amy"
               {...register('voice_id')}
             />
             <Field
               id="rive_asset"
               label="Rive asset filename"
-              placeholder="persona_maya.riv"
+              placeholder="emo_linear.riv"
               {...register('rive_asset')}
             />
           </div>

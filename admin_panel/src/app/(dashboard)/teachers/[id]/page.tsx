@@ -22,6 +22,8 @@ const schema = z.object({
   gender: z.enum(['female', 'male', 'neutral']),
   voice_id: z.string().optional(),
   rive_asset: z.string().optional(),
+  tts_age: z.enum(['young', 'adult', 'elder', '']).optional(),
+  tts_voice_sid: z.string().optional(),
   gradient_from: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, 'Must be a 6-digit hex color'),
@@ -32,10 +34,12 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-interface Persona extends FormValues {
+interface Persona extends Omit<FormValues, 'tts_age' | 'tts_voice_sid'> {
   id: string;
   image_url: string | null;
   is_active: boolean;
+  tts_age: 'young' | 'adult' | 'elder' | null;
+  tts_voice_sid: number | null;
 }
 
 export default function EditPersonaPage({ params }: { params: { id: string } }) {
@@ -70,6 +74,8 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
       gender: persona.gender,
       voice_id: persona.voice_id ?? '',
       rive_asset: persona.rive_asset ?? '',
+      tts_age: (persona.tts_age as 'young' | 'adult' | 'elder' | '') ?? '',
+      tts_voice_sid: persona.tts_voice_sid != null ? String(persona.tts_voice_sid) : '',
       gradient_from: persona.gradient_from,
       gradient_to: persona.gradient_to,
     });
@@ -83,6 +89,8 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
           ...values,
           voice_id: values.voice_id?.trim() || null,
           rive_asset: values.rive_asset?.trim() || null,
+          tts_age: values.tts_age?.trim() || null,
+          tts_voice_sid: values.tts_voice_sid?.trim() ? parseInt(values.tts_voice_sid, 10) : null,
           specialties: values.specialties.split(',').map((s) => s.trim()).filter(Boolean),
         },
       }),
@@ -154,7 +162,30 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
                   <option value="male">male</option>
                 </select>
               </div>
-              <Field id="voice_id" label="TTS voice id" {...register('voice_id')} />
+              <div>
+                <Label htmlFor="tts_age">Voice age</Label>
+                <select
+                  id="tts_age"
+                  className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                  {...register('tts_age')}
+                >
+                  <option value="">— unset —</option>
+                  <option value="young">young</option>
+                  <option value="adult">adult</option>
+                  <option value="elder">elder</option>
+                </select>
+              </div>
+              <Field
+                id="tts_voice_sid"
+                label="Voice SID (direct)"
+                type="number"
+                min={0}
+                placeholder="0"
+                {...register('tts_voice_sid')}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field id="voice_id" label="TTS voice id (name)" {...register('voice_id')} placeholder="en_US-amy" />
               <Field id="rive_asset" label="Rive asset" {...register('rive_asset')} />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -222,8 +253,12 @@ export default function EditPersonaPage({ params }: { params: { id: string } }) 
             <dd>{persona.is_active ? 'active' : 'inactive'}</dd>
             <dt className="text-muted-foreground">Gender</dt>
             <dd className="capitalize">{persona.gender}</dd>
-            <dt className="text-muted-foreground">Voice</dt>
+            <dt className="text-muted-foreground">Voice id</dt>
             <dd className="font-mono text-xs">{persona.voice_id ?? '—'}</dd>
+            <dt className="text-muted-foreground">Voice age</dt>
+            <dd>{persona.tts_age ?? '—'}</dd>
+            <dt className="text-muted-foreground">Voice SID</dt>
+            <dd className="font-mono text-xs">{persona.tts_voice_sid != null ? persona.tts_voice_sid : '—'}</dd>
             <dt className="text-muted-foreground">Rive asset</dt>
             <dd className="font-mono text-xs">{persona.rive_asset ?? '—'}</dd>
           </dl>

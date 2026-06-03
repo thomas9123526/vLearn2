@@ -9,6 +9,32 @@ import { PromptBuilderService } from './prompt-builder.service';
 import type { PersonaEntity } from '../database/entities/persona.entity';
 import type { ScenarioEntity } from '../database/entities/scenario.entity';
 
+const CEFR_LABELS = ['', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
+
+export interface EvaluationScores {
+  fluency: number;        // 1-5  pacing, hesitation, naturalness of phrasing
+  accuracy: number;       // 1-5  grammar correctness, tense, articles, agreement
+  vocabulary: number;     // 1-5  range, appropriateness, collocation
+  interaction: number;    // 1-5  turn-taking, follow-up questions, engagement
+  topic_adherence: number;// 1-5  engagement with assigned topic vs avoidance
+}
+
+export interface SpecificFeedbackItem {
+  turn_index: number;
+  user_text: string;
+  issue: string;
+  correction: string;
+  severity: 'minor' | 'moderate' | 'major';
+}
+
+export interface EvaluationResult {
+  overall_cefr_estimate: string;
+  scores: EvaluationScores;
+  specific_feedback: SpecificFeedbackItem[];
+  strengths: string[];
+  suggested_practice: string;
+}
+
 /**
  * Provider-agnostic orchestration. ConversationsService should call this
  * instead of the raw provider so prompt-building + caching hints stay in
@@ -52,9 +78,11 @@ export class ConversationOrchestrator {
       }
       return text;
     } catch (e) {
+      const err = e as AiProviderError;
       this.logger.warn(
-        `AI chat failed (${(e as AiProviderError).kind}): falling back to canned reply`,
+        `AI chat failed (${err.kind ?? 'unknown'}): ${err.message ?? String(e)} — falling back to canned reply`,
       );
+      if (err.cause) this.logger.debug(`Caused by: ${String(err.cause)}`);
       return this.fallbackReply(args.history);
     }
   }
@@ -148,6 +176,95 @@ export class ConversationOrchestrator {
         `AI suggestion failed (${(e as AiProviderError).kind}): using canned suggestion`,
       );
       return this.fallbackSuggestion(args.history);
+    }
+  }
+
+  /**
+   * End-of-session CEFR evaluation. Sends the full transcript to the AI
+   * examiner and returns structured scores. Returns null when the AI is
+   * unavailable so callers can skip silently.
+   */
+  async evaluateSession(args: {
+    messages: Array<{ role: string; content: string }>;
+    cefrLevel: number;
+    scenarioTopic: string | null;
+  }): Promise<EvaluationResult | null> {
+    const cefrLabel = CEFR_LABELS[args.cefrLevel] ?? 'B1';
+
+    // Build transcript in [USER turn N] / [TUTOR] format
+    let userTurnIdx = 0;
+    const lines: string[] = [];
+    for (const msg of args.messages) {
+      if (msg.role === 'user') {
+        lines.push(`[USER turn ${userTurnIdx}] ${msg.content}`);
+        userTurnIdx++;
+      } else {
+        lines.push(`[TUTOR] ${msg.content}`);
+      }
+    }
+    if (userTurnIdx < 2) return null; // too short to evaluate meaningfully
+
+    const transcript = lines.join('\n');
+    const topicLine = args.scenarioTopic ? `\nTopic: ${args.scenarioTopic}` : '';
+
+    const systemPrompt = `You are an English examiner assessing the CEFR level of a learner from a short conversation transcript.
+Given the transcript and a target CEFR level, produce a <think>...</think> block in which you reason carefully about the learner's USER turns (citing turn indices and short quotations), followed immediately by a single JSON object.
+
+JSON schema (no markdown fences, no prose outside the JSON after </think>):
+{
+  "overall_cefr_estimate": "A1|A2|B1|B2|C1|C2",
+  "scores": {
+    "fluency": <1-5>,
+    "accuracy": <1-5>,
+    "vocabulary": <1-5>,
+    "interaction": <1-5>,
+    "topic_adherence": <1-5>
+  },
+  "specific_feedback": [
+    {"turn_index": <int>, "user_text": "...", "issue": "...", "correction": "...", "severity": "minor|moderate|major"}
+  ],
+  "strengths": ["...", "..."],
+  "suggested_practice": "..."
+}
+
+Score definitions:
+- fluency: pacing, hesitation, naturalness of phrasing
+- accuracy: grammar correctness, tense, articles, agreement
+- vocabulary: range, appropriateness, collocation
+- interaction: turn-taking, follow-up questions, engagement relative to learner role
+- topic_adherence: genuine engagement with the assigned topic vs steering to easier ground (avoidance scores LOW)`;
+
+    const userPrompt = `Target CEFR: ${cefrLabel}${topicLine}
+
+Transcript:
+${transcript}
+
+Score the LEARNER's USER turns.`;
+
+    try {
+      const res = await this.ai.chat({
+        systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+        maxTokens: 1500,
+        temperature: 0.3,
+        enablePromptCache: false,
+      });
+
+      const text = res.content;
+      // Strip <think>...</think> chain-of-thought, then extract the JSON object
+      const afterThink = text.includes('</think>')
+        ? text.slice(text.indexOf('</think>') + 8).trim()
+        : text.trim();
+      const jsonStart = afterThink.indexOf('{');
+      const jsonEnd = afterThink.lastIndexOf('}');
+      if (jsonStart === -1 || jsonEnd === -1) {
+        this.logger.warn('evaluateSession: no JSON found in AI response');
+        return null;
+      }
+      return JSON.parse(afterThink.slice(jsonStart, jsonEnd + 1)) as EvaluationResult;
+    } catch (e) {
+      this.logger.warn(`evaluateSession failed: ${(e as Error).message}`);
+      return null;
     }
   }
 

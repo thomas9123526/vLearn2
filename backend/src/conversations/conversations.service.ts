@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
@@ -11,6 +12,7 @@ import {
   SessionScoreEntity,
   SessionStatus,
 } from '../database/entities/conversation.entity';
+import type { EvaluationResult } from '../ai/conversation.orchestrator';
 import { GuardViolationEntity } from '../database/entities/guard-violation.entity';
 import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
@@ -27,11 +29,15 @@ import type {
 
 @Injectable()
 export class ConversationsService {
+  private readonly logger = new Logger(ConversationsService.name);
+
   constructor(
     @InjectRepository(ConversationSessionEntity)
     private readonly sessions: Repository<ConversationSessionEntity>,
     @InjectRepository(ConversationMessageEntity)
     private readonly messages: Repository<ConversationMessageEntity>,
+    @InjectRepository(SessionScoreEntity)
+    private readonly scores: Repository<SessionScoreEntity>,
     @InjectRepository(ScenarioEntity)
     private readonly scenarios: Repository<ScenarioEntity>,
     @InjectRepository(PersonaEntity)
@@ -347,7 +353,95 @@ export class ConversationsService {
     session.xp_earned = xp;
     await this.sessions.save(session);
 
+    // Fire-and-forget AI evaluation — does not block the response
+    this.triggerEvaluation(session.id).catch((err: Error) =>
+      this.logger.warn(`Background evaluation failed for ${session.id}: ${err.message}`),
+    );
+
     return this.toSessionDto(session);
+  }
+
+  async getSessionScore(
+    userId: string,
+    sessionId: string,
+  ): Promise<Record<string, unknown> | null> {
+    const session = await this.sessions.findOne({
+      where: { id: sessionId, user_id: userId },
+    });
+    if (!session) throw new NotFoundException({ i18nKey: 'session.not_found' });
+
+    const score = await this.scores.findOne({ where: { session_id: sessionId } });
+    if (!score) return null;
+
+    return {
+      fluencyScore:          score.fluency_score,
+      accuracyScore:         score.grammar_score,
+      vocabularyScore:       score.vocabulary_score,
+      interactionScore:      score.engagement_score,
+      topicAdherenceScore:   score.topic_adherence_score,
+      overallScore:          score.overall_score,
+      cefrEstimate:          score.cefr_estimate,
+      strengths:             score.strengths,
+      improvements:          score.improvements,
+      suggestedPractice:     score.ai_feedback,
+      computedAt:            score.computed_at,
+    };
+  }
+
+  // ─── Private: AI evaluation ──────────────────────────────
+
+  private async triggerEvaluation(sessionId: string): Promise<void> {
+    const session = await this.sessions.findOne({ where: { id: sessionId } });
+    if (!session) return;
+
+    const msgs = await this.messages.find({
+      where: { session_id: sessionId },
+      order: { sequence: 'ASC' },
+    });
+
+    let scenarioTopic: string | null = null;
+    if (session.scenario_id) {
+      const scenario = await this.scenarios.findOne({
+        where: { id: session.scenario_id },
+        select: ['title'],
+      });
+      if (scenario?.title) {
+        scenarioTopic = scenario.title.en ?? Object.values(scenario.title)[0] ?? null;
+      }
+    }
+
+    const result: EvaluationResult | null = await this.orchestrator.evaluateSession({
+      messages: msgs.map((m) => ({ role: m.role, content: m.content })),
+      cefrLevel: session.cefr_level ?? 3,
+      scenarioTopic,
+    });
+    if (!result) return;
+
+    const s = result.scores;
+    const toHundred = (v: number) => Math.round(Math.max(1, Math.min(5, v)) * 20);
+    const avgHundred = Math.round(
+      ((s.fluency + s.accuracy + s.vocabulary + s.interaction + s.topic_adherence) / 5) * 20,
+    );
+
+    const fields = {
+      session_id:            sessionId,
+      fluency_score:         toHundred(s.fluency),
+      grammar_score:         toHundred(s.accuracy),
+      vocabulary_score:      toHundred(s.vocabulary),
+      engagement_score:      toHundred(s.interaction),
+      topic_adherence_score: toHundred(s.topic_adherence),
+      overall_score:         avgHundred,
+      cefr_estimate:         result.overall_cefr_estimate,
+      strengths:             result.strengths,
+      improvements:          result.specific_feedback.map((f) => f.issue).slice(0, 5),
+      ai_feedback:           result.suggested_practice,
+      fluency_metrics:       { specific_feedback: result.specific_feedback } as Record<string, unknown>,
+      evaluator_versions:    { provider: 'ai' } as Record<string, string>,
+    };
+
+    const existing = await this.scores.findOne({ where: { session_id: sessionId } });
+    await this.scores.save(existing ? { ...existing, ...fields } : fields);
+    this.logger.log(`Evaluation saved for session ${sessionId}: ${result.overall_cefr_estimate}`);
   }
 
   // ─── Helpers ────────────────────────────────────────────

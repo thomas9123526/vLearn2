@@ -218,6 +218,21 @@ class ConversationsApi {
       return null;
     }
   }
+
+  /// Fetches the AI evaluation score for a completed session.
+  /// Returns null if the evaluation is still running (backend returns 404 or
+  /// empty body — poll until non-null).
+  Future<Map<String, dynamic>?> getSessionScore(String sessionId) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>?>(
+        '/conversations/sessions/$sessionId/score',
+      );
+      return res.data;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
 }
 
 // ─── Progress ───────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart' as ap;
@@ -56,12 +57,20 @@ class SherpaOnnxTtsService extends TextToSpeechService {
   final _isSpeakingCtrl = StreamController<bool>.broadcast();
   bool _isSpeaking = false;
 
-  /// Emits `true` while audio is playing, `false` when it stops. The Rive
-  /// avatar in the conversation screen subscribes to this to drive the
-  /// mouth-shape state-machine input.
+  final _amplitudeCtrl = StreamController<double>.broadcast();
+  Timer? _amplitudeTimer;
+  double _ampSma = 0.0; // smoothed amplitude value
+
+  /// Emits `true` while audio is playing, `false` when it stops.
   @override
   Stream<bool> get isSpeakingStream => _isSpeakingCtrl.stream;
   bool get isSpeaking => _isSpeaking;
+
+  /// Emits a 0.0–1.0 loudness envelope at ~60 fps during speech playback.
+  /// Derived from the RMS of the synthesized PCM; drives the `amplitude`
+  /// input on the emo_linear.riv Mochi state machine.
+  @override
+  Stream<double> get amplitudeStream => _amplitudeCtrl.stream;
 
   @override
   bool get isAvailable => _available;
@@ -172,6 +181,7 @@ class SherpaOnnxTtsService extends TextToSpeechService {
     swatch.stop();
     debugPrint('[tts] engine.synthesize voice=$voiceId rate=$rate '
         'len=${text.length} wav=${wav.length}B in ${swatch.elapsedMilliseconds}ms');
+    _startAmplitudeEmitter(wav);
     _setSpeaking(true);
     try {
       await _player.play(ap.BytesSource(wav));
@@ -180,9 +190,72 @@ class SherpaOnnxTtsService extends TextToSpeechService {
     } catch (e, st) {
       debugPrint('[tts] playback failed: $e');
       _log.e('TTS: playback failed', error: e, stackTrace: st);
+      _stopAmplitudeEmitter();
       _setSpeaking(false);
       rethrow;
     }
+  }
+
+  // ─── Amplitude / lip-sync helpers ─────────────────────────────────────────
+
+  /// Parse the WAV sample rate from bytes 24–27 (little-endian uint32).
+  static int _wavSampleRate(Uint8List wav) {
+    if (wav.length < 28) return 22050;
+    return ByteData.sublistView(wav, 24, 28).getUint32(0, Endian.little);
+  }
+
+  /// Build a per-16ms RMS loudness envelope from a WAV buffer.
+  /// Returns a list of 0.0–1.0 values, one per ~16 ms window.
+  static List<double> _buildEnvelope(Uint8List wav) {
+    const headerBytes = 44;
+    const windowMs = 16;
+    const gain = 3.2;
+    if (wav.length <= headerBytes) return const [];
+
+    final sampleRate = _wavSampleRate(wav);
+    final int16 = Int16List.view(wav.buffer, headerBytes);
+    final windowSamples =
+        ((sampleRate * windowMs) ~/ 1000).clamp(1, int16.length);
+
+    final env = <double>[];
+    for (var i = 0; i < int16.length; i += windowSamples) {
+      final end = (i + windowSamples).clamp(0, int16.length);
+      var sum = 0.0;
+      for (var j = i; j < end; j++) {
+        final s = int16[j] / 32767.0;
+        sum += s * s;
+      }
+      final rms = math.sqrt(sum / (end - i));
+      env.add((rms * gain).clamp(0.0, 1.0));
+    }
+    return env;
+  }
+
+  void _startAmplitudeEmitter(Uint8List wav) {
+    _amplitudeTimer?.cancel();
+    _ampSma = 0.0;
+    final env = _buildEnvelope(wav);
+    if (env.isEmpty) return;
+
+    final sw = Stopwatch()..start();
+    _amplitudeTimer = Timer.periodic(const Duration(milliseconds: 16), (t) {
+      final i = (sw.elapsedMilliseconds / 16).floor();
+      final target = (i < env.length) ? env[i] : 0.0;
+      _ampSma = _ampSma * 0.6 + target * 0.4; // exponential smoothing
+      if (!_amplitudeCtrl.isClosed) _amplitudeCtrl.add(_ampSma);
+      if (i >= env.length) {
+        t.cancel();
+        _amplitudeTimer = null;
+        if (!_amplitudeCtrl.isClosed) _amplitudeCtrl.add(0.0);
+      }
+    });
+  }
+
+  void _stopAmplitudeEmitter() {
+    _amplitudeTimer?.cancel();
+    _amplitudeTimer = null;
+    _ampSma = 0.0;
+    if (!_amplitudeCtrl.isClosed) _amplitudeCtrl.add(0.0);
   }
 
   @override
@@ -277,6 +350,7 @@ class SherpaOnnxTtsService extends TextToSpeechService {
 
   @override
   Future<void> stop() async {
+    _stopAmplitudeEmitter();
     await _player.stop();
     _setSpeaking(false);
   }
@@ -288,6 +362,7 @@ class SherpaOnnxTtsService extends TextToSpeechService {
     _engine?.free();
     _engine = null;
     await _isSpeakingCtrl.close();
+    await _amplitudeCtrl.close();
     _initialized = false;
     _available = false;
   }

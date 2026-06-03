@@ -28,7 +28,7 @@ import { Repository } from 'typeorm';
 
 import { Public } from '../auth/decorators/public.decorator';
 import { AppConfigEntity } from '../database/entities/app-config.entity';
-import { UserEntity } from '../database/entities/user.entity';
+import { UserInfoEntity } from '../database/entities/user-info.entity';
 
 // ─── DTOs ────────────────────────────────────────────────────────────────────
 
@@ -170,8 +170,8 @@ class LicenseService implements OnModuleInit {
   constructor(
     @InjectRepository(AppConfigEntity)
     private readonly configRepo: Repository<AppConfigEntity>,
-    @InjectRepository(UserEntity)
-    private readonly usersRepo: Repository<UserEntity>,
+    @InjectRepository(UserInfoEntity)
+    private readonly userInfoRepo: Repository<UserInfoEntity>,
   ) {}
 
   onModuleInit() {
@@ -236,10 +236,11 @@ class LicenseService implements OnModuleInit {
 
     const serial = cert.serialNumber;
 
-    // 7. Update users license columns
+    // 7. Update license columns on vl_user_info (users table columns are kept
+    //    for cross-system compatibility but this app writes here exclusively).
     if (dto.userId) {
       try {
-        await this.usersRepo
+        await this.userInfoRepo
           .createQueryBuilder()
           .update()
           .set({
@@ -251,7 +252,7 @@ class LicenseService implements OnModuleInit {
             // that haven't been updated yet.
             ...(dto.platform ? { license_platform: dto.platform } : {}),
           } as object)
-          .where('id = :id', { id: dto.userId })
+          .where('user_id = :id', { id: dto.userId })
           .execute();
       } catch (e: unknown) {
         this.log.warn(`Failed to update user license: ${(e as Error).message}`);
@@ -259,7 +260,13 @@ class LicenseService implements OnModuleInit {
     }
 
     // 8. Log to vLearnLicense.verify_log
-    await this.logVerify(serial, dto.machineId, dto.userId ?? null, 'valid', dto.platform ?? null);
+    const notBefore = new Date(cert.validFrom);
+    await this.logVerify(serial, dto.machineId, dto.userId ?? null, 'valid', dto.platform ?? null, {
+      certDer,
+      mode,
+      notBefore,
+      notAfter,
+    });
 
     const daysRemaining = Math.max(0, Math.ceil((notAfter.getTime() - Date.now()) / DAY_MS));
 
@@ -284,34 +291,74 @@ class LicenseService implements OnModuleInit {
     userId: string | null,
     result: string,
     platform: string | null,
+    // Provided only on the valid path; used to auto-register unknown serials.
+    certContext?: { certDer: Buffer; mode: string; notBefore: Date; notAfter: Date },
   ): Promise<void> {
     if (!this.licensePool) return;
-    try {
-      // verify_log.platform is optional in the schema (added in
-      // datamanage/sql/add_verify_log_platform.sql). If the column
-      // is missing we fall back to the four-column insert so older
-      // databases keep working.
-      await this.licensePool.query(
-        `INSERT INTO verify_log (serial, machine_id, user_id, result, platform)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [serial, machineId, userId, result, platform],
-      );
-    } catch (e: unknown) {
-      const msg = (e as Error).message ?? '';
-      if (msg.includes('column "platform"')) {
-        try {
-          await this.licensePool.query(
-            `INSERT INTO verify_log (serial, machine_id, user_id, result)
-             VALUES ($1, $2, $3, $4)`,
-            [serial, machineId, userId, result],
-          );
-          return;
-        } catch (e2: unknown) {
-          this.log.warn(`verify_log fallback insert failed: ${(e2 as Error).message}`);
-          return;
-        }
+
+    const insertVerifyLog = async (withPlatform: boolean): Promise<void> => {
+      if (withPlatform) {
+        await this.licensePool!.query(
+          `INSERT INTO verify_log (serial, machine_id, user_id, result, platform)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [serial, machineId, userId, result, platform],
+        );
+      } else {
+        await this.licensePool!.query(
+          `INSERT INTO verify_log (serial, machine_id, user_id, result)
+           VALUES ($1, $2, $3, $4)`,
+          [serial, machineId, userId, result],
+        );
       }
-      this.log.warn(`verify_log insert failed: ${msg}`);
+    };
+
+    // Auto-register a cert serial that pre-dates the generate_log table.
+    // ON CONFLICT DO NOTHING is safe — if it was already registered by a
+    // concurrent request, we just skip.
+    const ensureGenerateLog = async (): Promise<void> => {
+      if (!certContext) return;
+      const days = Math.max(0, Math.round(
+        (certContext.notAfter.getTime() - certContext.notBefore.getTime()) / DAY_MS,
+      ));
+      await this.licensePool!.query(
+        `INSERT INTO generate_log
+           (serial, machine_id, mode, days, not_before, not_after, operator, cert_der)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (serial) DO NOTHING`,
+        [serial, machineId, certContext.mode, days,
+         certContext.notBefore, certContext.notAfter,
+         'auto-registered', certContext.certDer],
+      );
+    };
+
+    const isFkViolation = (e: unknown) => (e as any)?.code === '23503';
+    const isMissingColumn = (e: unknown) => ((e as Error)?.message ?? '').includes('column "platform"');
+
+    try {
+      await insertVerifyLog(platform !== null);
+    } catch (e1: unknown) {
+      if (isMissingColumn(e1)) {
+        // verify_log.platform column not yet added — try without it
+        try {
+          await insertVerifyLog(false);
+        } catch (e2: unknown) {
+          if (isFkViolation(e2)) {
+            await ensureGenerateLog();
+            try { await insertVerifyLog(false); } catch { /* give up */ }
+          } else {
+            this.log.warn(`verify_log fallback insert failed: ${(e2 as Error).message}`);
+          }
+        }
+      } else if (isFkViolation(e1)) {
+        // Serial not yet in generate_log (cert pre-dates the log table).
+        // Auto-register it, then retry.
+        await ensureGenerateLog();
+        try {
+          await insertVerifyLog(platform !== null);
+        } catch { /* give up — audit logging is non-critical */ }
+      } else {
+        this.log.warn(`verify_log insert failed: ${(e1 as Error).message}`);
+      }
     }
   }
 }
@@ -337,7 +384,7 @@ class LicenseController {
 // ─── Module ──────────────────────────────────────────────────────────────────
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AppConfigEntity, UserEntity])],
+  imports: [TypeOrmModule.forFeature([AppConfigEntity, UserInfoEntity])],
   providers: [LicenseService],
   controllers: [LicenseController],
 })

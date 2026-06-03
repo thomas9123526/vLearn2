@@ -245,8 +245,15 @@ export const PERMISSION_CATALOG: PermissionDef[] = [
   {
     key: 'stats.view',
     category: 'analytics',
-    description: 'View the admin stats dashboard',
+    description: 'View the admin stats dashboard and platform usage breakdown',
     grantable_to_subadmin: true,
+  },
+  {
+    key: 'reports.view',
+    category: 'analytics',
+    description: 'View user-submitted feedback and bug reports',
+    grantable_to_subadmin: true,
+    implies: ['stats.view'],
   },
   {
     key: 'leaderboard.view',

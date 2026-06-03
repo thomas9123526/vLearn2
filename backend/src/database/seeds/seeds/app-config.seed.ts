@@ -447,6 +447,16 @@ const CATALOG: ConfigSeed[] = [
     description: 'Track per-platform session counts and network bytes (stored in vl_user_network_stats)',
   },
 
+  // ── App defaults (sent to app on every launch) ──────────
+  {
+    key: 'app.default_language',
+    value: 'en',
+    value_type: 'string',
+    category: 'system',
+    description: 'Default UI language shown on first launch before the user picks one (en | zh | ru | ko)',
+    is_visible_to_app: true,
+  },
+
   // ── System ───────────────────────────────────────────────
   {
     key: 'system.maintenance_banner',

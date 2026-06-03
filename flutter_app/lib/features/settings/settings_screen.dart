@@ -14,6 +14,7 @@ import '../../core/theme/font_group.dart';
 import '../../features/conversation/widgets/chat_bubble.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/models.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../license/license_screen.dart';
 import 'change_password_dialog.dart';
 import 'edit_profile_dialog.dart';
@@ -42,13 +43,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final user = ref.watch(authProvider).user;
     final settings = ref.watch(appSettingsProvider);
     final fontGroup = ref.watch(fontGroupProvider);
     final bubbleStyle = ref.watch(bubbleStyleProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(l10n.settingsTitle)),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
@@ -61,30 +63,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onTap: () => showEditProfileDialog(context),
             ),
           const Divider(),
-          const _SectionHeader(text: 'Appearance'),
+          _SectionHeader(text: l10n.settingsAppearance),
           ListTile(
             leading: const Icon(Icons.palette_outlined),
-            title: const Text('Theme'),
+            title: Text(l10n.settingsTheme),
             subtitle: Text(settings.theme),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickTheme(context, ref),
           ),
           ListTile(
             leading: const Icon(Icons.language_outlined),
-            title: const Text('Language'),
+            title: Text(l10n.settingsLanguage),
             subtitle: Text(_languageLabel(settings.uiLanguage)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickLanguage(context, ref),
           ),
-          const _SectionHeader(text: 'Font'),
+          _SectionHeader(text: l10n.settingsFont),
           ListTile(
             leading: const Icon(Icons.text_fields_outlined),
-            title: const Text('Font group'),
+            title: Text(l10n.settingsFontGroup),
             subtitle: Text(fontGroup.displayName),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickFontGroup(context, ref, fontGroup),
           ),
-          const _SectionHeader(text: 'Conversation'),
+          _SectionHeader(text: l10n.settingsConversation),
           const _ActiveTutorTile(),
           ListTile(
             leading: Icon(
@@ -92,11 +94,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ? Icons.face_retouching_natural
                   : Icons.chat_bubble_outline,
             ),
-            title: const Text('Default mode'),
+            title: Text(l10n.settingsDefaultMode),
             subtitle: Text(
               settings.defaultConversationMode == 'face'
-                  ? 'Tutor mode (face-to-face)'
-                  : 'Chat mode',
+                  ? l10n.conversationModeFace
+                  : l10n.conversationModeChat,
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickDefaultMode(
@@ -107,7 +109,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.chat_bubble_outline),
-            title: const Text('Bubble style'),
+            title: Text(l10n.settingsBubbleStyle),
             subtitle: Text(bubbleStyle.displayName),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickBubbleStyle(context, ref, bubbleStyle),
@@ -151,7 +153,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ],
           const Divider(),
-          const _SectionHeader(text: 'Account'),
+          _SectionHeader(text: l10n.settingsAccount),
           ListTile(
             leading: const Icon(Icons.lock_outline),
             title: const Text('Change password'),
@@ -160,7 +162,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text('Sign out'),
+            title: Text(l10n.signOut),
             onTap: () => ref.read(authProvider.notifier).signOut(),
           ),
         ],
@@ -241,6 +243,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   String _languageLabel(String code) => switch (code) {
         'zh' => '中文',
+        'ru' => 'Русский',
+        'ko' => '한국어',
         _ => 'English',
       };
 
@@ -287,7 +291,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (_) => ListView(
         shrinkWrap: true,
         children: [
-          for (final l in const [('en', 'English'), ('zh', '中文')])
+          for (final l in const [
+            ('en', 'English'),
+            ('zh', '中文'),
+            ('ru', 'Русский'),
+            ('ko', '한국어'),
+          ])
             ListTile(
               title: Text(l.$2),
               onTap: () => Navigator.pop(context, l.$1),
@@ -360,6 +369,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     WidgetRef ref,
     String current,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final picked = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -371,10 +381,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.face_retouching_natural),
-                title: const Text('Tutor mode (face-to-face)'),
-                subtitle: const Text(
-                  'Speak with the animated tutor. The tutor speaks back.',
-                ),
+                title: Text(l10n.conversationModeFace),
+                subtitle: Text(l10n.conversationModeFaceHint),
                 trailing: current == 'face'
                     ? Icon(Icons.check, color: scheme.primary)
                     : null,
@@ -382,8 +390,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.chat_bubble_outline),
-                title: const Text('Chat mode'),
-                subtitle: const Text('Type back and forth with the tutor.'),
+                title: Text(l10n.conversationModeChat),
+                subtitle: Text(l10n.conversationModeChatHint),
                 trailing: current == 'chat'
                     ? Icon(Icons.check, color: scheme.primary)
                     : null,
