@@ -126,3 +126,4 @@ gitBundle/
 # Local nuget.exe and package feed for offline Windows builds (not committed — place manually)
 flutter_app/windows/nuget/
 flutter_app/windows/nuget_feed/
+flutter_app/windows/sqlite3_src/

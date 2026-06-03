@@ -53,6 +53,13 @@ set(FETCHCONTENT_SOURCE_DIR_NUGET
     "${CMAKE_CURRENT_SOURCE_DIR}/nuget"
     CACHE STRING "Local nuget directory (offline build bypass)" FORCE)
 
+# Pre-seed sqlite3 source for offline builds. sqlite3_flutter_libs uses
+# FetchContent to download sqlite-autoconf; this bypasses the download.
+# Place extracted sqlite3 source at flutter_app/windows/sqlite3_src/ on offline machines.
+set(FETCHCONTENT_SOURCE_DIR_SQLITE3
+    "${CMAKE_CURRENT_SOURCE_DIR}/sqlite3_src"
+    CACHE STRING "Local sqlite3 source directory (offline build bypass)" FORCE)
+
 # Flutter library and tool build rules.
 set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})
