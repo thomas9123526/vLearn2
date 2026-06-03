@@ -33,7 +33,7 @@ enum TutorMood {
   thinking,
 }
 
-/// Mochi (emo_linear.riv) `state` input enum — must stay in sync with the rig.
+/// Mochi (emo_visemes.riv) `state` input enum — must stay in sync with the rig.
 ///
 /// | value | expression   | type    |
 /// |-------|-------------|---------|
@@ -55,13 +55,13 @@ const _kStateDisappointed = 5.0;
 /// Big tutor avatar used in Tutor (Face) mode.
 ///
 /// Combines:
-///   * a circular body filled with the emo_linear.riv Mochi animation;
+///   * a circular body filled with the emo_visemes.riv Mochi animation;
 ///   * a pulsing glow ring tied to [mood];
 ///   * three floating emotion icons that fade in/out by mood.
 ///
 /// [amplitude] (0.0–1.0) is the real-time loudness value from the TTS
-/// service's RMS envelope — it drives the Mochi `amplitude` input while
-/// speaking so the mouth opens proportionally to audio loudness.
+/// service's RMS envelope — it is bucketed into one of six viseme shapes
+/// (mouth=0–5) and written to the Mochi `mouth` input while speaking.
 class TutorAvatar extends StatefulWidget {
   const TutorAvatar({
     required this.persona,
@@ -100,22 +100,27 @@ class _TutorAvatarState extends State<TutorAvatar>
       AnimationController(vsync: this, duration: const Duration(seconds: 4))
         ..repeat();
 
-  // ─── emo_linear.riv / Mochi state-machine inputs ──────────────────────────
+  // ─── emo_visemes.riv / Mochi state-machine inputs ─────────────────────────
   //
   // State machine name: "Mochi"
   //
   // Inputs:
-  //   Number  state     — 0 Idle | 1 Thinking | 2 Speaking | 3 Attention |
-  //                       4 Excited (moment) | 5 Disappointed (moment)
-  //   Number  amplitude — 0.0–1.0 mouth open amount (active only in state 2)
-  //   Trigger blink     — fire to play one blink
-  //   Number  mouth     — 0–5 viseme index (reserved, unused for now)
+  //   Number  state — 0 Idle | 1 Thinking | 2 Speaking | 3 Attention |
+  //                   4 Excited (moment) | 5 Disappointed (moment)
+  //   Number  mouth — 0 rest | 1 mbp | 2 ai | 3 e | 4 u | 5 o
+  //                   Driven by viseme bucketing from the RMS amplitude.
+  //   Trigger blink — fire to play one blink
   //
   // All lookups are nullable — a null means the input isn't exported on
   // the current asset version and the write is silently skipped.
   rive.NumberInput? _stateInput;
-  rive.NumberInput? _amplitudeInput;
+  rive.NumberInput? _mouthInput;
   rive.TriggerInput? _blinkInput;
+
+  // Viseme anti-chatter state — prevent mouth from flickering faster than 70ms.
+  int _currentViseme = 0;
+  int _lastSwitchMs = 0;
+  static const int _holdMs = 70;
 
   /// Shared file loader — decoded once per app session, reused on every
   /// mount so re-entering the conversation screen never flashes a blank.
@@ -124,7 +129,7 @@ class _TutorAvatarState extends State<TutorAvatar>
   // VM the native renderer crashes against the virtual GPU, so GPU defaults
   // off on Windows. See rive_render_config.dart.
   static final rive.FileLoader _fileLoader = rive.FileLoader.fromAsset(
-    'assets/animations/emoticon_linear/emo_linear.riv',
+    'assets/animations/emoticon_visemes/emo_visemes.riv',
     riveFactory: RiveRenderConfig.factory,
   );
 
@@ -147,11 +152,9 @@ class _TutorAvatarState extends State<TutorAvatar>
       _applyMoodToRive(widget.mood);
     }
 
-    // Always sync amplitude so the mouth tracks loudness continuously.
+    // Always sync mouth viseme so the mouth tracks loudness continuously.
     if (oldWidget.amplitude != widget.amplitude) {
-      try {
-        _amplitudeInput?.value = widget.amplitude.clamp(0.0, 1.0);
-      } catch (_) {}
+      _updateMouthFromAmplitude(widget.amplitude);
     }
   }
 
@@ -171,17 +174,17 @@ class _TutorAvatarState extends State<TutorAvatar>
     try {
       final sm = state.controller.stateMachine;
       // ignore: deprecated_member_use
-      _stateInput     = sm.number('state');
+      _stateInput = sm.number('state');
       // ignore: deprecated_member_use
-      _amplitudeInput = sm.number('amplitude');
+      _mouthInput = sm.number('mouth');
       // ignore: deprecated_member_use
-      _blinkInput     = sm.trigger('blink');
+      _blinkInput = sm.trigger('blink');
 
       AppConfig.logx(
         'rive-init',
         'Mochi SM "${sm.name}" — inputs: '
             'state=${_stateInput != null}, '
-            'amplitude=${_amplitudeInput != null}, '
+            'mouth=${_mouthInput != null}, '
             'blink=${_blinkInput != null}',
       );
 
@@ -190,9 +193,46 @@ class _TutorAvatarState extends State<TutorAvatar>
     } catch (e, st) {
       AppConfig.logx('rive-init failed', 'Mochi: $e\n$st');
       _stateInput = null;
-      _amplitudeInput = null;
+      _mouthInput = null;
       _blinkInput = null;
     }
+  }
+
+  /// Bucket [amp] (0.0–1.0 RMS envelope) into one of the six viseme shapes
+  /// and write it to the Mochi `mouth` input with anti-chatter debounce.
+  void _updateMouthFromAmplitude(double amp) {
+    if (widget.mood != TutorMood.speaking) return;
+    final target = _visemeFor(amp.clamp(0.0, 1.0));
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (target != _currentViseme && now - _lastSwitchMs > _holdMs) {
+      _currentViseme = target;
+      _lastSwitchMs = now;
+      try {
+        _mouthInput?.value = target.toDouble();
+      } catch (_) {}
+    }
+  }
+
+  /// Map RMS amplitude to one of the six Mochi mouth visemes.
+  ///
+  /// The thresholds are ordered by mouth openness, not by enum value —
+  /// do not replace with `(amp * 6).floor()`.
+  ///
+  /// | amp range  | mouth | shape          |
+  /// |------------|-------|----------------|
+  /// | < 0.08     | 1     | MBP — closed   |
+  /// | 0.08–0.28  | 0     | REST           |
+  /// | 0.28–0.48  | 4     | U — small round|
+  /// | 0.48–0.66  | 3     | E — wide       |
+  /// | 0.66–0.84  | 5     | O — round open |
+  /// | ≥ 0.84     | 2     | AI — wide open |
+  int _visemeFor(double amp) {
+    if (amp < 0.08) return 1;
+    if (amp < 0.28) return 0;
+    if (amp < 0.48) return 4;
+    if (amp < 0.66) return 3;
+    if (amp < 0.84) return 5;
+    return 2;
   }
 
   /// Blink every 2–5 s. The Mochi rig suppresses blinking in state 4
@@ -221,9 +261,10 @@ class _TutorAvatarState extends State<TutorAvatar>
         TutorMood.encouraging => _kStateIdle,           // no dedicated state
       };
       _stateInput?.value = stateVal;
-      // Reset amplitude whenever we leave Speaking so the mouth closes.
+      // Reset mouth to rest whenever we leave Speaking so the face closes.
       if (mood != TutorMood.speaking) {
-        _amplitudeInput?.value = 0.0;
+        _mouthInput?.value = 0.0;
+        _currentViseme = 0;
       }
     } catch (e) {
       AppConfig.logx('rive-mood failed', '$mood: $e');
@@ -306,7 +347,7 @@ class _TutorAvatarState extends State<TutorAvatar>
                       onLoaded: _onRiveLoaded,
                       onFailed: (e, st) => AppConfig.logx(
                         'rive parse failed',
-                        'emo_linear.riv: $e',
+                        'emo_visemes.riv: $e',
                       ),
                       builder: (context, state) {
                         switch (state) {

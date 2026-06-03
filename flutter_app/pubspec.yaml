@@ -156,6 +156,7 @@ flutter:
     - assets/images/
     - assets/animations/
     - assets/animations/emoticon_linear/
+    - assets/animations/emoticon_visemes/
     - assets/seed/scenarios.json
     - assets/seed/categories.json
     - assets/icons/
