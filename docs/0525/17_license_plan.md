@@ -1,11 +1,28 @@
 # vLearn2 — License system: architecture & plan
 
 This document is the full plan for the license feature requested in
-`todoList/list/17_license`. The matching scaffolding committed in
-the same change implements the **toggleable enable flag** and the
-**Settings → License** screen with placeholders; the cert + native +
-KeyGenerator pieces below are specced but not yet built because each
-is multi-day native work.
+`todoList/list/17_license`.
+
+## Implementation status (as of 2026-06)
+
+| Component | Status |
+| --- | --- |
+| Backend `license.enabled` flag + admin tab | ✅ Done |
+| Flutter `LicenseScreen` + Settings gating | ✅ Done |
+| `core/license/machine_id_service.dart` (method channel) | ✅ Done |
+| `core/license/license_state_provider.dart` | ✅ Done |
+| `core/license/license_state.dart` | ✅ Done |
+| `core/license/license_file_scanner.dart` | ✅ Done |
+| `AndroidDevIDLib.aar` (native machine ID) | ⏳ Planned |
+| `WindowsDevIDLib.dll` (native machine ID) | ⏳ Planned |
+| `KeyGenerator` tool (VS2022 + Qt 5) | ⏳ Planned |
+| Backend `LicenseService.verify` (X.509 chain) | ⏳ Planned |
+| QR scan integration (Android) | ⏳ Planned |
+
+The original scaffolding committed implements the **toggleable enable
+flag** and the **Settings → License** screen with the state machine;
+the cert + native + KeyGenerator pieces below are specced but not yet
+built because each is multi-day native work.
 
 ## 1. Goals
 
