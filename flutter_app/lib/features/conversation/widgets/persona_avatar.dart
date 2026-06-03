@@ -1,7 +1,7 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart' as rive;
+
+import '../../../core/config/rive_render_config.dart';
 
 /// Persona avatar that prefers a Rive animation when its asset is present;
 /// falls back to a gradient circle with the first letter when not. The
@@ -56,12 +56,10 @@ class PersonaAvatar extends StatelessWidget {
             ? rive.RiveWidgetBuilder(
                 fileLoader: rive.FileLoader.fromAsset(
                   riveAsset!,
-                  // On Windows (VMware dev) the native Rive renderer crashes
-                  // against the virtual GPU; fall back to the Flutter/Skia
-                  // renderer which is software-safe. See tutor_avatar.dart.
-                  riveFactory: Platform.isWindows
-                      ? rive.Factory.flutter
-                      : rive.Factory.rive,
+                  // GPU vs Flutter renderer chosen by RiveRenderConfig — the
+                  // native renderer crashes on the VMware VM's virtual GPU.
+                  // See rive_render_config.dart.
+                  riveFactory: RiveRenderConfig.factory,
                 ),
                 builder: (context, state) {
                   switch (state) {

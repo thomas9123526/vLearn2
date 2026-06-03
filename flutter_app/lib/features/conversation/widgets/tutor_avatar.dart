@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/config/app_config.dart';
+import 'package:flutter_app/core/config/rive_render_config.dart';
 import 'package:rive/rive.dart' as rive;
 
 import '../../../core/models/models.dart';
@@ -119,11 +119,13 @@ class _TutorAvatarState extends State<TutorAvatar>
 
   /// Shared file loader — decoded once per app session, reused on every
   /// mount so re-entering the conversation screen never flashes a blank.
-  // On Windows (VMware dev) the native Rive renderer crashes against the
-  // virtual GPU; fall back to the Flutter/Skia renderer which is software-safe.
+  // Backend chosen by [RiveRenderConfig.useGpu]: native (GPU) renderer where
+  // hardware supports it, Flutter/Skia renderer otherwise. On the VMware dev
+  // VM the native renderer crashes against the virtual GPU, so GPU defaults
+  // off on Windows. See rive_render_config.dart.
   static final rive.FileLoader _fileLoader = rive.FileLoader.fromAsset(
     'assets/animations/emoticon_linear/emo_linear.riv',
-    riveFactory: Platform.isWindows ? rive.Factory.flutter : rive.Factory.rive,
+    riveFactory: RiveRenderConfig.factory,
   );
 
   /// Natural blink scheduler — fires every 2–5 s regardless of mood.

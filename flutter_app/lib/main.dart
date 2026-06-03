@@ -28,6 +28,7 @@ import 'core/config/layout_config_provider.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'core/cache/cache_store.dart';
 import 'core/config/app_config.dart';
+import 'core/config/rive_render_config.dart';
 import 'core/license/license_state_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/router/app_router.dart';
@@ -100,7 +101,13 @@ Future<void> main() async {
   // I/O and use AppConfig.defaults briefly.
   final container = ProviderContainer();
   try {
-    await container.read(appConfigProvider.future);
+    final cfg = await container.read(appConfigProvider.future);
+    // Apply the optional Rive renderer override before the first avatar
+    // builds. Null leaves the per-platform default (GPU off on the VMware
+    // VM, on elsewhere) in place.
+    if (cfg.riveUseGpu != null) {
+      RiveRenderConfig.useGpu = cfg.riveUseGpu!;
+    }
   } catch (_) {
     // Treat unreadable config as "use defaults" — the service itself rewrites
     // a broken file on the next save, so this never leaves the app stuck.

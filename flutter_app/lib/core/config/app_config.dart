@@ -20,6 +20,7 @@ class AppConfig {
     required this.topicSyncInterval,
     required this.environment,
     this.modelPath,
+    this.riveUseGpu,
   });
 
   /// JSON shape — short field names per the spec (`baseurl`, `reqTout`,
@@ -49,6 +50,7 @@ class AppConfig {
       topicSyncInterval: (j['tSync'] as num?)?.toInt() ?? defaults.topicSyncInterval,
       environment: (j['dev'] as String?) ?? defaults.environment,
       modelPath: resolvedModel,
+      riveUseGpu: j['riveGpu'] as bool?,
     );
   }
 
@@ -92,6 +94,15 @@ class AppConfig {
   /// Example relative value: `"data/sherpa_2023"`.
   final String? modelPath;
 
+  /// Optional override for the Rive avatar rendering backend.
+  ///
+  /// On-disk key: `"riveGpu"` (bool). `true` forces the native GPU renderer,
+  /// `false` forces the Flutter/Skia renderer. When absent (`null`) the app
+  /// uses its per-platform default (GPU off on Windows, on elsewhere — the
+  /// VMware virtual GPU crashes the native renderer). Applied at startup in
+  /// `main.dart` via `RiveRenderConfig.useGpu`.
+  final bool? riveUseGpu;
+
   bool get isDev => environment == 'dev';
 
   /// Loopback host for the dev backend: Android emulator maps `10.0.2.2` to
@@ -123,6 +134,7 @@ class AppConfig {
         // Only write the key when set, so devices without an override
         // keep the smallest possible file.
         if (modelPath != null && modelPath!.isNotEmpty) 'model': modelPath,
+        if (riveUseGpu != null) 'riveGpu': riveUseGpu,
       };
 
   AppConfig copyWith({
@@ -131,6 +143,7 @@ class AppConfig {
     int? topicSyncInterval,
     String? environment,
     String? modelPath,
+    bool? riveUseGpu,
   }) =>
       AppConfig(
         backendBaseUrl: backendBaseUrl ?? this.backendBaseUrl,
@@ -138,6 +151,7 @@ class AppConfig {
         topicSyncInterval: topicSyncInterval ?? this.topicSyncInterval,
         environment: environment ?? this.environment,
         modelPath: modelPath ?? this.modelPath,
+        riveUseGpu: riveUseGpu ?? this.riveUseGpu,
       );
 }
 
