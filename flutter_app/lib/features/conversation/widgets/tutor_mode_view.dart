@@ -174,25 +174,39 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     const youngHints  = ['jenny', 'amy', 'aria', 'ryan'];
     const elderHints  = ['davis', 'alan', 'linda'];
 
-    List<String> hints = [];
-    if (persona.gender == 'female') hints = femaleHints;
-    if (persona.gender == 'male')   hints = maleHints;
-
-    // Narrow by age if set.
-    if (persona.ttsAge == 'young' && hints.isNotEmpty) {
-      hints = hints.where((h) => youngHints.contains(h)).toList();
-      if (hints.isEmpty) hints = youngHints; // fallback to age-only hints
-    } else if (persona.ttsAge == 'elder' && hints.isNotEmpty) {
-      hints = hints.where((h) => elderHints.contains(h)).toList();
-      if (hints.isEmpty) hints = elderHints;
+    final List<String> genderHints;
+    if (persona.gender == 'female') {
+      genderHints = femaleHints;
+    } else if (persona.gender == 'male') {
+      genderHints = maleHints;
+    } else {
+      genderHints = const [];
     }
 
+    // Build age-narrowed hints. If narrowing leaves no match in the voice
+    // list, fall back to gender-only hints (never skip to voices.first).
+    List<String> hints = genderHints;
+    if (persona.ttsAge == 'young' && genderHints.isNotEmpty) {
+      final narrowed = genderHints.where((h) => youngHints.contains(h)).toList();
+      hints = narrowed.isNotEmpty ? narrowed : youngHints;
+    } else if (persona.ttsAge == 'elder' && genderHints.isNotEmpty) {
+      final narrowed = genderHints.where((h) => elderHints.contains(h)).toList();
+      hints = narrowed.isNotEmpty ? narrowed : elderHints;
+    }
+
+    String firstMatch(List<String> h) => voices.firstWhere(
+          (v) => h.any((hint) => v.toLowerCase().contains(hint)),
+          orElse: () => '',
+        );
+
     if (hints.isNotEmpty) {
-      final match = voices.firstWhere(
-        (v) => hints.any((h) => v.toLowerCase().contains(h)),
-        orElse: () => '',
-      );
+      final match = firstMatch(hints);
+      // Age-narrowed hints yielded nothing → retry with gender-only hints.
       if (match.isNotEmpty) return match;
+      if (hints != genderHints && genderHints.isNotEmpty) {
+        final fallback = firstMatch(genderHints);
+        if (fallback.isNotEmpty) return fallback;
+      }
     }
 
     // 4. First voice.

@@ -161,7 +161,11 @@ final sttServiceProvider = Provider<SpeechToTextService>((ref) {
 final ttsServiceProvider = Provider<TextToSpeechService>((ref) {
   final snap = ref.watch(modelRegistrySnapshotProvider).valueOrNull;
   if (snap?.isReady == true) {
-    return SherpaOnnxTtsService(registry: ref.read(modelRegistryProvider));
+    final svc = SherpaOnnxTtsService(registry: ref.read(modelRegistryProvider));
+    // Pre-warm the native engine in the background so the first speak() call
+    // does not block the UI isolate while loading the 38 MB ONNX model.
+    svc.initialize();
+    return svc;
   }
   return PlaceholderTtsService();
 });
