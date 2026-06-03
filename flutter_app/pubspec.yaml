@@ -85,7 +85,7 @@ dependencies:
   # guarded behind ModelRegistry.isReady() so the app still boots without a
   # model bundle on disk — the user just lands on ModelsNotInstalledScreen
   # and can continue in text-only mode.
-  sherpa_onnx: ^1.10.46
+  sherpa_onnx: ^1.13.0
   permission_handler: ^11.3.1
   # Mic capture. `record` is the official Flutter Community recorder; it
   # streams 16-bit PCM at the rate we ask for, which feeds straight into
@@ -155,6 +155,9 @@ flutter:
     - assets/wordlists/
     - assets/images/
     - assets/animations/
+    - assets/animations/emoticon_linear/
+    - assets/seed/scenarios.json
+    - assets/seed/categories.json
     - assets/icons/
     # DataManage trust anchors. `root_ca.crt` (public) is committed
     # and pinned for cert-chain validation. `admin.key` (private) is

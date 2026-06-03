@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Patch,
   Post,
   UploadedFile,
@@ -10,14 +11,18 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import {
   ApiBearerAuth,
   ApiBody,
   ApiConsumes,
   ApiOkResponse,
   ApiOperation,
+  ApiProperty,
   ApiTags,
 } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import * as fs from 'fs';
 import * as path from 'path';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -25,13 +30,42 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { UsersService } from './users.service';
 import { UpdateProfileDto, UserProfileDto } from './dto/user.dto';
+import { UserReportEntity } from '../database/entities/user-report.entity';
+
+class CreateReportDto {
+  @ApiProperty({ enum: ['feedback', 'bug', 'other'], required: false })
+  @IsOptional()
+  @IsIn(['feedback', 'bug', 'other'])
+  type?: 'feedback' | 'bug' | 'other';
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(2000)
+  content!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  platform?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  app_version?: string;
+}
 
 @ApiTags('Users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    @InjectRepository(UserReportEntity)
+    private readonly reports: Repository<UserReportEntity>,
+  ) {}
 
   @Get('profile')
   @ApiOperation({ summary: 'Get the current user profile' })
@@ -88,5 +122,24 @@ export class UsersController {
     const storageKey = path.posix.join('avatars', filename);
     const publicUrl = `/uploads/${storageKey}`;
     return this.users.setAvatar(user.sub, storageKey, publicUrl);
+  }
+
+  /** Submit a feedback / bug report from the app. */
+  @Post('report')
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Submit a user feedback / bug report' })
+  async submitReport(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: CreateReportDto,
+  ) {
+    const report = this.reports.create({
+      user_id: user.sub,
+      type: dto.type ?? 'feedback',
+      content: dto.content,
+      platform: dto.platform ?? null,
+      app_version: dto.app_version ?? null,
+    });
+    await this.reports.save(report);
+    return { ok: true };
   }
 }

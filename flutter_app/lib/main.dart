@@ -16,16 +16,45 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 import 'package:rive/rive.dart' as rive;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'core/cache/cache_seeder.dart';
+import 'core/config/layout_config_provider.dart';
+import 'l10n/generated/app_localizations.dart';
+import 'core/cache/cache_store.dart';
 import 'core/config/app_config.dart';
 import 'core/license/license_state_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+
+const _kRequiredPackage = 'com.ryongma.cid';
+const _kAppCheckChannel = MethodChannel('com.vlearn2/app_check');
+
+/// Checks whether [_kRequiredPackage] is installed. If not, swaps in a
+/// blocking screen that tells the user to install it and exits on confirm.
+Future<void> _checkRequiredApp() async {
+  bool installed = false;
+  try {
+    installed = await _kAppCheckChannel.invokeMethod<bool>(
+          'isInstalled',
+          {'packageName': _kRequiredPackage},
+        ) ??
+        false;
+  } catch (_) {
+    installed = false;
+  }
+  if (!installed) {
+    runApp(const _RequiredAppMissingScreen());
+    // Prevent the rest of main() from running.
+    await Future<void>.delayed(const Duration(days: 9999));
+  }
+}
 
 /// Requests storage permissions so the app can create the public
 /// 룡마/가상외국어회화 config folder under `/storage/emulated/0/`.
@@ -61,7 +90,10 @@ Future<void> main() async {
   await rive.RiveNative.init();
   // Request external storage permission before reading the config file so
   // that ConfigFileService can create the public 룡마/가상외국어회화 directory.
-  if (Platform.isAndroid) await _requestAndroidStorage();
+  if (Platform.isAndroid) {
+    await _requestAndroidStorage();
+    await _checkRequiredApp();
+  }
   // Resolve the on-disk config (creating it with defaults if missing) so the
   // Dio client and any other config-dependent provider sees the real values
   // on its first read. Without this, the first request would race the file
@@ -73,12 +105,79 @@ Future<void> main() async {
     // Treat unreadable config as "use defaults" — the service itself rewrites
     // a broken file on the next save, so this never leaves the app stuck.
   }
+  // On first install the user has no saved language preference. Fetch the
+  // admin-configured default (app.default_language) from the remote config
+  // and write it to SharedPreferences before AppSettingsNotifier loads, so
+  // the very first launch already uses the language the admin chose.
+  try {
+    await container.read(layoutConfigProvider.notifier).refresh();
+    final prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey('settings.ui_language')) {
+      const supportedLangs = {'en', 'zh', 'ru', 'ko'};
+      final lang = container
+          .read(layoutConfigProvider)
+          .valueOrNull
+          ?.get<String>('app.default_language');
+      if (lang != null && supportedLangs.contains(lang)) {
+        await prefs.setString('settings.ui_language', lang);
+      }
+    }
+  } catch (_) {
+    // First-launch language detection is best-effort; the app defaults to
+    // English if the server is unreachable on the very first boot.
+  }
+  // Pre-seed the local SQLite cache from bundled asset JSON files so the
+  // scenario/category lists show instantly on first launch without a network
+  // round-trip. No-op on subsequent launches (cache already populated).
+  await CacheSeeder.seedIfEmpty(container.read(cacheStoreProvider));
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const VLearn2App(),
     ),
   );
+}
+
+/// Shown when [_kRequiredPackage] is not installed. Blocks app startup and
+/// exits on user confirmation.
+class _RequiredAppMissingScreen extends StatelessWidget {
+  const _RequiredAppMissingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red),
+                SizedBox(height: 24),
+                Text(
+                  'Required app not installed',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'Please install the CID app (com.ryongma.cid) before using this application.',
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: SystemNavigator.pop,
+                  child: Text('OK'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Root widget. Reads the theme key, font group, locale, and router from
@@ -112,8 +211,11 @@ class VLearn2App extends ConsumerWidget {
       supportedLocales: const [
         Locale('en'),
         Locale('zh'),
+        Locale('ru'),
+        Locale('ko'),
       ],
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

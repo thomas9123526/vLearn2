@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,6 +55,7 @@ class AudioRecorderService {
 
   final _stateCtrl =
       StreamController<AudioRecorderState>.broadcast(sync: true);
+  final _amplitudeCtrl = StreamController<double>.broadcast(sync: true);
   AudioRecorderState _state = AudioRecorderState.idle;
 
   StreamSubscription<Uint8List>? _sub;
@@ -63,6 +65,11 @@ class AudioRecorderService {
 
   AudioRecorderState get state => _state;
   Stream<AudioRecorderState> get stateStream => _stateCtrl.stream;
+
+  /// Emits normalised RMS amplitude (0.0–1.0) for each PCM chunk received
+  /// during recording. Resets to 0.0 when recording stops.
+  Stream<double> get amplitudeStream => _amplitudeCtrl.stream;
+
   bool get isRecording => _state == AudioRecorderState.recording;
 
   void _setState(AudioRecorderState next) {
@@ -71,7 +78,7 @@ class AudioRecorderService {
     _stateCtrl.add(next);
   }
 
-  /// Asks the OS for mic permission. Returns `true` if granted.
+/// Asks the OS for mic permission. Returns `true` if granted.
   ///
   /// On Android this triggers the system dialog the first time and reads the
   /// stored choice thereafter — `permission_handler` handles all of that.
@@ -116,7 +123,24 @@ class AudioRecorderService {
       );
       _startedAt = DateTime.now();
       _sub = stream.listen(
-        _buffer.add,
+        (chunk) {
+          _buffer.add(chunk);
+          // Compute RMS from the 16-bit PCM chunk and emit normalised 0..1.
+          // Copy to a fresh buffer first — chunk may be a sub-view with a
+          // non-zero offsetInBytes that isn't 2-byte-aligned, which would
+          // throw a RangeError from asInt16List.
+          if (chunk.length < 2) return;
+          final aligned = Uint8List.fromList(chunk);
+          final samples = aligned.buffer.asInt16List(0, aligned.lengthInBytes ~/ 2);
+          double sum = 0;
+          for (final s in samples) {
+            sum += s * s;
+          }
+          final rms = math.sqrt(sum / samples.length);
+          // int16 max is 32767; apply mild compression so quiet voices show up.
+          final normalized = math.pow(rms / 32767.0, 0.4).clamp(0.0, 1.0).toDouble();
+          _amplitudeCtrl.add(normalized);
+        },
         onError: (Object _) => _setState(AudioRecorderState.error),
         cancelOnError: true,
       );
@@ -140,6 +164,7 @@ class AudioRecorderService {
     await _recorder.stop();
     await _sub?.cancel();
     _sub = null;
+    _amplitudeCtrl.add(0.0);
     _setState(AudioRecorderState.idle);
     final pcm = _buffer.takeBytes();
     if (pcm.isEmpty) return null;
@@ -165,6 +190,7 @@ class AudioRecorderService {
     _sub = null;
     _buffer.clear();
     _startedAt = null;
+    _amplitudeCtrl.add(0.0);
     _setState(AudioRecorderState.idle);
   }
 
@@ -172,6 +198,7 @@ class AudioRecorderService {
     await cancel();
     await _recorder.dispose();
     await _stateCtrl.close();
+    await _amplitudeCtrl.close();
   }
 }
 

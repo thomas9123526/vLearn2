@@ -26,6 +26,9 @@ export class OpenAICompatibleProvider extends AiProvider {
   private readonly chatModel: string;
   private readonly analysisModel: string;
 
+  private readonly timeoutMs: number;
+  private readonly disableThinking: boolean;
+
   constructor(config: ConfigService) {
     super();
     const baseURL = config.get<string>('OPENAI_BASE_URL');
@@ -34,9 +37,15 @@ export class OpenAICompatibleProvider extends AiProvider {
         'OPENAI_BASE_URL not set — OpenAICompatibleProvider will throw on use.',
       );
     }
+    this.timeoutMs = parseInt(config.get<string>('AI_TIMEOUT_MS') ?? '60000', 10);
+    // Set AI_DISABLE_THINKING=true for Qwen3/DeepSeek reasoning models to stop
+    // them spending all tokens inside <think>…</think> with no actual reply.
+    this.disableThinking = config.get<string>('AI_DISABLE_THINKING') === 'true';
+
     this.client = new OpenAI({
       baseURL: baseURL ?? 'http://localhost:11434/v1',
       apiKey: config.get<string>('OPENAI_API_KEY') ?? 'not-needed',
+      timeout: this.timeoutMs,
     });
     this.name = config.get<string>('AI_PROVIDER_LABEL') ?? 'openai-compatible';
     this.chatModel = config.get<string>('AI_CHAT_MODEL') ?? 'llama3.1:70b';
@@ -52,11 +61,16 @@ export class OpenAICompatibleProvider extends AiProvider {
     this.logger.log(
       `OUTBOUND system_prompt (${req.systemPrompt.length} chars): ${req.systemPrompt}`,
     );
+    // Prepend /no_think for Qwen3/DeepSeek so the model skips chain-of-thought
+    // and replies directly — prevents spending all max_tokens inside <think>.
+    const systemPrompt = this.disableThinking
+      ? `/no_think\n${req.systemPrompt}`
+      : req.systemPrompt;
     try {
       const res = await this.client.chat.completions.create({
         model: this.chatModel,
         messages: [
-          { role: 'system', content: req.systemPrompt },
+          { role: 'system', content: systemPrompt },
           ...req.messages.map((m) => ({ role: m.role, content: m.content })),
         ],
         max_tokens: req.maxTokens ?? 400,
@@ -82,12 +96,15 @@ export class OpenAICompatibleProvider extends AiProvider {
   }
 
   async structured<T>(req: StructuredRequest): Promise<StructuredResponse<T>> {
+    const systemPrompt = this.disableThinking
+      ? `/no_think\n${req.systemPrompt}`
+      : req.systemPrompt;
     try {
       // Try json_schema first (supported by Groq, OpenAI; ignored by older Ollama)
       const res = await this.client.chat.completions.create({
         model: this.analysisModel,
         messages: [
-          { role: 'system', content: req.systemPrompt },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: req.userPrompt },
         ],
         max_tokens: req.maxTokens ?? 600,

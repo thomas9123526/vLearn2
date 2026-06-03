@@ -20,7 +20,6 @@ const i18nText = z.object({
 const schema = z.object({
   slug: z.string().min(2).max(100),
   category: z.enum(['travel', 'business', 'social', 'daily']),
-  difficulty: z.coerce.number().int().min(1).max(5),
   title: i18nText,
   description: i18nText,
   scene_description: i18nText,
@@ -35,6 +34,7 @@ type FormValues = z.infer<typeof schema>;
 export default function NewScenarioPage() {
   const router = useRouter();
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const {
     register,
@@ -42,7 +42,7 @@ export default function NewScenarioPage() {
     formState: { isSubmitting, errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { category: 'daily', difficulty: 2, estimated_minutes: 5, xp_reward: 50 },
+    defaultValues: { category: 'daily', estimated_minutes: 5, xp_reward: 50 },
   });
 
   async function onSubmit(values: FormValues) {
@@ -60,6 +60,15 @@ export default function NewScenarioPage() {
         const fd = new FormData();
         fd.append('file', imageFile);
         await api(`/admin/scenarios/${created.id}/image`, {
+          method: 'POST',
+          body: fd,
+          multipart: true,
+        });
+      }
+      if (backgroundImageFile) {
+        const fd = new FormData();
+        fd.append('file', backgroundImageFile);
+        await api(`/admin/scenarios/${created.id}/background-image`, {
           method: 'POST',
           body: fd,
           multipart: true,
@@ -93,7 +102,6 @@ export default function NewScenarioPage() {
                 <option>daily</option>
               </select>
             </div>
-            <Field id="difficulty" label="Difficulty (1-5)" type="number" {...register('difficulty')} />
             <Field id="estimated_minutes" label="Estimated minutes" type="number" {...register('estimated_minutes')} />
           </div>
           <Field id="xp_reward" label="XP reward" type="number" {...register('xp_reward')} />
@@ -114,6 +122,18 @@ export default function NewScenarioPage() {
             <Field id="tutor_role.en" label="Tutor role (EN)" {...register('tutor_role.en')} error={errors.tutor_role?.en?.message} />
           </Section>
 
+          <div>
+            <Label htmlFor="background_image">Scene background image (optional)</Label>
+            <Input
+              id="background_image"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => setBackgroundImageFile(e.target.files?.[0] ?? null)}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Background artwork shown behind the scenario. PNG / JPEG / WEBP, ≤ 5 MB.
+            </p>
+          </div>
           <div>
             <Label htmlFor="image">Hero image (optional)</Label>
             <Input

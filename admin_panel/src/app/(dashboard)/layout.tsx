@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import {
   LayoutDashboard,
   BookOpen,
@@ -17,34 +18,40 @@ import {
   MessageSquareCode,
   ListTree,
   KeyRound,
+  BarChart2,
+  MessageCircleWarning,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { tokenStore, currentClaims } from '@/lib/auth';
 import { useCurrentUser } from '@/hooks/use-current-user';
-
-const NAV = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard, perm: null },
-  { href: '/personas', label: 'Tutors', icon: Sparkles, perm: 'personas.edit' },
-  { href: '/prompt-templates', label: 'Prompts', icon: MessageSquareCode, perm: 'prompts.view' },
-  { href: '/scenarios', label: 'Scenarios', icon: BookOpen, perm: 'scenarios.view' },
-  { href: '/categories', label: 'Categories', icon: ListTree, perm: 'categories.view' },
-  { href: '/users', label: 'Users', icon: Users, perm: 'users.view' },
-  { href: '/news', label: 'News', icon: Newspaper, perm: 'news.view' },
-  { href: '/leaderboard', label: 'Leaderboard', icon: Trophy, perm: 'leaderboard.view' },
-  { href: '/audit', label: 'Audit log', icon: ScrollText, perm: 'audit.view' },
-  { href: '/admins', label: 'Admins', icon: ShieldCheck, perm: 'admins.view' },
-  { href: '/config', label: 'Config flags', icon: Settings, perm: 'config.view' },
-  { href: '/license', label: 'License', icon: KeyRound, perm: 'config.view' },
-  { href: '/settings', label: 'Settings', icon: Settings, perm: null },
-] as const;
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const user = useCurrentUser();
+  const t = useTranslations('nav');
+  const tAuth = useTranslations('auth');
+
+  const NAV = [
+    { href: '/', label: t('dashboard'), icon: LayoutDashboard, perm: null },
+    { href: '/teachers', label: t('teachers'), icon: Sparkles, perm: 'personas.edit' },
+    { href: '/prompt-templates', label: t('prompts'), icon: MessageSquareCode, perm: 'prompts.view' },
+    { href: '/scenarios', label: t('scenarios'), icon: BookOpen, perm: 'scenarios.view' },
+    { href: '/categories', label: t('categories'), icon: ListTree, perm: 'categories.view' },
+    { href: '/users', label: t('users'), icon: Users, perm: 'users.view' },
+    { href: '/news', label: t('news'), icon: Newspaper, perm: 'news.view' },
+    { href: '/leaderboard', label: t('leaderboard'), icon: Trophy, perm: 'leaderboard.view' },
+    { href: '/usage', label: t('usage'), icon: BarChart2, perm: 'analytics.view' },
+    { href: '/reports', label: t('reports'), icon: MessageCircleWarning, perm: 'analytics.view' },
+    { href: '/audit', label: t('auditLog'), icon: ScrollText, perm: 'audit.view' },
+    { href: '/admins', label: t('admins'), icon: ShieldCheck, perm: 'admins.view' },
+    { href: '/config', label: t('configFlags'), icon: Settings, perm: 'config.view' },
+    { href: '/license', label: t('license'), icon: KeyRound, perm: 'config.view' },
+    { href: '/settings', label: t('settings'), icon: Settings, perm: null },
+  ] as const;
 
   useEffect(() => {
-    // Hydration-safe auth gate.
     const claims = currentClaims();
     if (!claims) {
       router.replace('/signin');
@@ -95,17 +102,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted"
           >
             <LogOut className="h-4 w-4" />
-            Sign out
+            {tAuth('signOut')}
           </button>
         </div>
       </aside>
       <main className="flex-1 overflow-x-hidden">
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
           <div className="text-sm font-medium capitalize">
-            {pathname === '/' ? 'Dashboard' : pathname.slice(1).split('/').join(' / ')}
+            {pathname === '/' ? t('dashboard') : pathname.slice(1).split('/').join(' / ')}
           </div>
-          <div className="text-xs text-muted-foreground">
-            Role: <span className="font-medium">{user.role}</span>
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <div className="text-xs text-muted-foreground">
+              Role: <span className="font-medium">{user.role}</span>
+            </div>
           </div>
         </header>
         <div className="p-6">{children}</div>

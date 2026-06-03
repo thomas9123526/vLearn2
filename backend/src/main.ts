@@ -13,6 +13,7 @@
 // All real business logic lives inside feature modules under src/*. This
 // file is intentionally thin.
 
+import './polyfill'; // must be first — populates globalThis.crypto for Node 18
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -20,6 +21,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import compression from 'compression';
+import cors from 'cors';
 import * as path from 'path';
 import { AppModule } from './app.module';
 import { GzipFlagCache } from './app-config/app-config.module';
@@ -81,6 +83,20 @@ async function bootstrap() {
 
   // ─── API prefix + versioning ───────────────────────────────
   app.setGlobalPrefix('api', { exclude: ['health', 'uploads/(.*)'] });
+
+  // ─── CORS for static files ──────────────────────────────────
+  // The global CORS middleware may not apply to static files served via
+  // useStaticAssets, so we add explicit CORS middleware for /uploads/
+  const corsOptions = {
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
+    credentials: true,
+  };
+  app.use('/uploads/', cors(corsOptions), (_req: any, res: any, next: any) => {
+    // Helmet sets CORP to same-origin by default; override so cross-origin
+    // pages (admin panel on :4101) can load images served from :5101.
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  });
 
   // ─── Static uploads (scenario hero images, news hero images) ──
   const uploadsDir = process.env.UPLOADS_DIR ?? path.resolve('uploads');

@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../storage/model_registry.dart';
 import 'sherpa_onnx_stt.dart';
 import 'sherpa_onnx_tts.dart';
+import 'speech_config.dart';
+import 'streaming_stt_service.dart';
+import 'third_stt_service.dart';
 
 class SttResult {
   const SttResult({
@@ -61,10 +64,20 @@ abstract class TextToSpeechService {
   Future<void> dispose();
 
   /// Emits `true` when synthesized audio starts playing, `false` when it
-  /// stops. The Tutor-mode avatar subscribes to this to drive mouth-pulse
-  /// and emotion-state animations. Placeholder implementations return an
-  /// empty stream so subscribers don't crash when speech is unavailable.
+  /// stops. The Tutor-mode avatar subscribes to this to drive emotion-state
+  /// animations. Placeholder implementations return an empty stream.
   Stream<bool> get isSpeakingStream;
+
+  /// Synchronous snapshot of the current speaking state. Use this to
+  /// initialise UI that mounts mid-speech, since [isSpeakingStream] only
+  /// emits on changes and a late subscriber would miss the current state.
+  bool get isSpeaking;
+
+  /// Emits a 0.0–1.0 loudness envelope value at ~60 fps during speech
+  /// playback, derived from the RMS of the synthesized PCM. Drives the
+  /// `amplitude` input on the emo_linear.riv Mochi state machine so the
+  /// mouth opens proportionally to voice loudness. Emits 0 when silent.
+  Stream<double> get amplitudeStream;
 }
 
 // ─── Placeholder implementations (real sherpa-onnx integration lands later) ──
@@ -120,10 +133,14 @@ class PlaceholderTtsService extends TextToSpeechService {
   @override
   Future<void> dispose() async {}
 
-  /// Placeholder has nothing to play, so the stream is empty (never emits).
-  /// Subscribers stay safe — they just never get a tick.
   @override
   Stream<bool> get isSpeakingStream => const Stream.empty();
+
+  @override
+  bool get isSpeaking => false;
+
+  @override
+  Stream<double> get amplitudeStream => const Stream.empty();
 }
 
 /// Picks the sherpa-onnx implementation when the model registry reports the
@@ -147,6 +164,35 @@ final ttsServiceProvider = Provider<TextToSpeechService>((ref) {
     return SherpaOnnxTtsService(registry: ref.read(modelRegistryProvider));
   }
   return PlaceholderTtsService();
+});
+
+/// Provides a [StreamingSttService] for the third-party AAR engine.
+///
+/// Returns null when [SpeechConfig.sttEngine] is not [SttEngine.thirdStt].
+/// The caller must call [StreamingSttService.configure] before [start].
+/// Call [StreamingSttService.dispose] in ref.onDispose.
+///
+/// Example:
+/// ```dart
+/// final svc = ref.watch(streamingSttServiceProvider);
+/// if (svc != null) {
+///   ref.onDispose(svc.dispose);
+///   await svc.configure({'modelPath': '/data/.../model', 'sampleRate': 16000});
+///   await svc.start();
+///   svc.events.listen((e) { … });
+/// }
+/// ```
+final streamingSttServiceProvider = Provider<StreamingSttService?>((ref) {
+  // TODO: load SpeechConfig from assets/speech_config.json and expose as a
+  // provider. For now, the engine is selected at compile time.
+  // Set to SttEngine.sherpaOnnxStreaming (or sherpaOnnxWhisper) in production.
+  const engine = SttEngine.thirdStt; // fake engine for testing
+  if (engine == SttEngine.thirdStt) {
+    final svc = ThirdSttService();
+    ref.onDispose(svc.dispose);
+    return svc;
+  }
+  return null;
 });
 
 /// `true` when the on-disk model bundle passed manifest + SHA-256 checks.

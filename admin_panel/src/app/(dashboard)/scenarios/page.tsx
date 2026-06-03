@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, CheckCircle2, Archive, Trash2 } from 'lucide-react';
+import { Plus, CheckCircle2, Archive, Trash2, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
@@ -12,10 +13,10 @@ interface Scenario {
   id: string;
   slug: string;
   category: string;
-  difficulty: number;
   status: 'draft' | 'published' | 'archived';
   title: Record<string, string>;
   image_url: string | null;
+  background_image_url?: string | null;
   created_at: string;
 }
 
@@ -23,10 +24,19 @@ export default function ScenariosPage() {
   const canEdit = usePermission('scenarios.edit');
   const canDelete = usePermission('scenarios.delete');
   const qc = useQueryClient();
+  const [nameQuery, setNameQuery] = useState('');
+  const [categoryQuery, setCategoryQuery] = useState('');
+  const [filters, setFilters] = useState({ q: '', category: '' });
 
   const { data, isLoading, error } = useQuery<Scenario[]>({
-    queryKey: ['admin-scenarios'],
-    queryFn: () => api<Scenario[]>('/admin/scenarios'),
+    queryKey: ['admin-scenarios', filters],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (filters.q) params.set('q', filters.q);
+      if (filters.category) params.set('category', filters.category);
+      const url = `/admin/scenarios${params.toString() ? `?${params.toString()}` : ''}`;
+      return api<Scenario[]>(url);
+    },
   });
 
   const publish = useMutation({
@@ -44,8 +54,11 @@ export default function ScenariosPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Scenarios</h1>
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Scenarios</h1>
+          <p className="text-sm text-muted-foreground">Search by scenario name and category.</p>
+        </div>
         {canEdit && (
           <Link href="/scenarios/new">
             <Button>
@@ -56,6 +69,53 @@ export default function ScenariosPage() {
         )}
       </div>
 
+      <form
+        className="grid gap-3 rounded-md border border-border bg-muted p-4 md:grid-cols-[1fr_auto]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setFilters({ q: nameQuery.trim(), category: categoryQuery.trim() });
+        }}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1 text-sm">
+            <span className="font-medium">Scenario name</span>
+            <input
+              type="text"
+              value={nameQuery}
+              onChange={(event) => setNameQuery(event.target.value)}
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm shadow-sm focus:border-primary focus:outline-none"
+              placeholder="Search name"
+            />
+          </label>
+
+          <label className="space-y-1 text-sm">
+            <span className="font-medium">Category</span>
+            <input
+              type="text"
+              value={categoryQuery}
+              onChange={(event) => setCategoryQuery(event.target.value)}
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm shadow-sm focus:border-primary focus:outline-none"
+              placeholder="Category slug"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button type="submit">Filter</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setNameQuery('');
+              setCategoryQuery('');
+              setFilters({ q: '', category: '' });
+            }}
+          >
+            Clear
+          </Button>
+        </div>
+      </form>
+
       {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
       {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
 
@@ -65,7 +125,6 @@ export default function ScenariosPage() {
             <tr>
               <th className="px-4 py-2 text-left font-medium">Title</th>
               <th className="px-4 py-2 text-left font-medium">Category</th>
-              <th className="px-4 py-2 text-left font-medium">Difficulty</th>
               <th className="px-4 py-2 text-left font-medium">Status</th>
               <th className="px-4 py-2"></th>
             </tr>
@@ -79,7 +138,6 @@ export default function ScenariosPage() {
                   <span>{s.title?.en ?? s.slug}</span>
                 </td>
                 <td className="px-4 py-2 capitalize">{s.category}</td>
-                <td className="px-4 py-2">{'★'.repeat(s.difficulty)}</td>
                 <td className="px-4 py-2 capitalize">{s.status}</td>
                 <td className="px-4 py-2 text-right space-x-1">
                   {canEdit && s.status === 'draft' && (
@@ -91,6 +149,13 @@ export default function ScenariosPage() {
                     <Button size="sm" variant="ghost" onClick={() => archive.mutate(s.id)}>
                       <Archive className="h-4 w-4" /> Archive
                     </Button>
+                  )}
+                  {canEdit && (
+                    <Link href={`/scenarios/${s.id}`}>
+                      <Button size="sm" variant="outline">
+                        <Edit2 className="h-4 w-4" /> Edit
+                      </Button>
+                    </Link>
                   )}
                   {canDelete && (
                     <Button

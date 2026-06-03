@@ -21,6 +21,7 @@ import { AdminModule } from './admin/admin.module';
 import { AppConfigModule } from './app-config/app-config.module';
 import { LicenseModule } from './license/license.module';
 import { NewsModule } from './news/news.module';
+import { NetworkStatsModule } from './network-stats/network-stats.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { NewsModule } from './news/news.module';
     AppConfigModule,
     LicenseModule,
     NewsModule,
+    NetworkStatsModule,
   ],
   controllers: [HealthController],
   providers: [

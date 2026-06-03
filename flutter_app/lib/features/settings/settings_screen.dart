@@ -12,7 +12,9 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/theme/bubble_style.dart';
 import '../../core/theme/font_group.dart';
 import '../../features/conversation/widgets/chat_bubble.dart';
+import '../../core/config/app_config.dart';
 import '../../core/models/models.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../license/license_screen.dart';
 import 'change_password_dialog.dart';
 import 'edit_profile_dialog.dart';
@@ -41,53 +43,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final user = ref.watch(authProvider).user;
     final settings = ref.watch(appSettingsProvider);
     final fontGroup = ref.watch(fontGroupProvider);
     final bubbleStyle = ref.watch(bubbleStyleProvider);
-    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(l10n.settingsTitle)),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           if (user != null)
             ListTile(
-              leading: CircleAvatar(
-                backgroundColor: scheme.primaryContainer,
-                child: Text(user.avatarEmoji, style: const TextStyle(fontSize: 20)),
-              ),
+              leading: _UserAvatarCircle(user: user),
               title: Text(user.displayName),
               subtitle: Text(user.email ?? ''),
               trailing: const Icon(Icons.edit_outlined),
               onTap: () => showEditProfileDialog(context),
             ),
           const Divider(),
-          const _SectionHeader(text: 'Appearance'),
+          _SectionHeader(text: l10n.settingsAppearance),
           ListTile(
             leading: const Icon(Icons.palette_outlined),
-            title: const Text('Theme'),
+            title: Text(l10n.settingsTheme),
             subtitle: Text(settings.theme),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickTheme(context, ref),
           ),
           ListTile(
             leading: const Icon(Icons.language_outlined),
-            title: const Text('Language'),
+            title: Text(l10n.settingsLanguage),
             subtitle: Text(_languageLabel(settings.uiLanguage)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickLanguage(context, ref),
           ),
-          const _SectionHeader(text: 'Font'),
+          _SectionHeader(text: l10n.settingsFont),
           ListTile(
             leading: const Icon(Icons.text_fields_outlined),
-            title: const Text('Font group'),
+            title: Text(l10n.settingsFontGroup),
             subtitle: Text(fontGroup.displayName),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickFontGroup(context, ref, fontGroup),
           ),
-          const _SectionHeader(text: 'Conversation'),
+          _SectionHeader(text: l10n.settingsConversation),
           const _ActiveTutorTile(),
           ListTile(
             leading: Icon(
@@ -95,11 +94,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ? Icons.face_retouching_natural
                   : Icons.chat_bubble_outline,
             ),
-            title: const Text('Default mode'),
+            title: Text(l10n.settingsDefaultMode),
             subtitle: Text(
               settings.defaultConversationMode == 'face'
-                  ? 'Tutor mode (face-to-face)'
-                  : 'Chat mode',
+                  ? l10n.conversationModeFace
+                  : l10n.conversationModeChat,
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickDefaultMode(
@@ -110,7 +109,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.chat_bubble_outline),
-            title: const Text('Bubble style'),
+            title: Text(l10n.settingsBubbleStyle),
             subtitle: Text(bubbleStyle.displayName),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickBubbleStyle(context, ref, bubbleStyle),
@@ -139,8 +138,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ],
+          if (ref.watch(layoutConfigProvider).maybeWhen(
+                data: (cfg) => cfg.get<bool>('system.user_report_enabled') ?? true,
+                orElse: () => true,
+              )) ...[
+            const Divider(),
+            const _SectionHeader(text: 'Feedback'),
+            ListTile(
+              leading: const Icon(Icons.feedback_outlined),
+              title: const Text('Send feedback'),
+              subtitle: const Text('Report a bug or share your opinion'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showReportDialog(context, ref),
+            ),
+          ],
           const Divider(),
-          const _SectionHeader(text: 'Account'),
+          _SectionHeader(text: l10n.settingsAccount),
           ListTile(
             leading: const Icon(Icons.lock_outline),
             title: const Text('Change password'),
@@ -149,7 +162,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text('Sign out'),
+            title: Text(l10n.signOut),
             onTap: () => ref.read(authProvider.notifier).signOut(),
           ),
         ],
@@ -157,8 +170,81 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<void> _showReportDialog(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController();
+    String type = 'feedback';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Send feedback'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: type,
+                decoration: const InputDecoration(labelText: 'Type'),
+                items: const [
+                  DropdownMenuItem(value: 'feedback', child: Text('Feedback')),
+                  DropdownMenuItem(value: 'bug',      child: Text('Bug report')),
+                  DropdownMenuItem(value: 'other',    child: Text('Other')),
+                ],
+                onChanged: (v) => setState(() => type = v ?? 'feedback'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 4,
+                maxLength: 2000,
+                decoration: const InputDecoration(
+                  labelText: 'Message',
+                  hintText: 'Describe what you experienced…',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final text = controller.text.trim();
+                if (text.isEmpty) return;
+                Navigator.of(ctx).pop();
+                try {
+                  await ref.read(usersApiProvider).sendReport(
+                    content: text,
+                    type: type,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Feedback sent. Thank you!')),
+                    );
+                  }
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to send feedback. Try again later.')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+  }
+
   String _languageLabel(String code) => switch (code) {
         'zh' => '中文',
+        'ru' => 'Русский',
+        'ko' => '한국어',
         _ => 'English',
       };
 
@@ -205,7 +291,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (_) => ListView(
         shrinkWrap: true,
         children: [
-          for (final l in const [('en', 'English'), ('zh', '中文')])
+          for (final l in const [
+            ('en', 'English'),
+            ('zh', '中文'),
+            ('ru', 'Русский'),
+            ('ko', '한국어'),
+          ])
             ListTile(
               title: Text(l.$2),
               onTap: () => Navigator.pop(context, l.$1),
@@ -278,6 +369,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     WidgetRef ref,
     String current,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final picked = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -289,10 +381,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.face_retouching_natural),
-                title: const Text('Tutor mode (face-to-face)'),
-                subtitle: const Text(
-                  'Speak with the animated tutor. The tutor speaks back.',
-                ),
+                title: Text(l10n.conversationModeFace),
+                subtitle: Text(l10n.conversationModeFaceHint),
                 trailing: current == 'face'
                     ? Icon(Icons.check, color: scheme.primary)
                     : null,
@@ -300,8 +390,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.chat_bubble_outline),
-                title: const Text('Chat mode'),
-                subtitle: const Text('Type back and forth with the tutor.'),
+                title: Text(l10n.conversationModeChat),
+                subtitle: Text(l10n.conversationModeChatHint),
                 trailing: current == 'chat'
                     ? Icon(Icons.check, color: scheme.primary)
                     : null,
@@ -655,6 +745,50 @@ class _ModelStorageTile extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Profile tile avatar: shows the uploaded photo (rounded circle) when
+/// avatar_url is set; falls back to the emoji avatar otherwise.
+class _UserAvatarCircle extends StatefulWidget {
+  const _UserAvatarCircle({required this.user});
+
+  final UserProfile user;
+
+  @override
+  State<_UserAvatarCircle> createState() => _UserAvatarCircleState();
+}
+
+class _UserAvatarCircleState extends State<_UserAvatarCircle> {
+  bool _imageError = false;
+
+  String? _resolveUrl(String relative) {
+    if (relative.startsWith('http')) return relative;
+    final base = AppConfig.defaults.backendBaseUrl;
+    final idx = base.indexOf('/api');
+    final idx2 = base.indexOf('/vfls');
+    final origin =
+        idx > 0 ? base.substring(0, idx) : (idx2 > 0 ? base.substring(0, idx2) : base);
+    return '$origin$relative';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final url = widget.user.avatarUrl;
+    final fullUrl = (!_imageError && url != null && url.isNotEmpty) ? _resolveUrl(url) : null;
+
+    return CircleAvatar(
+      radius: 22,
+      backgroundColor: scheme.primaryContainer,
+      backgroundImage: fullUrl != null ? NetworkImage(fullUrl) : null,
+      onBackgroundImageError: fullUrl != null
+          ? (_, _) => setState(() => _imageError = true)
+          : null,
+      child: fullUrl == null
+          ? Text(widget.user.avatarEmoji, style: const TextStyle(fontSize: 20))
+          : null,
     );
   }
 }

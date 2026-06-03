@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import type { UserRole, UserStatus } from './user.entity';
 import { UserEntity } from './user.entity';
+import { encryptedFieldTransformer } from '../../common/field-encryption';
 
 @Entity({ name: 'vl_user_info' })
 @Index(['xp_total'])
@@ -21,7 +22,7 @@ export class UserInfoEntity {
   user!: UserEntity;
 
   @Index({ unique: true })
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 512, transformer: encryptedFieldTransformer })
   email!: string;
 
   @Column({ type: 'varchar', length: 10, default: '🐣' })
@@ -77,9 +78,28 @@ export class UserInfoEntity {
   @Column({ type: 'timestamptz', nullable: true })
   suspended_until!: Date | null;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, transformer: encryptedFieldTransformer })
   suspended_reason!: string | null;
 
   @Column({ type: 'boolean', default: true })
   leaderboard_opt_in!: boolean;
+
+  // ─── License (moved from users table) ──────────────────────────────────────
+  // Physical columns on users.license_* are kept for cross-system compatibility
+  // but this app reads/writes here exclusively.
+
+  @Column({ type: 'timestamptz', nullable: true })
+  license_valid_until!: Date | null;
+
+  @Column({ type: 'text', nullable: true, transformer: encryptedFieldTransformer })
+  license_machine_id!: string | null;
+
+  @Column({ type: 'text', nullable: true, transformer: encryptedFieldTransformer })
+  license_serial!: string | null;
+
+  /// Platform tag reported by the client at /license/verify time.
+  /// Values mirror Flutter's defaultTargetPlatform: 'android', 'windows',
+  /// 'ios', 'macos', 'linux', 'fuchsia', 'web'.
+  @Column({ type: 'text', nullable: true })
+  license_platform!: string | null;
 }
