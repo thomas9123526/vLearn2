@@ -233,8 +233,19 @@ class ConfigFileService {
       }
     }
 
-    // No permission yet — write to app-scoped storage. Next launch (after the
-    // user grants MANAGE_EXTERNAL_STORAGE in Settings) will migrate this file.
+    // No write permission yet (MANAGE_EXTERNAL_STORAGE opens the Settings
+    // page and returns immediately, so it may not be granted on this launch).
+    // If the admin pre-placed the config at the public path, reading it does
+    // not require MANAGE_EXTERNAL_STORAGE — try it before falling back to the
+    // app-scoped path so the first-launch config is never silently replaced
+    // with defaults.
+    final publicFile = File(p.join(publicDir.path, _fileName));
+    if (publicFile.existsSync()) {
+      return publicFile;
+    }
+
+    // No permission, no pre-placed file — write to app-scoped storage.
+    // Next launch after the user grants MANAGE_EXTERNAL_STORAGE will migrate.
     if (!fallbackDir.existsSync()) {
       fallbackDir.createSync(recursive: true);
     }
