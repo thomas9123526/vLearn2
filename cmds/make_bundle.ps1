@@ -23,7 +23,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$FallbackHash = "681e709e0ca3745d5db5ebe56e383ecc7e4ec4de"
+#$FallbackHash = "681e709e0ca3745d5db5ebe56e383ecc7e4ec4de"
+$FallbackHash = "1cc0864db9cfa60bb9bc0778679607d401319dfa"
 
 # Resolve output path
 $root = Split-Path $PSScriptRoot -Parent
