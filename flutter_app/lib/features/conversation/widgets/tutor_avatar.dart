@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -118,9 +119,11 @@ class _TutorAvatarState extends State<TutorAvatar>
 
   /// Shared file loader — decoded once per app session, reused on every
   /// mount so re-entering the conversation screen never flashes a blank.
+  // On Windows (VMware dev) the native Rive renderer crashes against the
+  // virtual GPU; fall back to the Flutter/Skia renderer which is software-safe.
   static final rive.FileLoader _fileLoader = rive.FileLoader.fromAsset(
     'assets/animations/emoticon_linear/emo_linear.riv',
-    riveFactory: rive.Factory.rive,
+    riveFactory: Platform.isWindows ? rive.Factory.flutter : rive.Factory.rive,
   );
 
   /// Natural blink scheduler — fires every 2–5 s regardless of mood.
