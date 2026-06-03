@@ -6,6 +6,7 @@ import {
   AiProviderError,
 } from './ai-provider.interface';
 import { PromptBuilderService } from './prompt-builder.service';
+import { AiCallLogger } from './ai-call-logger';
 import type { PersonaEntity } from '../database/entities/persona.entity';
 import type { ScenarioEntity } from '../database/entities/scenario.entity';
 
@@ -56,13 +57,30 @@ export class ConversationOrchestrator {
     userNativeLanguage: string;
     history: ChatMessage[];
   }): Promise<string> {
-    const systemPrompt = await this.prompts.buildSystemPrompt(
+    const { prompt: systemPrompt, source: promptSource } =
+      await this.prompts.buildSystemPrompt(
+        args.persona,
+        args.scenario,
+        args.userLevel,
+        args.userNativeLanguage,
+      );
+
+    const variables = this.prompts.getTutorContextWithSources(
       args.persona,
       args.scenario,
       args.userLevel,
       args.userNativeLanguage,
     );
-    this.logger.log(`\n${'─'.repeat(60)}\nSYSTEM PROMPT\n${'─'.repeat(60)}\n${systemPrompt}\n${'─'.repeat(60)}`);
+
+    AiCallLogger.request({
+      callType:     'generateTutorReply',
+      timestamp:    new Date().toISOString(),
+      promptSource,
+      variables,
+      systemPrompt,
+      history:      args.history,
+    });
+
     try {
       const res = await this.ai.chat({
         systemPrompt,
@@ -72,7 +90,17 @@ export class ConversationOrchestrator {
         enablePromptCache: this.ai.capabilities.supportsPromptCache,
       });
       const text = res.content.trim();
-      this.logger.log(`\n${'─'.repeat(60)}\nAI REPLY\n${'─'.repeat(60)}\n${text}\n${'─'.repeat(60)}`);
+
+      AiCallLogger.response({
+        callType:     'generateTutorReply',
+        latencyMs:    res.latencyMs,
+        modelUsed:    res.modelUsed,
+        inputTokens:  res.inputTokens,
+        outputTokens: res.outputTokens,
+        cachedTokens: res.cachedTokens,
+        content:      text || '(empty)',
+      });
+
       if (!text) {
         this.logger.warn('AI chat returned empty text; using canned reply');
         return this.fallbackReply(args.history);
@@ -100,14 +128,29 @@ export class ConversationOrchestrator {
     errors_found: string[];
     strengths: string[];
   } | null> {
+    const userPrompt = await this.prompts.buildGrammarPrompt(userMessages, level);
+    const systemPrompt = 'You are an expert English grammar evaluator.';
+
+    AiCallLogger.request({
+      callType:     'scoreGrammar',
+      timestamp:    new Date().toISOString(),
+      promptSource: 'DB template: grammar (or built-in default)',
+      variables: {
+        'user.level':    { value: String(level), from: 'user_progress.current_level' },
+        'user.messages': { value: `${userMessages.length} messages`, from: 'session history' },
+      },
+      systemPrompt,
+      history: [{ role: 'user', content: userPrompt }],
+    });
+
     try {
       const res = await this.ai.structured<{
         grammar_score: number;
         errors_found: string[];
         strengths: string[];
       }>({
-        systemPrompt: 'You are an expert English grammar evaluator.',
-        userPrompt: await this.prompts.buildGrammarPrompt(userMessages, level),
+        systemPrompt,
+        userPrompt,
         jsonSchema: {
           type: 'object',
           properties: {
@@ -120,6 +163,16 @@ export class ConversationOrchestrator {
         },
         maxTokens: 500,
       });
+
+      AiCallLogger.response({
+        callType:     'scoreGrammar',
+        latencyMs:    0,
+        modelUsed:    res.modelUsed,
+        inputTokens:  res.inputTokens,
+        outputTokens: res.outputTokens,
+        content:      JSON.stringify(res.data, null, 2),
+      });
+
       return res.data;
     } catch (e) {
       this.logger.warn(`Grammar scoring unavailable: ${(e as Error).message}`);
@@ -142,17 +195,28 @@ export class ConversationOrchestrator {
     userNativeLanguage: string;
     history: ChatMessage[];
   }): Promise<string> {
-    const baseSystem = await this.prompts.buildSystemPrompt(
-      args.persona,
-      args.scenario,
-      args.userLevel,
-      args.userNativeLanguage,
-    );
-    const systemPrompt =
-      baseSystem +
+    const { prompt: baseSystem, source: promptSource } =
+      await this.prompts.buildSystemPrompt(
+        args.persona,
+        args.scenario,
+        args.userLevel,
+        args.userNativeLanguage,
+      );
+    const idleSuffix =
       '\n\nThe student has gone quiet. Reply ONLY with a single short English sentence (8–15 words) ' +
       'the student could say next to continue the conversation. ' +
       'Do not introduce yourself, do not explain, do not use quotation marks.';
+    const systemPrompt = baseSystem + idleSuffix;
+
+    AiCallLogger.request({
+      callType:     'suggestNextLine',
+      timestamp:    new Date().toISOString(),
+      promptSource: promptSource + ' + idle-suffix appended',
+      variables:    this.prompts.getTutorContextWithSources(args.persona, args.scenario, args.userLevel, args.userNativeLanguage),
+      systemPrompt,
+      history:      args.history,
+    });
+
     try {
       const res = await this.ai.chat({
         systemPrompt,
@@ -165,10 +229,19 @@ export class ConversationOrchestrator {
         .replace(/^["'`\s]+|["'`\s]+$/g, '')
         .replace(/\s+/g, ' ')
         .trim();
+
+      AiCallLogger.response({
+        callType:     'suggestNextLine',
+        latencyMs:    res.latencyMs,
+        modelUsed:    res.modelUsed,
+        inputTokens:  res.inputTokens,
+        outputTokens: res.outputTokens,
+        cachedTokens: res.cachedTokens,
+        content:      text || '(empty)',
+      });
+
       if (!text) {
-        this.logger.warn(
-          'AI suggestion returned empty text; using canned suggestion',
-        );
+        this.logger.warn('AI suggestion returned empty text; using canned suggestion');
         return this.fallbackSuggestion(args.history);
       }
       return text;
@@ -242,6 +315,20 @@ ${transcript}
 
 Score the LEARNER's USER turns.`;
 
+    AiCallLogger.request({
+      callType:     'evaluateSession',
+      timestamp:    new Date().toISOString(),
+      promptSource: 'inline (built-in CEFR evaluator)',
+      variables: {
+        'session.cefrLevel':    { value: cefrLabel,                             from: 'session.cefr_level' },
+        'session.topic':        { value: args.scenarioTopic ?? '(none)',        from: 'scenario.title' },
+        'session.userTurns':    { value: String(userTurnIdx),                   from: 'session messages' },
+        'session.totalMessages':{ value: String(args.messages.length),          from: 'session messages' },
+      },
+      systemPrompt,
+      history: [{ role: 'user', content: userPrompt }],
+    });
+
     try {
       const res = await this.ai.chat({
         systemPrompt,
@@ -252,6 +339,17 @@ Score the LEARNER's USER turns.`;
       });
 
       const text = res.content;
+
+      AiCallLogger.response({
+        callType:     'evaluateSession',
+        latencyMs:    res.latencyMs,
+        modelUsed:    res.modelUsed,
+        inputTokens:  res.inputTokens,
+        outputTokens: res.outputTokens,
+        cachedTokens: res.cachedTokens,
+        content:      text,
+      });
+
       // Strip <think>...</think> chain-of-thought, then extract the JSON object
       const afterThink = text.includes('</think>')
         ? text.slice(text.indexOf('</think>') + 8).trim()

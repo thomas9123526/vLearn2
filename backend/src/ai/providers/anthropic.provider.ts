@@ -10,6 +10,7 @@ import {
   StructuredRequest,
   StructuredResponse,
 } from '../ai-provider.interface';
+import { AiCallLogger } from '../ai-call-logger';
 
 @Injectable()
 export class AnthropicProvider extends AiProvider {
@@ -25,6 +26,7 @@ export class AnthropicProvider extends AiProvider {
   private readonly client: Anthropic;
   private readonly chatModel: string;
   private readonly analysisModel: string;
+  private readonly baseURL: string;
 
   constructor(config: ConfigService) {
     super();
@@ -34,7 +36,8 @@ export class AnthropicProvider extends AiProvider {
         'ANTHROPIC_API_KEY not set — AnthropicProvider will throw on use. Set the env var or AI_PROVIDER to a different value.',
       );
     }
-    this.client = new Anthropic({ apiKey: apiKey ?? 'missing' });
+    this.baseURL = config.get<string>('ANTHROPIC_BASE_URL') ?? 'https://api.anthropic.com';
+    this.client = new Anthropic({ apiKey: apiKey ?? 'missing', baseURL: this.baseURL });
     this.chatModel = config.get<string>('AI_CHAT_MODEL') ?? 'claude-sonnet-4-6';
     this.analysisModel =
       config.get<string>('AI_ANALYSIS_MODEL') ?? 'claude-haiku-4-5-20251001';
@@ -42,6 +45,20 @@ export class AnthropicProvider extends AiProvider {
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
     const start = Date.now();
+    const endpoint = `${this.baseURL}/v1/messages`;
+
+    AiCallLogger.providerRequest({
+      provider:      'Anthropic',
+      endpoint,
+      model:         this.chatModel,
+      callType:      'chat',
+      maxTokens:     req.maxTokens ?? 400,
+      temperature:   req.temperature ?? 0.8,
+      systemLength:  req.systemPrompt.length,
+      messageCount:  req.messages.length,
+      cacheEnabled:  req.enablePromptCache,
+    });
+
     try {
       const res = await this.client.messages.create({
         model: this.chatModel,
@@ -66,13 +83,26 @@ export class AnthropicProvider extends AiProvider {
           .filter((b): b is Anthropic.TextBlock => b.type === 'text')
           .map((b) => b.text)
           .join('\n') ?? '';
-      return {
-        content,
-        inputTokens: res.usage.input_tokens,
+      const latencyMs = Date.now() - start;
+
+      AiCallLogger.providerResponse({
+        provider:     'Anthropic',
+        callType:     'chat',
+        latencyMs,
+        modelUsed:    res.model,
+        inputTokens:  res.usage.input_tokens,
         outputTokens: res.usage.output_tokens,
         cachedTokens: res.usage.cache_read_input_tokens ?? undefined,
-        modelUsed: res.model,
-        latencyMs: Date.now() - start,
+        content:      content || '(empty)',
+      });
+
+      return {
+        content,
+        inputTokens:  res.usage.input_tokens,
+        outputTokens: res.usage.output_tokens,
+        cachedTokens: res.usage.cache_read_input_tokens ?? undefined,
+        modelUsed:    res.model,
+        latencyMs,
       };
     } catch (e: unknown) {
       throw this.translateError(e);
@@ -80,8 +110,18 @@ export class AnthropicProvider extends AiProvider {
   }
 
   async structured<T>(req: StructuredRequest): Promise<StructuredResponse<T>> {
-    // Use Anthropic tool-use to enforce JSON schema. Caller passes a JSON
-    // Schema; we synthesize a one-tool definition and force the model to call it.
+    const endpoint = `${this.baseURL}/v1/messages`;
+
+    AiCallLogger.providerRequest({
+      provider:     'Anthropic',
+      endpoint,
+      model:        this.analysisModel,
+      callType:     'structured',
+      maxTokens:    req.maxTokens ?? 600,
+      systemLength: req.systemPrompt.length,
+      messageCount: 1,
+    });
+
     try {
       const res = await this.client.messages.create({
         model: this.analysisModel,
@@ -107,11 +147,22 @@ export class AnthropicProvider extends AiProvider {
           'Model did not call the return_result tool',
         );
       }
-      return {
-        data: toolBlock.input as T,
-        inputTokens: res.usage.input_tokens,
+
+      AiCallLogger.providerResponse({
+        provider:     'Anthropic',
+        callType:     'structured',
+        latencyMs:    0,
+        modelUsed:    res.model,
+        inputTokens:  res.usage.input_tokens,
         outputTokens: res.usage.output_tokens,
-        modelUsed: res.model,
+        content:      JSON.stringify(toolBlock.input, null, 2),
+      });
+
+      return {
+        data:         toolBlock.input as T,
+        inputTokens:  res.usage.input_tokens,
+        outputTokens: res.usage.output_tokens,
+        modelUsed:    res.model,
       };
     } catch (e: unknown) {
       throw this.translateError(e);

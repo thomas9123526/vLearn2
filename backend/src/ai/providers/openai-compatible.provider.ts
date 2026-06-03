@@ -10,6 +10,7 @@ import {
   StructuredRequest,
   StructuredResponse,
 } from '../ai-provider.interface';
+import { AiCallLogger } from '../ai-call-logger';
 
 @Injectable()
 export class OpenAICompatibleProvider extends AiProvider {
@@ -25,6 +26,7 @@ export class OpenAICompatibleProvider extends AiProvider {
   private readonly client: OpenAI;
   private readonly chatModel: string;
   private readonly analysisModel: string;
+  private readonly baseURL: string;
 
   private readonly timeoutMs: number;
   private readonly disableThinking: boolean;
@@ -37,13 +39,14 @@ export class OpenAICompatibleProvider extends AiProvider {
         'OPENAI_BASE_URL not set — OpenAICompatibleProvider will throw on use.',
       );
     }
+    this.baseURL = baseURL ?? 'http://localhost:11434/v1';
     this.timeoutMs = parseInt(config.get<string>('AI_TIMEOUT_MS') ?? '60000', 10);
     // Set AI_DISABLE_THINKING=true for Qwen3/DeepSeek reasoning models to stop
     // them spending all tokens inside <think>…</think> with no actual reply.
     this.disableThinking = config.get<string>('AI_DISABLE_THINKING') === 'true';
 
     this.client = new OpenAI({
-      baseURL: baseURL ?? 'http://localhost:11434/v1',
+      baseURL: this.baseURL,
       apiKey: config.get<string>('OPENAI_API_KEY') ?? 'not-needed',
       timeout: this.timeoutMs,
     });
@@ -54,18 +57,25 @@ export class OpenAICompatibleProvider extends AiProvider {
   }
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
-    const start = Date.now();
-    // Debug: prove the full system prompt leaves the backend. Look for this
-    // line in the backend console; LM Studio's log UI truncates the display
-    // but our outbound payload is intact.
-    this.logger.log(
-      `OUTBOUND system_prompt (${req.systemPrompt.length} chars): ${req.systemPrompt}`,
-    );
-    // Prepend /no_think for Qwen3/DeepSeek so the model skips chain-of-thought
-    // and replies directly — prevents spending all max_tokens inside <think>.
+    const start    = Date.now();
+    const endpoint = `${this.baseURL}/chat/completions`;
+
+    // Prepend /no_think for Qwen3/DeepSeek so the model skips chain-of-thought.
     const systemPrompt = this.disableThinking
       ? `/no_think\n${req.systemPrompt}`
       : req.systemPrompt;
+
+    AiCallLogger.providerRequest({
+      provider:     this.name,
+      endpoint,
+      model:        this.chatModel,
+      callType:     'chat',
+      maxTokens:    req.maxTokens ?? 400,
+      temperature:  req.temperature ?? 0.8,
+      systemLength: systemPrompt.length,
+      messageCount: req.messages.length,
+    });
+
     try {
       const res = await this.client.chat.completions.create({
         model: this.chatModel,
@@ -76,19 +86,32 @@ export class OpenAICompatibleProvider extends AiProvider {
         max_tokens: req.maxTokens ?? 400,
         temperature: req.temperature ?? 0.8,
       });
-      const content = this.extractAssistantText(res.choices[0]?.message);
+      const content  = this.extractAssistantText(res.choices[0]?.message);
+      const latencyMs = Date.now() - start;
+
       if (!content) {
         this.logger.warn(
           'Model returned empty assistant content (common with Qwen3 reasoning when max_tokens is too low). ' +
             'Raise max_tokens or disable reasoning in LM Studio.',
         );
       }
+
+      AiCallLogger.providerResponse({
+        provider:     this.name,
+        callType:     'chat',
+        latencyMs,
+        modelUsed:    res.model,
+        inputTokens:  res.usage?.prompt_tokens ?? 0,
+        outputTokens: res.usage?.completion_tokens ?? 0,
+        content:      content || '(empty)',
+      });
+
       return {
         content,
-        inputTokens: res.usage?.prompt_tokens ?? 0,
+        inputTokens:  res.usage?.prompt_tokens ?? 0,
         outputTokens: res.usage?.completion_tokens ?? 0,
-        modelUsed: res.model,
-        latencyMs: Date.now() - start,
+        modelUsed:    res.model,
+        latencyMs,
       };
     } catch (e: unknown) {
       throw this.translateError(e);
@@ -96,9 +119,21 @@ export class OpenAICompatibleProvider extends AiProvider {
   }
 
   async structured<T>(req: StructuredRequest): Promise<StructuredResponse<T>> {
+    const endpoint = `${this.baseURL}/chat/completions`;
     const systemPrompt = this.disableThinking
       ? `/no_think\n${req.systemPrompt}`
       : req.systemPrompt;
+
+    AiCallLogger.providerRequest({
+      provider:     this.name,
+      endpoint,
+      model:        this.analysisModel,
+      callType:     'structured',
+      maxTokens:    req.maxTokens ?? 600,
+      systemLength: systemPrompt.length,
+      messageCount: 2,
+    });
+
     try {
       // Try json_schema first (supported by Groq, OpenAI; ignored by older Ollama)
       const res = await this.client.chat.completions.create({
@@ -128,11 +163,22 @@ export class OpenAICompatibleProvider extends AiProvider {
           'Could not parse model JSON',
         );
       }
-      return {
-        data: parsed as T,
-        inputTokens: res.usage?.prompt_tokens ?? 0,
+
+      AiCallLogger.providerResponse({
+        provider:     this.name,
+        callType:     'structured',
+        latencyMs:    0,
+        modelUsed:    res.model,
+        inputTokens:  res.usage?.prompt_tokens ?? 0,
         outputTokens: res.usage?.completion_tokens ?? 0,
-        modelUsed: res.model,
+        content:      JSON.stringify(parsed, null, 2),
+      });
+
+      return {
+        data:         parsed as T,
+        inputTokens:  res.usage?.prompt_tokens ?? 0,
+        outputTokens: res.usage?.completion_tokens ?? 0,
+        modelUsed:    res.model,
       };
     } catch (e: unknown) {
       // TODO: fallback to response_format: 'json_object' for Ollama compatibility

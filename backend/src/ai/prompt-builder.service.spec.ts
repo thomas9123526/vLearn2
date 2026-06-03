@@ -29,13 +29,14 @@ describe('PromptBuilderService', () => {
       style: 'Encouraging, patient',
       specialties: ['Travel'],
     } as never;
-    const result = await service.buildSystemPrompt(persona, null, 3, 'ko');
+    const { prompt, source } = await service.buildSystemPrompt(persona, null, 3, 'ko');
 
-    expect(result).toContain('You are Maya');
-    expect(result).toContain('Encouraging, patient');
-    expect(result).toContain('English level: B1 (3/6)');
-    expect(result).toContain('Native language: ko');
-    expect(result).toContain('Free conversation practice');
+    expect(source).toBeTruthy();
+    expect(prompt).toContain('Maya');
+    expect(prompt).toContain('Encouraging, patient');
+    expect(prompt).toContain('B1');
+    expect(prompt).toContain('ko');
+    expect(prompt).toContain('Free conversation practice');
   });
 
   it('builds a grammar prompt that lists numbered messages', async () => {

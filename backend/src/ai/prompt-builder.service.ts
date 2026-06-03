@@ -11,6 +11,7 @@ import {
   PromptTemplateEntity,
 } from '../database/entities/prompt-template.entity';
 import { AppConfigEntity } from '../database/entities/app-config.entity';
+import type { PromptVariable } from './ai-call-logger';
 
 /**
  * Builds vendor-agnostic prompts in the cch_prompt section format
@@ -52,27 +53,52 @@ export class PromptBuilderService {
     private readonly configRepo: Repository<AppConfigEntity>,
   ) {}
 
+  /**
+   * Returns the flat context map used to render placeholders, annotated with
+   * the origin of each variable. Used by the orchestrator for debug logging.
+   */
+  getTutorContextWithSources(
+    persona: PersonaEntity,
+    scenario: ScenarioEntity | null,
+    userLevel: number,
+    userNativeLanguage: string,
+  ): Record<string, PromptVariable> {
+    const ctx = this.tutorContext(persona, scenario, userLevel, userNativeLanguage);
+    const annotated: Record<string, PromptVariable> = {};
+    for (const [k, v] of Object.entries(ctx)) {
+      let from: string;
+      if (k.startsWith('persona.'))          from = 'persona DB row (vl_personas)';
+      else if (k.startsWith('scenario.'))    from = scenario ? 'scenario DB row (vl_scenarios)' : 'default (no scenario)';
+      else if (k === 'user.level' || k === 'user.level_label')
+                                             from = 'user_progress.current_level';
+      else if (k === 'user.native_language') from = 'user_info.native_language';
+      else                                   from = 'computed';
+      annotated[k] = { value: v || '(empty)', from };
+    }
+    return annotated;
+  }
+
   async buildSystemPrompt(
     persona: PersonaEntity,
     scenario: ScenarioEntity | null,
     userLevel: number,
     userNativeLanguage: string,
-  ): Promise<string> {
+  ): Promise<{ prompt: string; source: string }> {
     const ctx = this.tutorContext(persona, scenario, userLevel, userNativeLanguage);
 
     // Priority 1: per-scenario custom prompt
     if (scenario?.custom_prompt?.trim()) {
-      return this.render(scenario.custom_prompt, ctx);
+      return { prompt: this.render(scenario.custom_prompt, ctx), source: 'custom_prompt (per-scenario override)' };
     }
 
     // Priority 2: global full-template override
     const tpl = await this.loadTemplate('tutor_system');
     if (tpl) {
-      return this.render(tpl, ctx);
+      return { prompt: this.render(tpl, ctx), source: 'DB template: tutor_system (vl_prompt_templates)' };
     }
 
     // Priority 3: section-by-section cch_prompt builder
-    return this.buildCchPrompt(ctx);
+    return { prompt: await this.buildCchPrompt(ctx), source: 'section-builder ([role]/[learner]/[topic]/…)' };
   }
 
   async buildGrammarPrompt(
