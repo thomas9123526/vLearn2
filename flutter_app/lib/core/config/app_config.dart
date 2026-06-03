@@ -268,7 +268,9 @@ class ConfigFileService {
       final jsonStr = _decodeContent(raw.trim());
       final j = jsonDecode(jsonStr) as Map<String, dynamic>;
       return AppConfig.fromJson(j, configDir: file.parent.path);
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[app_config] parse failed — overwriting with defaults. '
+          'path=${file.path} error=$e\n$st');
       await write(AppConfig.defaults, file: file);
       return AppConfig.defaults;
     }
