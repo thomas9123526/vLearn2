@@ -101,7 +101,12 @@ class SherpaOnnxTtsService extends TextToSpeechService {
     try {
       final model = await _resolveListedFile(manifest, 'tts/model');
       final tokens = await _resolveListedFile(manifest, 'tts/tokens');
-      final dataDir = await _resolveListedDir(manifest, 'tts/espeak-ng-data');
+      // Piper voices use espeak-ng-data; lexicon-based voices (e.g. vits-vctk)
+      // use a lexicon.txt instead. Support both.
+      final lexicon = await _resolveListedFile(manifest, 'tts/lexicon');
+      final dataDir = lexicon != null
+          ? null
+          : await _resolveListedDir(manifest, 'tts/espeak-ng-data');
 
       if (model == null || tokens == null) {
         _log.w('TTS: manifest missing required model/tokens files.');
@@ -115,6 +120,7 @@ class SherpaOnnxTtsService extends TextToSpeechService {
             vits: so.OfflineTtsVitsModelConfig(
               model: model,
               tokens: tokens,
+              lexicon: lexicon ?? '',
               dataDir: dataDir ?? '',
             ),
           ),
