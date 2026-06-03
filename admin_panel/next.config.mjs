@@ -9,6 +9,7 @@ const nextConfig = {
   basePath: '/vAdmin',
   // nginx location /vAdmin/ requires the trailing slash; keep it canonical
   trailingSlash: true,
+  allowedDevOrigins: ['192.168.135.30'],
   experimental: {
     serverActions: { allowedOrigins: ['localhost:4100', 'localhost:4101', '172.86.121.43', '192.168.135.30:4101'] },
   },
