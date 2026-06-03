@@ -18,25 +18,28 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Resolve bundle path - default to vlearn_update.bundle next to this script's
-# parent (project root), then try current working directory.
+# Resolve bundle path - check gitBundle/ folder first, then project root,
+# then current working directory.
 $root = Split-Path $PSScriptRoot -Parent
 
 if ($Bundle -eq "") {
-    $candidate = Join-Path $root "vlearn_update.bundle"
-    if (Test-Path $candidate) {
-        $Bundle = $candidate
-    } else {
-        $candidate = Join-Path (Get-Location) "vlearn_update.bundle"
+    $candidates = @(
+        (Join-Path $root "gitBundle\vlearn_update.bundle"),
+        (Join-Path $root "vlearn_update.bundle"),
+        (Join-Path (Get-Location) "vlearn_update.bundle")
+    )
+    foreach ($candidate in $candidates) {
         if (Test-Path $candidate) {
             $Bundle = $candidate
+            break
         }
     }
 }
 
 if ($Bundle -eq "" -or -not (Test-Path $Bundle)) {
     Write-Host "[apply] ERROR: bundle file not found."
-    Write-Host "        Place vlearn_update.bundle in the project root, or pass the path:"
+    Write-Host "        Expected: gitBundle\vlearn_update.bundle (project root)"
+    Write-Host "        Or pass the path explicitly:"
     Write-Host "          .\cmds\apply_bundle.ps1 -Bundle C:\path\to\vlearn_update.bundle"
     exit 1
 }

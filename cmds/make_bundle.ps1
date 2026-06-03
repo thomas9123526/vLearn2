@@ -26,8 +26,12 @@ $ErrorActionPreference = "Stop"
 
 # Resolve output path
 $root = Split-Path $PSScriptRoot -Parent
+$bundleDir = Join-Path $root "gitBundle"
+if (-not (Test-Path $bundleDir)) {
+    New-Item -ItemType Directory -Path $bundleDir | Out-Null
+}
 if ($Out -eq "") {
-    $Out = Join-Path $root "vlearn_update.bundle"
+    $Out = Join-Path $bundleDir "vlearn_update.bundle"
 }
 
 Write-Host "[bundle] Base hash : $BaseHash"
@@ -40,7 +44,7 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 }
 
 # Verify the base hash exists in this repo
-$checkHash = git cat-file -t $BaseHash 2>&1
+git cat-file -t $BaseHash 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[bundle] ERROR: hash '$BaseHash' not found in this repo."
     Write-Host "         Make sure you are running from inside the project folder"
@@ -70,9 +74,9 @@ Write-Host ""
 Write-Host "[bundle] Done. $Out ($sizeMB MB)"
 Write-Host ""
 Write-Host "--- Apply on VMware ---"
-Write-Host "1. Copy $Out to VMware."
+Write-Host "1. Copy $Out to VMware gitBundle\ folder."
 Write-Host "2. Inside the project folder on VMware, run:"
-Write-Host "     git pull vlearn_update.bundle HEAD"
+Write-Host "     .\cmds\apply_bundle.ps1"
 Write-Host ""
 Write-Host "--- Next bundle (use last applied HEAD as new base) ---"
 $head = git rev-parse HEAD
