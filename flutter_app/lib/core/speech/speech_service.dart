@@ -162,8 +162,10 @@ final ttsServiceProvider = Provider<TextToSpeechService>((ref) {
   final snap = ref.watch(modelRegistrySnapshotProvider).valueOrNull;
   if (snap?.isReady == true) {
     final svc = SherpaOnnxTtsService(registry: ref.read(modelRegistryProvider));
-    // Pre-warm the native engine in the background so the first speak() call
-    // does not block the UI isolate while loading the 38 MB ONNX model.
+    // Dispose the native engine and free the 38 MB model when this provider
+    // is rebuilt (e.g. hot-reload) so we never have two engines in memory.
+    ref.onDispose(svc.dispose);
+    // Pre-warm in background so the first speak() call doesn't block the UI.
     svc.initialize();
     return svc;
   }
