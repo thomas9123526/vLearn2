@@ -285,7 +285,7 @@ export class PromptBuilderService {
       (_m, key: string) => ctx[key] ?? '',
     );
     // Pass 2: [cefr_level] inline variable in custom/DB prompts
-    out = out.replace(/\[cefr_level\]/g, ctx['scenario.cefr_level'] || ctx['user.level_label'] ?? '');
+    out = out.replace(/\[cefr_level\]/g, ctx['scenario.cefr_level'] || ctx['user.level_label'] || '');
     return out;
   }
 
