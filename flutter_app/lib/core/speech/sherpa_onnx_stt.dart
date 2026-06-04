@@ -39,7 +39,7 @@ class SherpaOnnxSttService extends SpeechToTextService {
   final ModelRegistry registry;
   final Logger _log;
 
-  bool _initialized = false;
+  Future<void>? _initFuture;
   bool _available = false;
 
   // Only one of these is ever non-null per session — `_online` for streaming
@@ -59,10 +59,9 @@ class SherpaOnnxSttService extends SpeechToTextService {
       );
 
   @override
-  Future<void> initialize() async {
-    if (_initialized) return;
-    _initialized = true;
+  Future<void> initialize() => _initFuture ??= _doInitialize();
 
+  Future<void> _doInitialize() async {
     final snap = await registry.snapshot();
     if (!snap.isReady || snap.manifest == null) {
       _log.i('STT: model registry not ready (${snap.status}); skipping init.');
@@ -140,7 +139,7 @@ class SherpaOnnxSttService extends SpeechToTextService {
 
   @override
   Future<SttResult> transcribe(Uint8List audioData, {String? language}) async {
-    if (!_initialized) await initialize();
+    await initialize();
     if (!_available) {
       debugPrint('[stt] engine unavailable — models not installed?');
       throw SttUnavailableException(
@@ -257,7 +256,7 @@ class SherpaOnnxSttService extends SpeechToTextService {
     _online = null;
     _offline?.free();
     _offline = null;
-    _initialized = false;
+    _initFuture = null;
     _available = false;
   }
 }

@@ -9,7 +9,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/datapack/datapack_installer.dart';
 import '../../core/datapack/datapack_provider.dart';
 import '../../core/router/app_router.dart';
+import '../../core/speech/speech_service.dart';
 import '../../core/storage/auth_history.dart';
+import '../../core/storage/model_registry.dart';
 
 /// Splash screen — port of `vLearn2Spec/design_handoff_freetalk/reference/splash.jsx`.
 ///
@@ -70,6 +72,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   /// no part of the app reads from `<support>/datapack_unpacked/` before
   /// the .ddp files are decoded into place.
   bool _installDone = false;
+
+  /// Set after STT + TTS engines have been pre-warmed so the conversation
+  /// screen never blocks on first-use engine loading.
+  bool _enginesReady = false;
+
+  /// Short status string shown inside [_PreparingIndicator] while loading.
+  String _loadingStage = 'Preparing your data…';
 
   /// Non-null when the install pass reported failures. Each entry is a
   /// short "pack_path: error" string. Shown in a footer overlay so the
@@ -133,18 +142,44 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         _installFailures = ['installer: $e'];
       });
     }
+    _preWarmEngines();
+  }
+
+  /// After install completes, pre-warm the model registry then the TTS and
+  /// STT engines so the conversation screen never blocks on first-use loading.
+  /// Errors are swallowed — unavailable engines show inline errors later.
+  Future<void> _preWarmEngines() async {
+    try {
+      if (!mounted) return;
+      setState(() => _loadingStage = 'Verifying models…');
+      await ref.read(modelRegistrySnapshotProvider.future);
+
+      if (!mounted) return;
+      setState(() => _loadingStage = 'Loading voice engine…');
+      await ref.read(ttsServiceProvider).initialize();
+
+      if (!mounted) return;
+      setState(() => _loadingStage = 'Loading speech recognition…');
+      await ref.read(sttServiceProvider).initialize();
+    } catch (_) {
+      // Don't block navigation — unavailable engines surface errors inline.
+    }
+    if (!mounted) return;
+    setState(() => _enginesReady = true);
     _maybeScheduleAutoNav();
   }
 
   /// Auto-navigate to /signin only once we know both:
   ///   1) the device has signed in before (`_returning == true`)
   ///   2) the .ddp installer has finished its pass (`_installDone`)
+  ///   3) the STT/TTS engines have finished pre-warming (`_enginesReady`)
   /// First-time users (`_returning == false`) navigate via the
-  /// Tap-to-begin CTA instead, which is itself gated on `_installDone`.
+  /// Tap-to-begin CTA instead, which is itself gated on both flags.
   void _maybeScheduleAutoNav() {
     if (_autoNavTimer != null) return;       // already scheduled
     if (_returning != true) return;          // not a returning user
     if (!_installDone) return;               // wait for install pass
+    if (!_enginesReady) return;              // wait for engine pre-warm
     _autoNavTimer = Timer(_autoNavDelay, () {
       if (!mounted) return;
       // Stop the infinite bob right before navigation so the upcoming route
@@ -248,12 +283,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     // the slot empty so the button doesn't appear and then
                     // vanish on a returning device.
                     //
-                    // The CTA / auto-nav both wait on the .ddp installer
-                    // (`_installDone`). While it's running we show a small
-                    // "Preparing your data…" indicator so the user can see
-                    // why we're not advancing yet.
-                    if (!_installDone)
-                      _PreparingIndicator(color: inkSoft)
+                    // Hold the CTA / auto-nav until both the .ddp installer
+                    // and the STT/TTS engine pre-warm are done. Show a
+                    // staged progress indicator with the current stage label
+                    // so the user can see what is happening.
+                    if (!_installDone || !_enginesReady)
+                      _PreparingIndicator(color: inkSoft, message: _loadingStage)
                     else if (_returning == false)
                       _TapToBeginButton(
                         controller: _entrance,
@@ -704,8 +739,9 @@ class _InstallFailureBanner extends StatelessWidget {
 /// Spinner sized so the overall splash layout doesn't shift when the CTA
 /// replaces it (and vice-versa).
 class _PreparingIndicator extends StatelessWidget {
-  const _PreparingIndicator({required this.color});
+  const _PreparingIndicator({required this.color, required this.message});
   final Color color;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -722,7 +758,7 @@ class _PreparingIndicator extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'Preparing your data…',
+          message,
           style: TextStyle(
             fontFamily: 'EditorialBody',
             fontSize: 12,

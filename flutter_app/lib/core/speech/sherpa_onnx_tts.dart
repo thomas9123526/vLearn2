@@ -47,7 +47,7 @@ class SherpaOnnxTtsService extends TextToSpeechService {
   final ModelRegistry registry;
   final Logger _log;
 
-  bool _initialized = false;
+  Future<void>? _initFuture;
   bool _available = false;
   List<String> _voices = const [];
 
@@ -83,11 +83,12 @@ class SherpaOnnxTtsService extends TextToSpeechService {
         onDevice: true,
       );
 
+  /// Idempotent: all callers share the same Future so concurrent awaits all
+  /// resolve when the engine finishes loading, not just the first caller.
   @override
-  Future<void> initialize() async {
-    if (_initialized) return;
-    _initialized = true;
+  Future<void> initialize() => _initFuture ??= _doInitialize();
 
+  Future<void> _doInitialize() async {
     final snap = await registry.snapshot();
     if (!snap.isReady || snap.manifest == null) {
       _log.i('TTS: model registry not ready (${snap.status}); skipping init.');
@@ -169,7 +170,7 @@ class SherpaOnnxTtsService extends TextToSpeechService {
     String? language,
     double rate = 1.0,
   }) async {
-    if (!_initialized) await initialize();
+    await initialize();
     if (!_available || _engine == null) {
       debugPrint('[tts] engine unavailable — models not installed?');
       throw TtsUnavailableException(
@@ -271,7 +272,7 @@ class SherpaOnnxTtsService extends TextToSpeechService {
     String? language,
     double rate = 1.0,
   }) async {
-    if (!_initialized) await initialize();
+    await initialize();
     if (!_available || _engine == null) {
       throw TtsUnavailableException(
         'Speech models are not installed yet. Ask your admin to drop the '
@@ -369,7 +370,7 @@ class SherpaOnnxTtsService extends TextToSpeechService {
     _engine = null;
     await _isSpeakingCtrl.close();
     await _amplitudeCtrl.close();
-    _initialized = false;
+    _initFuture = null;
     _available = false;
   }
 
