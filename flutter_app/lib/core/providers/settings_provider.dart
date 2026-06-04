@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/layout_config_provider.dart';
 import '../theme/bubble_style.dart';
 import '../theme/font_group.dart';
 
@@ -62,9 +63,26 @@ class AppSettingsState {
 }
 
 class AppSettingsNotifier extends StateNotifier<AppSettingsState> {
-  AppSettingsNotifier() : super(AppSettingsState.initial) {
+  AppSettingsNotifier(this._ref) : super(AppSettingsState.initial) {
     _load();
+    // Apply admin-configured language whenever layoutConfigProvider updates.
+    // This fires once immediately (with baked defaults) and again when the
+    // server response arrives, so the language switches without needing a
+    // SharedPreferences write in main().
+    _ref.listen<AsyncValue<LayoutConfig>>(
+      layoutConfigProvider,
+      (_, next) {
+        const supported = {'en', 'zh', 'ru', 'ko'};
+        final lang = next.valueOrNull?.get<String>('app.default_language');
+        if (lang != null && supported.contains(lang) && lang != state.uiLanguage) {
+          setUiLanguage(lang);
+        }
+      },
+      fireImmediately: true,
+    );
   }
+
+  final Ref _ref;
 
   static const _kTheme = 'settings.theme';
   static const _kLanguage = 'settings.ui_language';
@@ -137,7 +155,7 @@ class AppSettingsNotifier extends StateNotifier<AppSettingsState> {
 
 final appSettingsProvider =
     StateNotifierProvider<AppSettingsNotifier, AppSettingsState>(
-  (_) => AppSettingsNotifier(),
+  AppSettingsNotifier.new,
 );
 
 /// Convenience selectors for hot-path code that wants a synchronous read

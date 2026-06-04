@@ -22,9 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa_onnx;
 import 'package:rive/rive.dart' as rive;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'core/cache/cache_seeder.dart';
-import 'core/config/layout_config_provider.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'core/cache/cache_store.dart';
 import 'core/config/app_config.dart';
@@ -111,25 +109,6 @@ Future<void> main() async {
   } catch (_) {
     // Treat unreadable config as "use defaults" — the service itself rewrites
     // a broken file on the next save, so this never leaves the app stuck.
-  }
-  // Apply the admin-configured language (app.default_language) on every
-  // launch. This lets the admin control the UI language from the panel;
-  // it overrides any language the user previously stored in preferences.
-  // If the key is absent or the server is unreachable, the stored preference
-  // (or English) is kept.
-  try {
-    await container.read(layoutConfigProvider.notifier).refresh();
-    const supportedLangs = {'en', 'zh', 'ru', 'ko'};
-    final lang = container
-        .read(layoutConfigProvider)
-        .valueOrNull
-        ?.get<String>('app.default_language');
-    if (lang != null && supportedLangs.contains(lang)) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('settings.ui_language', lang);
-    }
-  } catch (_) {
-    // Language sync is best-effort; keep whatever is stored locally.
   }
   // Pre-seed the local SQLite cache from bundled asset JSON files so the
   // scenario/category lists show instantly on first launch without a network
