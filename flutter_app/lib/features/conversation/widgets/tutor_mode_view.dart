@@ -71,11 +71,16 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
       setState(() => _amplitude = amp);
     });
     _resetIdleTimer();
-    // Speak the tutor's opening greeting on first load. The message is
-    // already in widget.messages when the screen is first built (it comes
-    // from the getSession response), so didUpdateWidget never fires for it.
+    // Speak the tutor's opening greeting on first load.
+    // Guard: only when no user turn exists yet (Turn 0). If user turns exist,
+    // the session is being resumed from history and replaying old messages
+    // would be unexpected. Mid-conversation mode switches (chat→tutor) are
+    // also Turn 0-safe: the parent keeps the same messages list, so this
+    // widget is only ever re-created at Turn 0 if the user hasn't spoken yet.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _maybeSpeakLatestAssistantReply();
+      if (!mounted) return;
+      final hasUserTurn = widget.messages.any((m) => m.role == 'user');
+      if (!hasUserTurn) _maybeSpeakLatestAssistantReply();
     });
   }
 
@@ -267,9 +272,12 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
   @override
   Widget build(BuildContext context) {
     // If speech models finish loading after the screen first appears, retry
-    // speaking the opening message that was skipped due to models not ready.
+    // the opening greeting — but only when still at Turn 0 (no user message).
     ref.listen<bool>(speechReadyProvider, (prev, next) {
-      if (next && prev != true) _maybeSpeakLatestAssistantReply();
+      if (next && prev != true) {
+        final hasUserTurn = widget.messages.any((m) => m.role == 'user');
+        if (!hasUserTurn) _maybeSpeakLatestAssistantReply();
+      }
     });
 
     final scheme = Theme.of(context).colorScheme;

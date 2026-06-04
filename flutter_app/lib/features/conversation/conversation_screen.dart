@@ -343,10 +343,13 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
     _ttsSub = tts.isSpeakingStream.listen((speaking) {
       if (mounted) setState(() => _ttsSpeaking = speaking);
     });
-    // The opening assistant message arrives with the initial getSession
-    // response, so didUpdateWidget never fires for it. Trigger TTS here.
+    // Speak the opening assistant message, which arrives with getSession and
+    // so never triggers didUpdateWidget. Only applies at Turn 0 (no user
+    // messages yet) — resumed sessions must not replay old heard messages.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _maybeSpeakLatestAssistantReply();
+      if (!mounted) return;
+      final hasUserTurn = widget.messages.any((m) => m.role == 'user');
+      if (!hasUserTurn) _maybeSpeakLatestAssistantReply();
     });
   }
 
@@ -494,10 +497,13 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
 
   @override
   Widget build(BuildContext context) {
-    // If speech models finish loading after the screen appears, retry speaking
-    // the opening message that was skipped because models weren't ready yet.
+    // If speech models finish loading after the screen appears, retry the
+    // opening message — but only at Turn 0 (no user turn yet).
     ref.listen<bool>(speechReadyProvider, (prev, next) {
-      if (next && prev != true) _maybeSpeakLatestAssistantReply();
+      if (next && prev != true) {
+        final hasUserTurn = widget.messages.any((m) => m.role == 'user');
+        if (!hasUserTurn) _maybeSpeakLatestAssistantReply();
+      }
     });
 
     final scheme = widget.scheme;
