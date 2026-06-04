@@ -11,22 +11,24 @@ class QLabel;
 // tokens.json) expressed for Qt, plus global font + stylesheet installation.
 namespace Theme {
 
+// Obsidian (dark navy + periwinkle) — the theme the running VFLS app uses.
+// Values from flutter_app/lib/core/theme/app_tokens.dart.
 struct Palette {
-    QColor bg          {"#FAF6EF"};
-    QColor surface     {"#FFFFFF"};
-    QColor surfaceAlt  {"#F2EADA"};
-    QColor surfaceDeep {"#E8DCC4"};
-    QColor ink         {"#2A1D12"};
-    QColor inkSoft     {"#6C5641"};
-    QColor inkFaint    {"#A8917B"};
-    QColor border      {0x46, 0x30, 0x16, 0x22};  // #463016 @ low alpha
-    QColor accent      {"#D4633A"};
-    QColor accent2     {"#7D8C52"};
-    QColor accentSoft  {"#FBE1D1"};
-    QColor accentInk   {"#6E2911"};
-    QColor good        {"#5E8A4A"};
-    QColor warn        {"#C89035"};
-    QColor bad         {"#B94A3A"};
+    QColor bg          {"#121120"};   // background
+    QColor surface     {"#1E1C2E"};   // cards / panels
+    QColor surfaceAlt  {"#26243A"};   // inputs / elevated (surfaceVariant)
+    QColor surfaceDeep {"#2C2A4A"};   // primaryDark / chip hover
+    QColor ink         {"#EFEEEF"};   // onSurface (primary text)
+    QColor inkSoft     {"#A8A6B8"};   // onSurfaceMuted (secondary text)
+    QColor inkFaint    {"#6E6C82"};   // faint
+    QColor border      {"#38364E"};   // outline
+    QColor accent      {"#4F4C7E"};   // primary (buttons, selected nav)
+    QColor accent2     {"#9D99C7"};   // periwinkle (gradient end, highlights)
+    QColor accentSoft  {"#2C2A4A"};   // soft fill for chips
+    QColor accentInk   {"#C9C6E0"};   // light periwinkle text
+    QColor good        {"#5DBE9C"};   // success
+    QColor warn        {"#FFBB4C"};   // warning
+    QColor bad         {"#FF7177"};   // error
 };
 
 const Palette& palette();

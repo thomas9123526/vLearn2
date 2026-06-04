@@ -148,6 +148,49 @@ void install(QApplication& app)
         QListWidget { background: %surface%; border: 1px solid %border%; border-radius: 14px; }
         QListWidget::item { padding: 12px; border-bottom: 1px solid %border%; }
         QListWidget::item:selected { background: %accentSoft%; color: %ink%; }
+
+        /* ---- Home: hero / streak-xp card ---- */
+        #HeroCard {
+            border: none; border-radius: 16px;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 %accent%, stop:1 %accent2%);
+        }
+        #HeroBig   { color: white; font-size: 22px; font-weight: 700; }
+        #HeroSmall { color: rgba(255,255,255,0.85); font-size: 12px; }
+        #HeroXp    { color: white; font-family: '%mono%'; font-size: 16px; font-weight: 700; }
+        QProgressBar {
+            background: rgba(255,255,255,0.20); border: none; border-radius: 5px;
+            min-height: 8px; max-height: 8px; text-align: center;
+        }
+        QProgressBar::chunk { background: white; border-radius: 5px; }
+
+        /* ---- Home: stat cards ---- */
+        #StatCard {
+            background: %surface%; border: 1px solid %border%; border-radius: 16px;
+        }
+        #StatNum  { font-size: 26px; font-weight: 700; color: %ink%; }
+        #StatLbl  { color: %inkSoft%; font-size: 12px; }
+        #StatIcon { color: %accent2%; font-size: 18px; }
+
+        /* ---- Scenario cards ---- */
+        #ScenarioCard {
+            background: %surface%; border: 1px solid %border%; border-radius: 16px;
+        }
+        #ScenarioCard:hover { border: 1px solid %accent2%; }
+        #ScenarioTitle { font-size: 15px; font-weight: 600; color: %ink%; }
+        #ScenarioMeta  { color: %inkSoft%; font-family: '%mono%'; font-size: 11px; }
+        QLabel#CatChip {
+            background: %surfaceDeep%; color: %accentInk%; border-radius: 999px;
+            padding: 3px 10px; font-size: 10px; font-weight: 700;
+        }
+
+        /* ---- Scrollbars ---- */
+        QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
+        QScrollBar::handle:vertical { background: %border%; border-radius: 5px; min-height: 30px; }
+        QScrollBar::handle:vertical:hover { background: %inkFaint%; }
+        QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
+        QScrollBar:horizontal { background: transparent; height: 10px; margin: 2px; }
+        QScrollBar::handle:horizontal { background: %border%; border-radius: 5px; min-width: 30px; }
     )");
 
     QString out = qss;

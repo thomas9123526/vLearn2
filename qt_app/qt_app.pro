@@ -18,6 +18,10 @@ SOURCES += \
     src/ui/Theme.cpp \
     src/api/ApiClient.cpp \
     src/auth/LoginDialog.cpp \
+    src/home/HomePage.cpp \
+    src/scenarios/ScenariosPage.cpp \
+    src/progress/ProgressPage.cpp \
+    src/settings/SettingsPage.cpp \
     src/chat/ChatPage.cpp \
     src/chat/HistoryPage.cpp \
     src/shell/MainShell.cpp
@@ -26,8 +30,13 @@ HEADERS += \
     src/model/Models.h \
     src/config/AppConfig.h \
     src/ui/Theme.h \
+    src/ui/ClickableFrame.h \
     src/api/ApiClient.h \
     src/auth/LoginDialog.h \
+    src/home/HomePage.h \
+    src/scenarios/ScenariosPage.h \
+    src/progress/ProgressPage.h \
+    src/settings/SettingsPage.h \
     src/chat/ChatPage.h \
     src/chat/HistoryPage.h \
     src/shell/MainShell.h

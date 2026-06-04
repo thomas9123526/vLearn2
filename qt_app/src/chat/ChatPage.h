@@ -18,6 +18,7 @@ public:
     explicit ChatPage(ApiClient* api, QWidget* parent = nullptr);
 
     void startNewChat();                 // pick persona → POST /sessions
+    void startScenario(const QString& scenarioId, const QString& title); // first tutor + scenario
     void openSession(const QString& id); // GET /sessions/:id → render history
 
 signals:

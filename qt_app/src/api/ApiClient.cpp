@@ -92,6 +92,21 @@ void ApiClient::signIn(const QString& cidUsername,
             /*auth=*/false);
 }
 
+void ApiClient::getProfile(Callback cb)
+{
+    request("GET", "/users/profile", nullptr, std::move(cb), /*auth=*/true);
+}
+
+void ApiClient::getProgress(Callback cb)
+{
+    request("GET", "/progress", nullptr, std::move(cb), /*auth=*/true);
+}
+
+void ApiClient::listScenarios(Callback cb)
+{
+    request("GET", "/scenarios", nullptr, std::move(cb), /*auth=*/true);
+}
+
 void ApiClient::listTeachers(Callback cb)
 {
     request("GET", "/teachers", nullptr, std::move(cb), /*auth=*/true);
@@ -99,12 +114,15 @@ void ApiClient::listTeachers(Callback cb)
 
 void ApiClient::startSession(const QString& personaId,
                              const QString& mode,
+                             const QString& scenarioId,
                              Callback cb)
 {
     QJsonObject body{
         {"personaId", personaId},
         {"mode",      mode},        // "chat" for chat mode (or "face")
     };
+    if (!scenarioId.isEmpty())
+        body.insert("scenarioId", scenarioId);
     request("POST", "/conversations/sessions", &body, std::move(cb), true);
 }
 

@@ -1,7 +1,11 @@
 #include "shell/MainShell.h"
 #include "api/ApiClient.h"
-#include "chat/ChatPage.h"
+#include "home/HomePage.h"
+#include "scenarios/ScenariosPage.h"
+#include "progress/ProgressPage.h"
 #include "chat/HistoryPage.h"
+#include "chat/ChatPage.h"
+#include "settings/SettingsPage.h"
 #include "ui/Theme.h"
 
 #include <QWidget>
@@ -14,36 +18,32 @@
 #include <QVariant>
 #include <QLabel>
 #include <QStatusBar>
+#include <QJsonObject>
 
-enum { PageChat = 0, PageHistory = 1, PageProfile = 2 };
+enum { PageHome = 0, PageScenarios, PageHistory, PageProgress, PageSettings, PageChat };
 
 MainShell::MainShell(ApiClient* api, QWidget* parent)
     : QMainWindow(parent)
     , m_api(api)
 {
-    setWindowTitle(tr("FreeTalk"));
+    setWindowTitle(tr("Virtual Foreign Language"));
     resize(1120, 720);
 
-    // ---- Content stack -------------------------------------------------
+    // ---- Pages ---------------------------------------------------------
+    m_home      = new HomePage(m_api);
+    m_scenarios = new ScenariosPage(m_api);
+    m_history   = new HistoryPage(m_api);
+    m_progress  = new ProgressPage(m_api);
+    m_settings  = new SettingsPage(m_api);
+    m_chat      = new ChatPage(m_api);
+
     m_stack = new QStackedWidget;
-
-    m_chat = new ChatPage(m_api);
-    m_history = new HistoryPage(m_api);
-
-    // Simple profile page.
-    auto* profile = new QWidget;
-    {
-        auto* pl = new QVBoxLayout(profile);
-        pl->setContentsMargins(48, 32, 48, 32);
-        auto* k = new QLabel(tr("ACCOUNT"));        k->setObjectName("Kicker");
-        auto* h = new QLabel(tr("Hey %1").arg(m_api->displayName())); h->setObjectName("H1");
-        auto* s = new QLabel(tr("Signed in to FreeTalk."));           s->setObjectName("Sub");
-        pl->addWidget(k); pl->addWidget(h); pl->addWidget(s); pl->addStretch(1);
-    }
-
-    m_stack->addWidget(m_chat);      // PageChat
-    m_stack->addWidget(m_history);   // PageHistory
-    m_stack->addWidget(profile);     // PageProfile
+    m_stack->addWidget(m_home);       // 0
+    m_stack->addWidget(m_scenarios);  // 1
+    m_stack->addWidget(m_history);    // 2
+    m_stack->addWidget(m_progress);   // 3
+    m_stack->addWidget(m_settings);   // 4
+    m_stack->addWidget(m_chat);       // 5 (not in nav)
 
     // ---- Sidebar -------------------------------------------------------
     auto* sidebar = new QFrame;
@@ -53,49 +53,55 @@ MainShell::MainShell(ApiClient* api, QWidget* parent)
     sb->setContentsMargins(16, 20, 16, 16);
     sb->setSpacing(6);
 
-    // Logo: "Free" ink + "Talk" accent italic
+    // Logo: "F" monogram + FreeTalk
     auto* logoRow = new QHBoxLayout;
-    logoRow->setSpacing(0);
-    auto* free = new QLabel("Free"); free->setObjectName("Logo");
-    auto* talk = new QLabel("Talk"); talk->setObjectName("LogoAccent");
-    logoRow->addWidget(free); logoRow->addWidget(talk); logoRow->addStretch(1);
+    logoRow->setSpacing(10);
+    auto* mono = Theme::makeAvatar("F", 34, Theme::palette().accent);
+    auto* word = new QLabel("FreeTalk"); word->setObjectName("Logo");
+    logoRow->addWidget(mono);
+    logoRow->addWidget(word);
+    logoRow->addStretch(1);
     sb->addLayout(logoRow);
     sb->addSpacing(18);
 
     m_navGroup = new QButtonGroup(this);
     m_navGroup->setExclusive(true);
-    addNav(tr("  Chat"),     PageChat);
-    addNav(tr("  History"),  PageHistory);
-    addNav(tr("  Profile"),  PageProfile);
-
-    sb->addWidget(m_navGroup->buttons().at(0));
-    sb->addWidget(m_navGroup->buttons().at(1));
-    sb->addWidget(m_navGroup->buttons().at(2));
+    addNav(tr("  Home"),                 PageHome);
+    addNav(tr("  Scenarios"),            PageScenarios);
+    addNav(tr("  Conversation history"), PageHistory);
+    addNav(tr("  Progress"),             PageProgress);
+    addNav(tr("  Settings"),             PageSettings);
+    for (QAbstractButton* b : m_navGroup->buttons())
+        sb->addWidget(b);
 
     sb->addStretch(1);
 
-    // Quick-talk CTA
-    auto* quick = new QPushButton(tr("Quick talk  →"));
-    quick->setProperty("variant", QStringLiteral("primary"));
-    quick->setCursor(Qt::PointingHandCursor);
-    sb->addWidget(quick);
-    sb->addSpacing(10);
-
     // Profile footer
+    auto* line = new QFrame; line->setFrameShape(QFrame::HLine);
+    line->setStyleSheet(QStringLiteral("color:%1;").arg(Theme::palette().border.name()));
+    sb->addWidget(line);
+
     auto* footer = new QHBoxLayout;
     footer->setSpacing(10);
-    footer->addWidget(Theme::makeAvatar(m_api->displayName().isEmpty() ? "U"
-                                        : m_api->displayName(), 36, Theme::palette().accent2));
-    auto* name = new QLabel(m_api->displayName().isEmpty() ? tr("You")
-                                                           : m_api->displayName());
-    name->setStyleSheet("font-weight:600;");
-    footer->addWidget(name);
+    m_footerAvatar = new QWidget;
+    auto* fav = new QHBoxLayout(m_footerAvatar);
+    fav->setContentsMargins(0, 0, 0, 0);
+    fav->addWidget(Theme::makeAvatar("U", 32, Theme::palette().accent2));
+    auto* fcol = new QVBoxLayout; fcol->setSpacing(0);
+    m_footerName = new QLabel(tr("You"));
+    m_footerName->setStyleSheet("font-weight:600;font-size:12px;");
+    m_footerSub = new QLabel("A1 · 0🔥");
+    m_footerSub->setStyleSheet(QStringLiteral("color:%1;font-family:'%2';font-size:10px;")
+                                   .arg(Theme::palette().inkSoft.name(), Theme::fontMono()));
+    fcol->addWidget(m_footerName);
+    fcol->addWidget(m_footerSub);
+    footer->addWidget(m_footerAvatar);
+    footer->addLayout(fcol);
     footer->addStretch(1);
     sb->addLayout(footer);
 
-    // ---- Root layout ---------------------------------------------------
-    auto* root = new QWidget;
-    root->setObjectName("Root");
+    // ---- Root ----------------------------------------------------------
+    auto* root = new QWidget; root->setObjectName("Root");
     auto* rl = new QHBoxLayout(root);
     rl->setContentsMargins(0, 0, 0, 0);
     rl->setSpacing(0);
@@ -103,28 +109,33 @@ MainShell::MainShell(ApiClient* api, QWidget* parent)
     rl->addWidget(m_stack, 1);
     setCentralWidget(root);
 
-    statusBar()->showMessage(tr("Welcome, %1").arg(m_api->displayName()));
-
     // ---- Wiring --------------------------------------------------------
+    connect(m_home, &HomePage::profileLoaded, this, [this](const UserProfile& p) {
+        updateProfile(p);
+        m_settings->setProfile(p);
+    });
     connect(m_chat, &ChatPage::statusMessage, this, [this](const QString& t) {
         statusBar()->showMessage(t);
     });
-    connect(quick, &QPushButton::clicked, this, [this]() {
+    auto startScenario = [this](const QString& id, const QString& title) {
         showPage(PageChat);
-        m_chat->startNewChat();
-    });
-    connect(m_history, &HistoryPage::openRequested, this, [this](const QString& id) {
+        m_chat->startScenario(id, title);
+    };
+    connect(m_home,      &HomePage::scenarioActivated,      this, startScenario);
+    connect(m_scenarios, &ScenariosPage::scenarioActivated, this, startScenario);
+    connect(m_history,   &HistoryPage::openRequested, this, [this](const QString& id) {
         showPage(PageChat);
         m_chat->openSession(id);
     });
+    connect(m_settings, &SettingsPage::signOutRequested, this, &QWidget::close);
 
-    // Start on Chat and immediately begin a new conversation.
-    static_cast<QPushButton*>(m_navGroup->button(PageChat))->setChecked(true);
-    showPage(PageChat);
-    m_chat->startNewChat();
+    // Start on Home.
+    static_cast<QPushButton*>(m_navGroup->button(PageHome))->setChecked(true);
+    showPage(PageHome);
+    m_home->refresh();
 }
 
-QPushButton* MainShell::addNav(const QString& text, int pageIndex)
+void MainShell::addNav(const QString& text, int pageIndex)
 {
     auto* b = new QPushButton(text);
     b->setObjectName("NavItem");
@@ -132,12 +143,28 @@ QPushButton* MainShell::addNav(const QString& text, int pageIndex)
     b->setCursor(Qt::PointingHandCursor);
     m_navGroup->addButton(b, pageIndex);
     connect(b, &QPushButton::clicked, this, [this, pageIndex]() { showPage(pageIndex); });
-    return b;
 }
 
 void MainShell::showPage(int index)
 {
     m_stack->setCurrentIndex(index);
     if (auto* b = m_navGroup->button(index)) b->setChecked(true);
-    if (index == PageHistory) m_history->refresh();
+
+    if (index == PageHome)      m_home->refresh();
+    if (index == PageScenarios) m_scenarios->refresh();
+    if (index == PageHistory)   m_history->refresh();
+    if (index == PageProgress)  m_progress->refresh();
+}
+
+void MainShell::updateProfile(const UserProfile& p)
+{
+    m_footerName->setText(p.displayName.isEmpty() ? tr("You") : p.displayName);
+    m_footerSub->setText(QStringLiteral("%1 · %2🔥").arg(p.cefr()).arg(p.streakDays));
+
+    // Refresh the footer avatar with the user's initial.
+    auto* fav = qobject_cast<QHBoxLayout*>(m_footerAvatar->layout());
+    QLayoutItem* old;
+    while ((old = fav->takeAt(0)) != nullptr) { delete old->widget(); delete old; }
+    fav->addWidget(Theme::makeAvatar(
+        p.displayName.isEmpty() ? "U" : p.displayName, 32, Theme::palette().accent2));
 }

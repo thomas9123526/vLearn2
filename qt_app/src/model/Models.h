@@ -3,6 +3,28 @@
 #include <QString>
 #include <QDateTime>
 #include <QJsonObject>
+#include <QJsonValue>
+
+// I18nTextDto {en,ko,zh} or a plain string → pick a readable string (prefer en).
+inline QString localized(const QJsonValue& v)
+{
+    if (v.isString()) return v.toString();
+    if (v.isObject()) {
+        const QJsonObject o = v.toObject();
+        for (const char* k : {"en", "ko", "zh"}) {
+            const QString s = o.value(k).toString();
+            if (!s.isEmpty()) return s;
+        }
+    }
+    return QString();
+}
+
+// CEFR label from a 1-based level (1→A1 … 6→C2).
+inline QString cefrLabel(int level)
+{
+    static const char* k[] = {"A1", "A2", "B1", "B2", "C1", "C2"};
+    return k[qBound(0, level - 1, 5)];
+}
 
 // Plain data structs mirroring the backend DTOs (see
 // backend/src/conversations/dto/conversation.dto.ts). Kept deliberately
@@ -56,5 +78,70 @@ struct Session {
         s.status    = o.value("status").toString();
         s.turnCount = o.value("turnCount").toInt();
         return s;
+    }
+};
+
+// GET /users/profile (UserProfileDto)
+struct UserProfile {
+    QString displayName;
+    QString avatarEmoji;
+    QString activePersonaId;
+    int     currentLevel = 1;
+    int     xpTotal      = 0;
+    int     streakDays   = 0;
+
+    QString cefr() const { return cefrLabel(currentLevel); }
+
+    static UserProfile fromJson(const QJsonObject& o) {
+        UserProfile u;
+        u.displayName     = o.value("displayName").toString();
+        u.avatarEmoji     = o.value("avatarEmoji").toString();
+        u.activePersonaId = o.value("activePersonaId").toString();
+        u.currentLevel    = o.value("currentLevel").toInt(1);
+        u.xpTotal         = o.value("xpTotal").toInt();
+        u.streakDays      = o.value("streakDays").toInt();
+        return u;
+    }
+};
+
+// GET /scenarios (titles/descriptions are I18nTextDto)
+struct Scenario {
+    QString id;
+    QString category;
+    QString title;
+    QString description;
+    int     estimatedMinutes = 0;
+    int     xpReward = 0;
+    int     cefrLevel = 0;
+
+    static Scenario fromJson(const QJsonObject& o) {
+        Scenario s;
+        s.id          = o.value("id").toString();
+        s.category    = o.value("category").toString();
+        s.title       = localized(o.value("title"));
+        s.description = localized(o.value("description"));
+        // Accept camelCase or snake_case.
+        s.estimatedMinutes = o.value("estimatedMinutes").toInt(
+                                 o.value("estimated_minutes").toInt());
+        s.xpReward         = o.value("xpReward").toInt(
+                                 o.value("xp_reward").toInt());
+        s.cefrLevel        = o.value("cefrLevel").toInt(
+                                 o.value("cefr_level").toInt());
+        return s;
+    }
+};
+
+// GET /progress (summary)
+struct ProgressSummary {
+    int sessionsTotal = 0;
+    int minutesTotal  = 0;
+    int scenariosDone = 0;
+
+    static ProgressSummary fromJson(const QJsonObject& o) {
+        ProgressSummary p;
+        p.sessionsTotal = o.value("sessions_total").toInt();
+        p.minutesTotal  = o.value("minutes_spoken_total").toInt();
+        p.scenariosDone = o.value("scenarios_completed").toInt();
+        return p;
     }
 };

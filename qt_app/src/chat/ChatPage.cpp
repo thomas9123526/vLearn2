@@ -198,7 +198,7 @@ void ChatPage::startNewChat()
         const Persona& persona = personas.at(qMax(0, names.indexOf(picked)));
 
         emit statusMessage(tr("Starting session with %1…").arg(persona.name));
-        m_api->startSession(persona.id, "chat",
+        m_api->startSession(persona.id, "chat", QString(),
             [this, persona](bool ok2, const QJsonValue& sdata, const QString& serr) {
                 if (!ok2 || !sdata.isObject()) {
                     QMessageBox::critical(this, tr("Cannot start chat"),
@@ -211,6 +211,36 @@ void ChatPage::startNewChat()
                 setHeader(persona.name, Theme::personaAccent(persona.name),
                           tr("AI Tutor · Online"));
                 addDatePill(tr("New conversation"));
+                setSending(false);
+                emit statusMessage(tr("Connected. Say hello!"));
+                m_input->setFocus();
+            });
+    });
+}
+
+void ChatPage::startScenario(const QString& scenarioId, const QString& title)
+{
+    emit statusMessage(tr("Preparing “%1”…").arg(title));
+    m_api->listTeachers([this, scenarioId, title](bool ok, const QJsonValue& data, const QString& err) {
+        if (!ok || !data.isArray() || data.toArray().isEmpty()) {
+            QMessageBox::critical(this, tr("Cannot start"),
+                tr("Could not load tutors: %1").arg(ok ? tr("none returned") : err));
+            return;
+        }
+        const Persona persona = Persona::fromJson(data.toArray().first().toObject());
+        m_api->startSession(persona.id, "chat", scenarioId,
+            [this, persona, title](bool ok2, const QJsonValue& sdata, const QString& serr) {
+                if (!ok2 || !sdata.isObject()) {
+                    QMessageBox::critical(this, tr("Cannot start"),
+                        tr("Failed to start session: %1").arg(serr));
+                    return;
+                }
+                const Session s = Session::fromJson(sdata.toObject());
+                m_sessionId = s.id;
+                clearTranscript();
+                setHeader(persona.name, Theme::personaAccent(persona.name),
+                          tr("AI Tutor · Online"));
+                addDatePill(title.isEmpty() ? tr("New conversation") : title);
                 setSending(false);
                 emit statusMessage(tr("Connected. Say hello!"));
                 m_input->setFocus();

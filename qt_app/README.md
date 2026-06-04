@@ -1,18 +1,24 @@
 # vLearn2 — Qt Widgets chat client (Ubuntu)
 
-A native Qt 5.12 desktop client for vLearn2's **chat mode**, styled to the
-FreeTalk design (Apricot theme). No Flutter, no Rive, no animation, no tutor/face
-mode — plain Qt Widgets talking to the existing Nest.js backend.
+A native Qt 5.12 desktop client for vLearn2 / "Virtual Foreign Language", styled
+to match the running Flutter Windows app — **Obsidian** dark theme (navy
+`#121120` + periwinkle `#4F4C7E`/`#9D99C7`). No Flutter, no Rive, no animation,
+no tutor/face mode — plain Qt Widgets talking to the existing Nest.js backend.
 
 ## What it does
 1. **Sign in** (`POST /auth/signin`) — username (`cidUsername`) + password.
-2. **App shell** — a 220px FreeTalk sidebar (Chat / History / Profile +
-   "Quick talk" CTA) around a stacked content area, at desktop 1120×720.
-3. **Chat** — pick a tutor (`GET /teachers`), start a session
-   (`POST /conversations/sessions` with `mode:"chat"`), then send/receive
-   (`POST /conversations/sessions/:id/messages`) as styled bubbles.
-4. **History** — list past conversations (`GET /conversations/sessions`) and
-   reopen one (`GET /conversations/sessions/:id`).
+2. **App shell** — a 220px FreeTalk sidebar (Home / Scenarios / Conversation
+   history / Progress / Settings + profile footer) around a stacked content
+   area, at desktop 1120×720.
+3. **Home** — greeting (`GET /users/profile`), streak/XP hero card,
+   Sessions/Minutes/Topics stats (`GET /progress`), recommended scenarios
+   (`GET /scenarios`).
+4. **Scenarios** — browse scenarios; click one to start a chat session
+   (`POST /conversations/sessions` with `mode:"chat"` + `scenarioId`).
+5. **Chat** — send/receive (`POST /conversations/sessions/:id/messages`) as
+   styled bubbles.
+6. **History** — past conversations (`GET /conversations/sessions`), reopen one.
+7. **Progress** — CEFR level + activity totals. **Settings** — profile + sign out.
 
 ## Layout
 ```
@@ -23,11 +29,16 @@ qt_app/
   src/
     main.cpp                 # theme install → config load → login → shell
     config/AppConfig.{h,cpp} # reads app_config.json
-    ui/Theme.{h,cpp}         # Apricot tokens → fonts + global QSS stylesheet
-    model/Models.h           # Persona / Message / Session (mirror backend DTOs)
+    ui/Theme.{h,cpp}         # Obsidian tokens → fonts + global QSS stylesheet
+    ui/ClickableFrame.h      # tappable card frame
+    model/Models.h           # Profile / Scenario / Progress / Message / Session
     api/ApiClient.{h,cpp}    # QNetworkAccessManager REST client + JWT bearer
     auth/LoginDialog.{h,cpp}
-    shell/MainShell.{h,cpp}  # sidebar + stacked pages
+    shell/MainShell.{h,cpp}  # sidebar + stacked pages + profile footer
+    home/HomePage.{h,cpp}    # greeting + streak/XP + stats + recommended
+    scenarios/ScenariosPage.{h,cpp}
+    progress/ProgressPage.{h,cpp}
+    settings/SettingsPage.{h,cpp}
     chat/ChatPage.{h,cpp}    # themed conversation screen (bubbles + input bar)
     chat/HistoryPage.{h,cpp} # session list
 ```
