@@ -1,25 +1,35 @@
 # vLearn2 — Qt Widgets chat client (Ubuntu)
 
-A native Qt 5.12 desktop client for vLearn2's **chat mode**. No Flutter, no Rive,
-no animation — plain Qt Widgets talking to the existing Nest.js backend.
+A native Qt 5.12 desktop client for vLearn2's **chat mode**, styled to the
+FreeTalk design (Apricot theme). No Flutter, no Rive, no animation, no tutor/face
+mode — plain Qt Widgets talking to the existing Nest.js backend.
 
 ## What it does
 1. **Sign in** (`POST /auth/signin`) — username (`cidUsername`) + password.
-2. **Pick a tutor** (`GET /teachers`).
-3. **Start a chat session** (`POST /conversations/sessions` with `mode:"chat"`).
-4. **Chat** — send a message (`POST /conversations/sessions/:id/messages`),
-   show the tutor's reply.
+2. **App shell** — a 220px FreeTalk sidebar (Chat / History / Profile +
+   "Quick talk" CTA) around a stacked content area, at desktop 1120×720.
+3. **Chat** — pick a tutor (`GET /teachers`), start a session
+   (`POST /conversations/sessions` with `mode:"chat"`), then send/receive
+   (`POST /conversations/sessions/:id/messages`) as styled bubbles.
+4. **History** — list past conversations (`GET /conversations/sessions`) and
+   reopen one (`GET /conversations/sessions/:id`).
 
 ## Layout
 ```
 qt_app/
-  qt_app.pro              # qmake project (Qt5 Widgets + Network)
+  qt_app.pro                 # qmake project (Qt5 Widgets + Network)
+  assets.qrc, assets/fonts/  # bundled Lora / Inter / JetBrains Mono
+  app_config.json            # backend endpoint (read before any network call)
   src/
-    main.cpp              # login → chat wiring; base-url resolution
-    model/Models.h        # Persona / Message / Session structs (mirror backend DTOs)
-    api/ApiClient.{h,cpp} # QNetworkAccessManager REST client + JWT bearer
+    main.cpp                 # theme install → config load → login → shell
+    config/AppConfig.{h,cpp} # reads app_config.json
+    ui/Theme.{h,cpp}         # Apricot tokens → fonts + global QSS stylesheet
+    model/Models.h           # Persona / Message / Session (mirror backend DTOs)
+    api/ApiClient.{h,cpp}    # QNetworkAccessManager REST client + JWT bearer
     auth/LoginDialog.{h,cpp}
-    chat/ChatWindow.{h,cpp}
+    shell/MainShell.{h,cpp}  # sidebar + stacked pages
+    chat/ChatPage.{h,cpp}    # themed conversation screen (bubbles + input bar)
+    chat/HistoryPage.{h,cpp} # session list
 ```
 
 ## Build & run
