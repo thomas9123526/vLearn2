@@ -25,13 +25,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Continue'   # don't stop on non-zero exit codes
 
-$Root    = Split-Path $PSScriptRoot -Parent
-$Backend = Join-Path $Root 'backend'
-$Admin   = Join-Path $Root 'admin_panel'
-$Flutter = Join-Path $Root 'flutter_app'
-$Results = Join-Path $Root 'test-results'
+$Root       = Split-Path $PSScriptRoot -Parent
+$Backend    = Join-Path $Root 'backend'
+$Admin      = Join-Path $Root 'admin_panel'
+$Flutter    = Join-Path $Root 'flutter_app'
+$ResultsDir = Join-Path $Root 'test-results'   # different name avoids collision with $results hash
 
-New-Item -ItemType Directory -Force -Path $Results | Out-Null
+New-Item -ItemType Directory -Force -Path $ResultsDir | Out-Null
 
 # ── Colour helpers ─────────────────────────────────────────────────────────
 
@@ -177,6 +177,6 @@ Write-Host "`n  Passed: $passed   Failed: $failed   Skipped: $skipped" -Foregrou
 Write-Host "$('═' * 60)`n" -ForegroundColor White
 
 # Save machine-readable results to test-results/summary.json
-$results | ConvertTo-Json -Depth 3 | Out-File (Join-Path $Results 'summary.json') -Encoding UTF8
+$results | ConvertTo-Json -Depth 3 | Out-File (Join-Path $ResultsDir 'summary.json') -Encoding UTF8
 
 if ($failed -gt 0) { exit 1 } else { exit 0 }
