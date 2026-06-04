@@ -6,7 +6,7 @@ no animation — plain Qt Widgets talking to the existing Nest.js backend.
 ## What it does
 1. **Sign in** (`POST /auth/signin`) — username (`cidUsername`) + password.
 2. **Pick a tutor** (`GET /teachers`).
-3. **Start a chat session** (`POST /conversations/sessions` with `mode:"message"`).
+3. **Start a chat session** (`POST /conversations/sessions` with `mode:"chat"`).
 4. **Chat** — send a message (`POST /conversations/sessions/:id/messages`),
    show the tutor's reply.
 

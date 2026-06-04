@@ -6,14 +6,25 @@
 #include <QLabel>
 #include <QFormLayout>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QVariant>
 #include <QJsonValue>
 
 LoginDialog::LoginDialog(ApiClient* api, QWidget* parent)
     : QDialog(parent)
     , m_api(api)
 {
-    setWindowTitle(tr("vLearn2 — Sign in"));
+    setWindowTitle(tr("FreeTalk — Sign in"));
     setModal(true);
+
+    auto* free = new QLabel("Free", this); free->setObjectName("Logo");
+    auto* talk = new QLabel("Talk", this); talk->setObjectName("LogoAccent");
+    auto* logo = new QHBoxLayout;
+    logo->setSpacing(0);
+    logo->addStretch(1);
+    logo->addWidget(free);
+    logo->addWidget(talk);
+    logo->addStretch(1);
 
     m_username = new QLineEdit(this);
     m_username->setPlaceholderText(tr("e.g. kky1206"));
@@ -32,12 +43,18 @@ LoginDialog::LoginDialog(ApiClient* api, QWidget* parent)
 
     m_signIn = new QPushButton(tr("Sign in"), this);
     m_signIn->setDefault(true);
+    m_signIn->setProperty("variant", QStringLiteral("primary"));
+    m_signIn->setCursor(Qt::PointingHandCursor);
 
     auto* root = new QVBoxLayout(this);
+    root->setContentsMargins(28, 24, 28, 24);
+    root->setSpacing(14);
+    root->addLayout(logo);
+    root->addSpacing(6);
     root->addLayout(form);
     root->addWidget(m_error);
     root->addWidget(m_signIn);
-    resize(360, sizeHint().height());
+    resize(380, sizeHint().height());
 
     connect(m_signIn,   &QPushButton::clicked, this, &LoginDialog::attemptSignIn);
     connect(m_password, &QLineEdit::returnPressed, this, &LoginDialog::attemptSignIn);

@@ -33,7 +33,8 @@ public:
     void listTeachers(Callback cb);
 
     // Conversation (chat mode)
-    void startSession(const QString& personaId, const QString& mode, Callback cb);
+    void startSession(const QString& personaId, const QString& mode /* "chat"|"face" */, Callback cb);
+    void listSessions(Callback cb);
     void getSession(const QString& id, Callback cb);
     void sendMessage(const QString& sessionId, const QString& content, Callback cb);
     void endSession(const QString& sessionId, Callback cb);

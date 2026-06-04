@@ -2,9 +2,10 @@
 #include <QMessageBox>
 
 #include "config/AppConfig.h"
+#include "ui/Theme.h"
 #include "api/ApiClient.h"
 #include "auth/LoginDialog.h"
-#include "chat/ChatWindow.h"
+#include "shell/MainShell.h"
 
 // Optional override: ./vlearn_chat --config /path/to/app_config.json
 static QString configPathArg(const QApplication& app)
@@ -19,7 +20,10 @@ static QString configPathArg(const QApplication& app)
 int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
-    QApplication::setApplicationName("vLearn2 Chat");
+    QApplication::setApplicationName("FreeTalk");
+
+    // FreeTalk look: load fonts + apply the Apricot stylesheet.
+    Theme::install(app);
 
     // 1. Read the endpoint from app_config.json BEFORE any networking.
     const AppConfig cfg = AppConfig::load(configPathArg(app));
@@ -31,15 +35,14 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    // 2. Now build the network client against the configured base URL.
+    // 2. Build the network client against the configured base URL.
     ApiClient api(cfg.baseUrl);
 
     LoginDialog login(&api);
     if (login.exec() != QDialog::Accepted)
         return 0;   // user cancelled sign-in
 
-    ChatWindow win(&api);
-    win.setWindowTitle(QObject::tr("vLearn2 — Chat  (%1)").arg(cfg.baseUrl));
-    win.show();
+    MainShell shell(&api);
+    shell.show();
     return app.exec();
 }

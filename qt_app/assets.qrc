@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/fonts">
+        <file alias="Lora.ttf">assets/fonts/Lora.ttf</file>
+        <file alias="Inter.ttf">assets/fonts/Inter.ttf</file>
+        <file alias="JetBrainsMono.ttf">assets/fonts/JetBrainsMono.ttf</file>
+    </qresource>
+</RCC>

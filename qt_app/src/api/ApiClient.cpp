@@ -103,9 +103,14 @@ void ApiClient::startSession(const QString& personaId,
 {
     QJsonObject body{
         {"personaId", personaId},
-        {"mode",      mode},        // "message" for chat mode
+        {"mode",      mode},        // "chat" for chat mode (or "face")
     };
     request("POST", "/conversations/sessions", &body, std::move(cb), true);
+}
+
+void ApiClient::listSessions(Callback cb)
+{
+    request("GET", "/conversations/sessions", nullptr, std::move(cb), true);
 }
 
 void ApiClient::getSession(const QString& id, Callback cb)
