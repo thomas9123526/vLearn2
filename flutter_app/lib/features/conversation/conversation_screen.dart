@@ -361,11 +361,6 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
     final hasUserTurn = widget.messages.any((m) => m.role == 'user');
     if (hasUserTurn) _seenCount = widget.messages.length;
 
-    // Speak the opening assistant message on first load (Turn 0 only).
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (!hasUserTurn) _maybeSpeakLatestAssistantReply();
-    });
   }
 
   @override
@@ -517,14 +512,6 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
 
   @override
   Widget build(BuildContext context) {
-    // If speech models finish loading after the screen appears, retry the
-    // opening message — but only at Turn 0 (no user turn yet).
-    ref.listen<bool>(speechReadyProvider, (prev, next) {
-      if (next && prev != true) {
-        final hasUserTurn = widget.messages.any((m) => m.role == 'user');
-        if (!hasUserTurn) _maybeSpeakLatestAssistantReply();
-      }
-    });
 
     final scheme = widget.scheme;
     final busy = widget.sending || _transcribing || _ttsSpeaking;
