@@ -477,7 +477,7 @@ class _HeroCard extends StatelessWidget {
 
   /// Resolves a stored image URL to one the image widgets can load.
   /// - `http(s)://...`    → returned as-is (absolute network URL)
-  /// - `asset:...`        → returned as-is (handled by [_imageProvider] / [_imageWidget])
+  /// - `asset:...`        → returned as-is (handled by [_imageProvider])
   /// - `/uploads/...`     → prepends uploadsOrigin (relative backend path)
   String _resolveScenarioImage(String relative) {
     if (relative.startsWith('http') || relative.startsWith('asset:')) {
@@ -492,17 +492,6 @@ class _HeroCard extends StatelessWidget {
     return NetworkImage(url);
   }
 
-  /// Returns an [Image] widget for both network and asset URLs.
-  Widget _imageWidget(
-    String url, {
-    required BoxFit fit,
-    required Widget Function(BuildContext, Object, StackTrace?) errorBuilder,
-  }) {
-    if (url.startsWith('asset:')) {
-      return Image.asset(url.substring(6), fit: fit, errorBuilder: errorBuilder);
-    }
-    return Image.network(url, fit: fit, errorBuilder: errorBuilder);
-  }
 }
 
 class _CategoryIllustration extends StatelessWidget {
