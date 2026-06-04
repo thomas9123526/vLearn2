@@ -296,6 +296,7 @@ class _ScoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sessionFeedback = score['sessionFeedback'] as String?;
     final cefr = score['cefrEstimate'] as String?;
     final fluency = (score['fluencyScore'] as num?)?.toInt();
     final accuracy = (score['accuracyScore'] as num?)?.toInt();
@@ -303,8 +304,14 @@ class _ScoreCard extends StatelessWidget {
     final interaction = (score['interactionScore'] as num?)?.toInt();
     final topicAdherence = (score['topicAdherenceScore'] as num?)?.toInt();
     final strengths = (score['strengths'] as List?)?.cast<String>() ?? [];
-    final improvements =
-        (score['improvements'] as List?)?.cast<String>() ?? [];
+    final rawSpecific = (score['specificFeedback'] as List?) ?? [];
+    final specificFeedback = rawSpecific
+        .cast<Map<String, dynamic>>()
+        .where((f) {
+          final issue = f['issue'] as String?;
+          return issue != null && issue.isNotEmpty && issue != 'None';
+        })
+        .toList();
     final practice = score['suggestedPractice'] as String?;
 
     return Column(
@@ -328,6 +335,27 @@ class _ScoreCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
+
+        // Session feedback prose — shown first
+        if (sessionFeedback != null && sessionFeedback.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Text(
+              sessionFeedback,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(height: 1.55),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         // Score bars (scores are 0-100; display as 1-5 dots for clarity)
         Container(
@@ -366,11 +394,11 @@ class _ScoreCard extends StatelessWidget {
           const SizedBox(height: 16),
         ],
 
-        // Areas to work on
-        if (improvements.isNotEmpty) ...[
-          _SectionHeader('Work on', Icons.build_outlined, scheme),
+        // Turn-by-turn feedback
+        if (specificFeedback.isNotEmpty) ...[
+          _SectionHeader('Turn feedback', Icons.rate_review_outlined, scheme),
           const SizedBox(height: 8),
-          ...improvements.map((s) => _BulletLine(s, scheme)),
+          ...specificFeedback.map((f) => _TurnFeedbackItem(f, scheme)),
           const SizedBox(height: 16),
         ],
 
@@ -517,6 +545,92 @@ class _BulletLine extends StatelessWidget {
             child: Text(text,
                 style: Theme.of(context).textTheme.bodyMedium),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TurnFeedbackItem extends StatelessWidget {
+  const _TurnFeedbackItem(this.item, this.scheme);
+  final Map<String, dynamic> item;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final turnIndex = item['turn_index'] as int? ?? 0;
+    final userText = item['user_text'] as String? ?? '';
+    final issue = item['issue'] as String? ?? '';
+    final correction = item['correction'] as String?;
+    final severity = item['severity'] as String? ?? 'minor';
+
+    final severityColor = switch (severity) {
+      'major'    => scheme.error,
+      'moderate' => const Color(0xFFE67E22),
+      _          => scheme.onSurfaceVariant,
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(
+          left: BorderSide(color: severityColor, width: 3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Turn $turnIndex',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: severityColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  severity,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: severityColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          if (userText.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '"$userText"',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontStyle: FontStyle.italic,
+                  ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(issue, style: Theme.of(context).textTheme.bodyMedium),
+          if (correction != null && correction.isNotEmpty && correction != 'None') ...[
+            const SizedBox(height: 4),
+            Text(
+              '→ $correction',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
+          ],
         ],
       ),
     );

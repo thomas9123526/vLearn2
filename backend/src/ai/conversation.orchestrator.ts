@@ -29,6 +29,8 @@ export interface SpecificFeedbackItem {
 }
 
 export interface EvaluationResult {
+  /** Prose summary paragraph between </think> and the JSON block. */
+  session_feedback: string;
   overall_cefr_estimate: string;
   scores: EvaluationScores;
   specific_feedback: SpecificFeedbackItem[];
@@ -278,7 +280,9 @@ ${transcript}`;
         content:      text,
       });
 
-      // Strip <think>...</think> chain-of-thought, then extract the JSON object
+      // Strip <think>...</think> chain-of-thought, then extract the JSON object.
+      // Any prose BETWEEN </think> and the opening "{" is the session feedback
+      // paragraph the model emits before the structured output.
       const afterThink = text.includes('</think>')
         ? text.slice(text.indexOf('</think>') + 8).trim()
         : text.trim();
@@ -288,7 +292,11 @@ ${transcript}`;
         this.logger.warn('evaluateSession: no JSON found in AI response');
         return null;
       }
-      return JSON.parse(afterThink.slice(jsonStart, jsonEnd + 1)) as EvaluationResult;
+      const sessionFeedback = jsonStart > 0
+        ? afterThink.slice(0, jsonStart).trim()
+        : '';
+      const parsed = JSON.parse(afterThink.slice(jsonStart, jsonEnd + 1));
+      return { ...parsed, session_feedback: sessionFeedback } as EvaluationResult;
     } catch (e) {
       this.logger.warn(`evaluateSession failed: ${(e as Error).message}`);
       return null;

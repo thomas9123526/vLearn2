@@ -373,7 +373,9 @@ export class ConversationsService {
     const score = await this.scores.findOne({ where: { session_id: sessionId } });
     if (!score) return null;
 
+    const metrics = (score.fluency_metrics ?? {}) as Record<string, unknown>;
     return {
+      sessionFeedback:       score.ai_feedback,
       fluencyScore:          score.fluency_score,
       accuracyScore:         score.grammar_score,
       vocabularyScore:       score.vocabulary_score,
@@ -383,7 +385,8 @@ export class ConversationsService {
       cefrEstimate:          score.cefr_estimate,
       strengths:             score.strengths,
       improvements:          score.improvements,
-      suggestedPractice:     score.ai_feedback,
+      specificFeedback:      (metrics['specific_feedback'] as unknown[]) ?? [],
+      suggestedPractice:     (metrics['suggested_practice'] as string | undefined) ?? null,
       computedAt:            score.computed_at,
     };
   }
@@ -430,9 +433,9 @@ export class ConversationsService {
       overall_score:         avgHundred,
       cefr_estimate:         result.overall_cefr_estimate,
       strengths:             result.strengths,
-      improvements:          result.specific_feedback.map((f) => f.issue).slice(0, 5),
-      ai_feedback:           result.suggested_practice,
-      fluency_metrics:       { specific_feedback: result.specific_feedback } as Record<string, unknown>,
+      improvements:          result.specific_feedback.filter((f) => f.issue && f.issue !== 'None').map((f) => f.issue).slice(0, 5),
+      ai_feedback:           result.session_feedback,
+      fluency_metrics:       { specific_feedback: result.specific_feedback, suggested_practice: result.suggested_practice } as Record<string, unknown>,
       evaluator_versions:    { provider: 'ai' } as Record<string, string>,
     };
 
