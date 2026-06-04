@@ -160,15 +160,13 @@ class AppConfigService {
 }
 
 @ApiTags('App Config')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
 @Controller('app-config')
 class AppConfigController {
   constructor(private readonly svc: AppConfigService) {}
 
   @Get()
   @ApiOperation({
-    summary: 'All visibility flags for the Flutter app to cache',
+    summary: 'All visibility flags for the Flutter app to cache (public)',
   })
   flags() {
     return this.svc.appVisibleFlags();

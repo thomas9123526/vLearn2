@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/app_apis.dart';
 import '../../core/config/app_config.dart';
+import '../../core/config/layout_config_provider.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/auth_provider.dart';
@@ -58,6 +59,13 @@ class _ScenarioBriefScreenState extends ConsumerState<ScenarioBriefScreen> {
     final scheme = Theme.of(context).colorScheme;
     final user = ref.watch(authProvider).user;
     final uploadsOrigin = _resolveUploadsOrigin();
+    final layoutConfig = ref.watch(layoutConfigProvider).valueOrNull;
+    final showBgImage    = layoutConfig?.isVisible('scenario_detail.background_image') ?? true;
+    final showDescription = layoutConfig?.isVisible('scenario_detail.description') ?? true;
+    final showObjectives  = layoutConfig?.isVisible('scenario_detail.objectives') ?? true;
+    final showKeyPhrases  = layoutConfig?.isVisible('scenario_detail.key_phrases') ?? true;
+    final showCefrPill    = layoutConfig?.isVisible('scenario_detail.cefr_pill') ?? true;
+    final showXpPill      = layoutConfig?.isVisible('scenario_detail.xp_pill') ?? true;
 
     final activeSession = activeSessionAsync.asData?.value;
     final speechReady = ref.watch(speechReadyProvider);
@@ -113,19 +121,31 @@ class _ScenarioBriefScreenState extends ConsumerState<ScenarioBriefScreen> {
                 _ContinueBanner(session: activeSession),
                 const SizedBox(height: 16),
               ],
-              _HeroCard(scenario: scenario, locale: locale, uploadsOrigin: uploadsOrigin),
+              _HeroCard(
+                scenario: scenario,
+                locale: locale,
+                uploadsOrigin: uploadsOrigin,
+                showBackgroundImage: showBgImage,
+                showDescription: showDescription,
+                showCefrPill: showCefrPill,
+                showXpPill: showXpPill,
+              ),
               const SizedBox(height: 20),
               _RolesRow(scenario: scenario, persona: activePersona),
               const SizedBox(height: 20),
               _TwistBanner(scenario: scenario, locale: locale),
-              const SizedBox(height: 20),
-              const _SectionHeader(text: 'Objectives'),
-              const SizedBox(height: 8),
-              _Objectives(scenario: scenario),
-              const SizedBox(height: 20),
-              const _SectionHeader(text: 'Phrases worth stealing'),
-              const SizedBox(height: 8),
-              _Phrases(scenario: scenario),
+              if (showObjectives) ...[
+                const SizedBox(height: 20),
+                const _SectionHeader(text: 'Objectives'),
+                const SizedBox(height: 8),
+                _Objectives(scenario: scenario),
+              ],
+              if (showKeyPhrases) ...[
+                const SizedBox(height: 20),
+                const _SectionHeader(text: 'Phrases worth stealing'),
+                const SizedBox(height: 8),
+                _Phrases(scenario: scenario),
+              ],
               const SizedBox(height: 20),
               _PersonaPairing(
                 persona: activePersona,
@@ -379,10 +399,18 @@ class _HeroCard extends StatelessWidget {
     required this.scenario,
     required this.locale,
     required this.uploadsOrigin,
+    this.showBackgroundImage = true,
+    this.showDescription = true,
+    this.showCefrPill = true,
+    this.showXpPill = true,
   });
   final Scenario scenario;
   final String locale;
   final String uploadsOrigin;
+  final bool showBackgroundImage;
+  final bool showDescription;
+  final bool showCefrPill;
+  final bool showXpPill;
 
   @override
   Widget build(BuildContext context) {
@@ -397,7 +425,7 @@ class _HeroCard extends StatelessWidget {
     // origin — Dio's baseUrl is /vfls/api on prod, but the static
     // mount lives at the server root, so we strip the suffix here.
     final bgImageUrl = scenario.backgroundImageUrl;
-    final hasBg = bgImageUrl != null && bgImageUrl.isNotEmpty;
+    final hasBg = showBackgroundImage && bgImageUrl != null && bgImageUrl.isNotEmpty;
     const cardRadius = BorderRadius.vertical(
       top: Radius.circular(20),
       bottom: Radius.circular(20),
@@ -460,19 +488,21 @@ class _HeroCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            scenario.description.forLocale(locale),
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          if (showDescription) ...[
+            const SizedBox(height: 16),
+            Text(
+              scenario.description.forLocale(locale),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             children: [
-              _Pill(text: 'CEFR · $levelLabel', scheme: scheme),
+              if (showCefrPill) _Pill(text: 'CEFR · $levelLabel', scheme: scheme),
               if (scenario.timeConstrained)
                 _Pill(text: '~${scenario.estimatedMinutes} min', scheme: scheme),
-              _Pill(text: '+${scenario.xpReward} XP', scheme: scheme),
+              if (showXpPill) _Pill(text: '+${scenario.xpReward} XP', scheme: scheme),
             ],
           ),
         ],
