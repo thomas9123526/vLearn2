@@ -164,7 +164,7 @@ The session continued from a previous context. The main requests in this session
 
    - **`todoList_report/scenario/field_description_ko.md`** (CREATED, then user-modified)
      - Korean translation of field_description.md
-     - User changed "한국어" to "조선어" in `title_ko` and `key_phrases` rows
+     - User changed "조선어" to "조선어" in `title_ko` and `key_phrases` rows
 
    - **`datamanage/ca/make_root_ca.ps1`** (READ)
      - DataManage Root CA: `pathlen:1`, CN=`DataManage Root CA`, 7300 days, `keyCertSign + cRLSign + digitalSignature`

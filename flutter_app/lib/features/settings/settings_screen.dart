@@ -255,7 +255,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _languageLabel(String code) => switch (code) {
     'zh' => '中文',
     'ru' => 'Русский',
-    'ko' => '한국어',
+    'ko' => '조선어',
     _ => 'English',
   };
 
@@ -306,7 +306,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ('en', 'English'),
             ('zh', '中文'),
             ('ru', 'Русский'),
-            ('ko', '한국어'),
+            ('ko', '조선어'),
           ])
             ListTile(
               title: Text(l.$2),
