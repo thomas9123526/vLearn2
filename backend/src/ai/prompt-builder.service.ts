@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import type { PersonaEntity } from '../database/entities/persona.entity';
@@ -13,45 +14,117 @@ import {
 import { AppConfigEntity } from '../database/entities/app-config.entity';
 import type { PromptVariable } from './ai-call-logger';
 
+// ---------------------------------------------------------------------------
+// Locale table — mirrors ConversationModel config/locale.yaml
+// ---------------------------------------------------------------------------
+
+interface LocaleData {
+  country: string;
+  countryAdj: string;
+  learnerDesc: string;
+  avoidCulturesPhrase: string;
+  avoidedTopicsSentence: string;
+}
+
+const LOCALE_TABLE: Record<string, LocaleData> = {
+  china: {
+    country: 'China',
+    countryAdj: 'Chinese',
+    learnerDesc: 'adult learners of English',
+    avoidCulturesPhrase: 'American and European',
+    avoidedTopicsSentence:
+      'Stay clear of politics, religion, alcohol dating, partisan history, violence harm, distress self harm, yankee culture, western culture, and law and national economy.',
+  },
+  japan: {
+    country: 'Japan',
+    countryAdj: 'Japanese',
+    learnerDesc: 'adult learners of English',
+    avoidCulturesPhrase: 'American, European, Chinese, or Singaporean',
+    avoidedTopicsSentence:
+      'Stay clear of politics, religion, alcohol dating, partisan history, violence harm, distress self harm, yankee culture, western culture, and law and national economy.',
+  },
+  italy: {
+    country: 'Italy',
+    countryAdj: 'Italian',
+    learnerDesc: 'adult learners of English',
+    avoidCulturesPhrase: 'American or British',
+    avoidedTopicsSentence:
+      'Stay clear of politics, religion, alcohol dating, partisan history, violence harm, distress self harm, yankee culture, western culture, and law and national economy.',
+  },
+};
+
+// Fallback used when locale is unknown
+const GENERIC_LOCALE: LocaleData = {
+  country: '',
+  countryAdj: '',
+  learnerDesc: 'adult learners of English',
+  avoidCulturesPhrase: '',
+  avoidedTopicsSentence:
+    'Stay clear of politics, religion, violence, and other sensitive topics.',
+};
+
+// Maps user native-language code/name (lowercase) → locale key
+const LANG_TO_LOCALE: Record<string, string> = {
+  zh: 'china', 'zh-cn': 'china', 'zh-tw': 'china',
+  chinese: 'china', mandarin: 'china', cantonese: 'china',
+  ja: 'japan', japanese: 'japan',
+  it: 'italy', italian: 'italy',
+};
+
+// DB config keys we read for admin-panel locale overrides
+const LOCALE_CONFIG_KEYS = [
+  'prompt.locale.country',
+  'prompt.locale.country_adjective',
+  'prompt.locale.learner_audience',
+  'prompt.locale.avoid_cultures',
+  'prompt.avoided_topics',
+] as const;
+
+// ---------------------------------------------------------------------------
+// Deployment guidelines — verbatim from ConversationModel prompts.py
+// Placeholders: {modelRoleName}, {cefrLevel}, {country}, {avoidCultures}
+// ---------------------------------------------------------------------------
+const DEPLOYMENT_GUIDELINES = `- Sound like a real person, not a textbook. Stay in character as {modelRoleName} -- speak the way they would speak in this setting.
+- Respond ONLY in English, even if the learner switches to another language. Do not code-switch or quote long non-English passages. If the learner addresses you in their L1, respond in English while staying in character.
+- Keep vocabulary, grammar, and sentence length at CEFR {cefrLevel} unless the learner reaches higher and sustains it.
+- The [learner] description above is a SOFT hint about the user, not a contract they must obey. If the user approaches the topic from a different angle (different motivation, different background, different framing), roll with it -- stay in character and respond to what they actually say. The FIXED parts are your own [role] and the [topic].
+- If the user tries to swap roles (asks you to take their role, or starts behaving as if they are {modelRoleName}), gently keep your own [role] in one in-character sentence and continue the conversation on topic. Do not lecture about who plays whom.
+- Subtopics above are starting points, not a checklist. Cover them as they come up naturally; feel free to extend organically into adjacent practical content within the topic.
+- Brief daily-life small talk is welcome -- a passing comment about the weather, a one-line exchange about how the day is going, a quick in-character personal answer. Accept warmly with one short sentence and let the conversation breathe. Do NOT redirect for these.
+- Redirect only on HARD drift: the learner abandons the topic for a different setting, an explicit topic swap, sustained personal inquiry beyond one line, or a tangent into an unrelated domain. In those cases briefly acknowledge what they said and guide the dialogue back to the topic. One or two sentences is enough; do not lecture about staying on topic.
+- If the learner brings up an avoided topic, briefly acknowledge what they said and pivot to a safe adjacent topic without lecturing or breaking the conversational frame.{localeGrounding}
+- When the learner makes a small mistake: at A1-A2 gently recast the correct form inside your reply; at B1 and above you may briefly explain or ask a clarifying question if it would help.
+- Ask follow-up questions, share small reactions.
+- Do not use bullet lists, headings, or numbered steps in your replies.`;
+
 /**
- * Builds vendor-agnostic prompts in the cch_prompt section format
- * ([role] / [learner] / [topic] / [subtopics] / [cefr_level] / [locale] /
- * [avoided_topics] / [guidelines]).
+ * Builds vendor-agnostic prompts matching the ConversationModel's
+ * _SCENARIO_DEPLOYMENT_SYSTEM_PROMPT_TEMPLATE ([role]/[learner]/[topic]/
+ * [subtopics]/[cefr_level]/[locale]/[avoided_topics]/[guidelines]).
  *
  * Priority order for the tutor system prompt:
  *   1. scenario.custom_prompt  — per-scenario full override (highest)
  *   2. vl_prompt_templates row — global full-template override from DB
- *   3. Section-by-section builder — toggleable via prompt.section.* flags
+ *   3. Section-by-section builder — ConversationModel format
  *
- * Placeholder syntax: `{{group.field}}` — resolved against a flat key-value
- * map. Unknown placeholders collapse to '' so template internals never leak.
+ * Placeholder syntax in custom prompts / DB templates: `{{group.field}}`
  */
 @Injectable()
 export class PromptBuilderService {
   private readonly logger = new Logger('PromptBuilderService');
 
-  private static readonly SECTION_KEYS = [
-    'prompt.section.role',
-    'prompt.section.learner',
-    'prompt.section.topic',
-    'prompt.section.subtopics',
-    'prompt.section.cefr_level',
-    'prompt.section.locale',
-    'prompt.section.avoided_topics',
-    'prompt.section.guidelines',
-    'prompt.locale.country',
-    'prompt.locale.country_adjective',
-    'prompt.locale.learner_audience',
-    'prompt.locale.avoid_cultures',
-    'prompt.avoided_topics',
-  ] as const;
+  /** When true, appends /no_think at the end of conversation system prompts. */
+  readonly disableThinking: boolean;
 
   constructor(
+    config: ConfigService,
     @InjectRepository(PromptTemplateEntity)
     private readonly templates: Repository<PromptTemplateEntity>,
     @InjectRepository(AppConfigEntity)
     private readonly configRepo: Repository<AppConfigEntity>,
-  ) {}
+  ) {
+    this.disableThinking = config.get<string>('AI_DISABLE_THINKING') === 'true';
+  }
 
   /**
    * Returns the flat context map used to render placeholders, annotated with
@@ -88,17 +161,26 @@ export class PromptBuilderService {
 
     // Priority 1: per-scenario custom prompt
     if (scenario?.custom_prompt?.trim()) {
-      return { prompt: this.render(scenario.custom_prompt, ctx), source: 'custom_prompt (per-scenario override)' };
+      return {
+        prompt: this.render(scenario.custom_prompt, ctx),
+        source: 'custom_prompt (per-scenario override)',
+      };
     }
 
-    // Priority 2: global full-template override
+    // Priority 2: global full-template override from DB
     const tpl = await this.loadTemplate('tutor_system');
     if (tpl) {
-      return { prompt: this.render(tpl, ctx), source: 'DB template: tutor_system (vl_prompt_templates)' };
+      return {
+        prompt: this.render(tpl, ctx),
+        source: 'DB template: tutor_system (vl_prompt_templates)',
+      };
     }
 
-    // Priority 3: section-by-section cch_prompt builder
-    return { prompt: await this.buildCchPrompt(ctx), source: 'section-builder ([role]/[learner]/[topic]/…)' };
+    // Priority 3: ConversationModel section builder
+    return {
+      prompt: await this.buildCchPrompt(ctx),
+      source: 'section-builder ([role]/[learner]/[topic]/…)',
+    };
   }
 
   async buildGrammarPrompt(
@@ -113,7 +195,8 @@ export class PromptBuilderService {
         .join('\n'),
     };
     const tpl = await this.loadTemplate('grammar');
-    return this.render(tpl ?? DEFAULT_GRAMMAR, ctx);
+    const base = this.render(tpl ?? DEFAULT_GRAMMAR, ctx);
+    return this.disableThinking ? `${base}\n/no_think` : base;
   }
 
   async buildFeedbackPrompt(summary: {
@@ -144,97 +227,118 @@ export class PromptBuilderService {
 
   // ── Private helpers ──────────────────────────────────────────────────────
 
+  /**
+   * Builds the system prompt in ConversationModel's structured section format,
+   * matching the _SCENARIO_DEPLOYMENT_SYSTEM_PROMPT_TEMPLATE used at training
+   * time so the model stays inside its trained distribution.
+   */
   private async buildCchPrompt(ctx: Record<string, string>): Promise<string> {
+    // Load DB locale overrides (admin panel can override per-instance)
     let cfg: Record<string, unknown> = {};
     try {
       const rows = await this.configRepo.find({
-        where: { key: In([...PromptBuilderService.SECTION_KEYS]) },
+        where: { key: In([...LOCALE_CONFIG_KEYS]) },
       });
       cfg = Object.fromEntries(rows.map((r) => [r.key, r.value]));
     } catch (e) {
       this.logger.warn(
-        `Could not load prompt config flags, using defaults: ${(e as Error).message}`,
+        `Could not load locale config, using built-in defaults: ${(e as Error).message}`,
       );
     }
-
-    const on = (key: string, def = true): boolean => {
-      const v = cfg[key];
-      return typeof v === 'boolean' ? v : def;
-    };
-    const str = (key: string, def = ''): string => {
+    const dbStr = (key: string, def = ''): string => {
       const v = cfg[key];
       return typeof v === 'string' && v.trim() ? v.trim() : def;
     };
 
-    const sections: string[] = [];
+    // Resolve locale: scenario.locale > user native language > china default
+    const scenarioLocale = ctx['scenario.locale'];
+    const nativeLang = ctx['user.native_language']?.toLowerCase() ?? '';
+    const localeName =
+      scenarioLocale ||
+      LANG_TO_LOCALE[nativeLang] ||
+      'china';
+    const loc = LOCALE_TABLE[localeName] ?? GENERIC_LOCALE;
 
-    if (on('prompt.section.role')) {
-      const specialties = ctx['persona.specialties']
-        ? ` specializing in ${ctx['persona.specialties']}`
-        : '';
-      const tutorRole = ctx['scenario.tutor_role'] && ctx['scenario.tutor_role'] !== '—'
-        ? `\nYour role in this scenario: ${ctx['scenario.tutor_role']}.`
-        : '';
-      sections.push(
-        `[role]\nYou are ${ctx['persona.name']}: a ${ctx['persona.style']} English tutor${specialties}.${tutorRole}`,
-      );
-    }
+    const country        = dbStr('prompt.locale.country',           loc.country);
+    const countryAdj     = dbStr('prompt.locale.country_adjective', loc.countryAdj);
+    const audience       = dbStr('prompt.locale.learner_audience',  loc.learnerDesc);
+    const avoidCultures  = dbStr('prompt.locale.avoid_cultures',    loc.avoidCulturesPhrase);
+    const avoidedTopics  = dbStr('prompt.avoided_topics',           loc.avoidedTopicsSentence);
 
-    if (on('prompt.section.learner')) {
-      const learner = ctx['scenario.user_role'] && ctx['scenario.user_role'] !== '—'
-        ? ctx['scenario.user_role']
-        : 'a language learner';
-      sections.push(`[learner]\n${learner}`);
-    }
+    // [role] — model character name + description
+    const modelRoleName = ctx['persona.name'];
+    const tutorRole = ctx['scenario.tutor_role'];
+    const hasTutorRole = tutorRole && tutorRole !== '—';
+    const specialties = ctx['persona.specialties']
+      ? `, specializing in ${ctx['persona.specialties']}`
+      : '';
+    const modelRoleDesc = hasTutorRole
+      ? trimDesc(tutorRole)
+      : `a ${ctx['persona.style']} English conversation tutor${specialties}`;
 
-    if (on('prompt.section.topic')) {
-      sections.push(`[topic]\n${ctx['scenario.title']}`);
-    }
+    // [learner] — user's role in the scenario
+    const learnerRole = ctx['scenario.user_role'];
+    const hasLearnerRole = learnerRole && learnerRole !== '—';
+    const userRoleDesc = hasLearnerRole
+      ? trimDesc(learnerRole)
+      : 'an adult English learner having an everyday conversation';
 
-    if (on('prompt.section.subtopics')) {
-      const lines: string[] = [
-        'The conversation may naturally start from any of these and can move freely between them or extend into adjacent practical content:',
-      ];
-      const objectives = ctx['scenario.objectives'];
-      if (objectives) {
-        objectives.split(', ').filter(Boolean).forEach((o) => lines.push(`- ${o}`));
-      }
-      const keyPhrases = ctx['scenario.key_phrases'];
-      if (keyPhrases) {
-        lines.push(`\nKey phrases to encourage: ${keyPhrases}`);
-      }
-      sections.push(`[subtopics]\n${lines.join('\n')}`);
-    }
+    // [topic]
+    const topic = ctx['scenario.title'] || 'open-ended everyday conversation';
 
-    if (on('prompt.section.cefr_level')) {
-      sections.push(`[cefr_level]\n${ctx['user.level_label']}`);
-    }
+    // [subtopics]
+    const objectives = ctx['scenario.objectives'];
+    const subtopicsBlock = objectives?.trim()
+      ? objectives
+          .split(', ')
+          .filter(Boolean)
+          .map((o) => `- ${o.trim()}`)
+          .join('\n')
+      : '- (no specific subtopics; follow the topic naturally)';
 
-    if (on('prompt.section.locale')) {
-      const localeLines: string[] = [];
-      const country = str('prompt.locale.country');
-      if (country) localeLines.push(`country: ${country}`);
-      const adj = str('prompt.locale.country_adjective');
-      if (adj) localeLines.push(`country_adjective: ${adj}`);
-      const audience = str('prompt.locale.learner_audience');
-      if (audience) localeLines.push(`learner_audience: ${audience}`);
-      const avoid = str('prompt.locale.avoid_cultures');
-      if (avoid) localeLines.push(`avoid_default_cultures: ${avoid}`);
-      if (localeLines.length) {
-        sections.push(`[locale]\n${localeLines.join('\n')}`);
-      }
-    }
+    // [cefr_level]
+    const cefrLevel = ctx['user.level_label'];
 
-    if (on('prompt.section.avoided_topics')) {
-      const avoided = str('prompt.avoided_topics', DEFAULT_AVOIDED_TOPICS);
-      sections.push(`[avoided_topics]\n${avoided}`);
-    }
+    // [guidelines] — locale grounding bullet is only included when we have a country
+    const localeGrounding = country
+      ? `\n- Ground cultural items in ${country}. Do not default to ${avoidCultures} names, places, foods, or brands.`
+      : '';
 
-    if (on('prompt.section.guidelines')) {
-      sections.push(`[guidelines]\n${this.render(DEFAULT_GUIDELINES, ctx)}`);
-    }
+    const guidelines = DEPLOYMENT_GUIDELINES
+      .replace(/{modelRoleName}/g, modelRoleName)
+      .replace(/{cefrLevel}/g, cefrLevel)
+      .replace(/{country}/g, country)
+      .replace(/{avoidCultures}/g, avoidCultures)
+      .replace(/{localeGrounding}/g, localeGrounding);
 
-    return sections.join('\n\n');
+    const sections = [
+      `[role]\nYou are ${modelRoleName}: ${modelRoleDesc}.`,
+      `[learner]\n${userRoleDesc}.`,
+      `[topic]\n${topic}`,
+      [
+        '[subtopics]',
+        'The conversation may naturally start from any of these and can move freely',
+        'between them or extend into adjacent practical content the learner might',
+        'want to practice:',
+        subtopicsBlock,
+      ].join('\n'),
+      `[cefr_level]\n${cefrLevel}`,
+      ...(country
+        ? [
+            [
+              '[locale]',
+              `country: ${country}`,
+              `country_adjective: ${countryAdj}`,
+              `learner_audience: ${audience}`,
+              `avoid_default_cultures: ${avoidCultures}`,
+            ].join('\n'),
+          ]
+        : []),
+      `[avoided_topics]\n${avoidedTopics}`,
+      `[guidelines]\n${guidelines}`,
+    ].join('\n\n');
+
+    return this.disableThinking ? `${sections}\n/no_think` : sections;
   }
 
   private tutorContext(
@@ -258,6 +362,7 @@ export class PromptBuilderService {
       'persona.specialties': specialties,
       'persona.gender': persona.gender ?? 'neutral',
       'persona.accent': persona.accent ?? '',
+      'scenario.locale': sc?.locale ?? '',
       'scenario.title': sc ? en(sc.title) : 'Free conversation practice',
       'scenario.setting': sc ? en(sc.scene_description) : '—',
       'scenario.tutor_role': sc ? en(sc.tutor_role) : '—',
@@ -276,9 +381,7 @@ export class PromptBuilderService {
       /\{\{\s*([\w.]+)\s*\}\}/g,
       (_m, key: string) => ctx[key] ?? '',
     );
-    // Pass 2: [cefr_level] used as an inline variable in custom prompts and
-    // global templates — replace with the actual level label so the selected
-    // level from the scenario detail screen reaches the AI model.
+    // Pass 2: [cefr_level] inline variable in custom/DB prompts
     out = out.replace(/\[cefr_level\]/g, ctx['user.level_label'] ?? '');
     return out;
   }
@@ -296,27 +399,19 @@ export class PromptBuilderService {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function levelLabelFor(level: number): string {
   const labels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
   return level >= 1 && level <= 6 ? labels[level - 1] : 'A1';
 }
 
-const DEFAULT_AVOIDED_TOPICS =
-  'Stay clear of politics, religion, alcohol, dating, partisan history, violence, harm, and distress.';
-
-const DEFAULT_GUIDELINES = `- Sound like a real person, not a textbook. Stay in character as {{persona.name}} throughout.
-- Respond ONLY in English, even if the learner switches to another language. Do not code-switch or quote long non-English passages.
-- If the learner addresses you in their native language, respond in English while staying in character.
-- Keep vocabulary, grammar, and sentence length at {{user.level_label}} level unless the learner demonstrates a higher level and sustains it.
-- The [learner] description is a soft hint, not a contract. If the user approaches from a different angle, roll with it — the fixed parts are your [role] and the [topic].
-- If the user tries to swap roles, gently keep your own role in one in-character sentence and continue.
-- Brief daily-life small talk is welcome — accept warmly with one short sentence and let the conversation breathe.
-- Redirect only when the learner clearly abandons the topic for a different setting or domain. One or two sentences is enough; do not lecture.
-- If the learner brings up an avoided topic, briefly acknowledge and pivot to a safe adjacent topic without lecturing.
-- When the learner makes a small mistake: at A1–A2 gently recast the correct form inside your reply; at B1 and above you may briefly explain if it helps.
-- Ask follow-up questions, share small reactions.
-- Do not use bullet lists, headings, or numbered steps in your replies.
-- Respond naturally and conversationally (2-4 sentences usually).`;
+/** Strip trailing period so the template's own period doesn't double up. */
+function trimDesc(s: string): string {
+  return s.trim().replace(/\.\s*$/, '').trimEnd();
+}
 
 const DEFAULT_GRAMMAR = `Analyze the grammar quality of these English messages from a level {{user.level}}/6 English learner.
 

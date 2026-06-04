@@ -129,7 +129,8 @@ export class ConversationOrchestrator {
     strengths: string[];
   } | null> {
     const userPrompt = await this.prompts.buildGrammarPrompt(userMessages, level);
-    const systemPrompt = 'You are an expert English grammar evaluator.';
+    const noThink = this.prompts.disableThinking ? '\n/no_think' : '';
+    const systemPrompt = `You are an expert English grammar evaluator.${noThink}`;
 
     AiCallLogger.request({
       callType:     'scoreGrammar',
@@ -306,7 +307,8 @@ Score definitions:
 - accuracy: grammar correctness, tense, articles, agreement
 - vocabulary: range, appropriateness, collocation
 - interaction: turn-taking, follow-up questions, engagement relative to learner role
-- topic_adherence: genuine engagement with the assigned topic vs steering to easier ground (avoidance scores LOW)`;
+- topic_adherence: genuine engagement with the assigned topic vs steering to easier ground (avoidance scores LOW)
+/think`;
 
     const userPrompt = `Target CEFR: ${cefrLabel}${topicLine}
 

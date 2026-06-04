@@ -60,10 +60,9 @@ export class OpenAICompatibleProvider extends AiProvider {
     const start    = Date.now();
     const endpoint = `${this.baseURL}/chat/completions`;
 
-    // Prepend /no_think for Qwen3/DeepSeek so the model skips chain-of-thought.
-    const systemPrompt = this.disableThinking
-      ? `/no_think\n${req.systemPrompt}`
-      : req.systemPrompt;
+    // /no_think or /think directives are appended by PromptBuilderService at
+    // the end of the system prompt so placement matches the model's training.
+    const systemPrompt = req.systemPrompt;
 
     AiCallLogger.providerRequest({
       provider:     this.name,
@@ -120,9 +119,7 @@ export class OpenAICompatibleProvider extends AiProvider {
 
   async structured<T>(req: StructuredRequest): Promise<StructuredResponse<T>> {
     const endpoint = `${this.baseURL}/chat/completions`;
-    const systemPrompt = this.disableThinking
-      ? `/no_think\n${req.systemPrompt}`
-      : req.systemPrompt;
+    const systemPrompt = req.systemPrompt;
 
     AiCallLogger.providerRequest({
       provider:     this.name,

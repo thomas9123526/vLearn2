@@ -106,6 +106,13 @@ export class ScenarioEntity {
   @Column({ type: 'varchar', length: 500, nullable: true })
   image_alt_text!: string | null;
 
+  /**
+   * Locale key for AI prompt grounding (china | japan | italy …).
+   * Null means auto-detect from the user's native language at runtime.
+   */
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  locale!: string | null;
+
   /** Scenario-specific system prompt override. When set, this is sent to the
    *  AI provider instead of the globally assembled cch_prompt template.
    *  Supports {{placeholder}} substitution. Null = use global template. */

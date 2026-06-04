@@ -143,6 +143,15 @@ class UpdateScenarioDto {
   @Min(0)
   xp_reward?: number;
 
+  /**
+   * Locale key for AI prompt grounding (china | japan | italy).
+   * Null = auto-detect from the user's native language at runtime.
+   */
+  @ApiProperty({ required: false, nullable: true, enum: ['china', 'japan', 'italy'] })
+  @IsOptional()
+  @IsString()
+  locale?: string | null;
+
   /** Scenario-specific system prompt. Empty string or null clears the override. */
   @ApiProperty({ required: false, nullable: true })
   @IsOptional()
