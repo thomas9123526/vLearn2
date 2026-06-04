@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/config/app_config.dart';
 import '../../core/errors/polite_error.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/cached_providers.dart';
@@ -27,6 +28,16 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
     final cached = ref.watch(scenariosProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
     final locale = ref.watch(localeProvider).languageCode;
+
+    // Resolve the origin for /uploads/... image URLs (same logic as brief screen).
+    const envOverride = String.fromEnvironment('API_BASE_URL');
+    final config = ref.watch(appConfigProvider).asData?.value ?? AppConfig.defaults;
+    final apiBase = envOverride.isNotEmpty ? envOverride : config.backendBaseUrl;
+    String strip(String s, String suffix) {
+      final i = s.indexOf(suffix);
+      return i > 0 ? s.substring(0, i) : s;
+    }
+    final uploadsOrigin = strip(strip(apiBase, '/api'), '/vfls');
 
     // The full scenario list is cached; filtering runs client-side, so
     // typing a query or tapping a chip is instant — no network per filter.
@@ -147,7 +158,7 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
                       : 'loading',
                 ),
                 onRefresh: () => ref.read(scenariosProvider.notifier).refresh(),
-                child: _list(context, cached, filtered, locale),
+                child: _list(context, cached, filtered, locale, uploadsOrigin),
               ),
             ),
           ),
@@ -164,6 +175,7 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
     Cached<List<Scenario>> cached,
     List<Scenario> filtered,
     String locale,
+    String uploadsOrigin,
   ) {
     if (!cached.hasValue) {
       // Cold first launch — nothing cached yet.
@@ -197,6 +209,7 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
       itemBuilder: (_, i) => _ScenarioTile(
         scenario: filtered[i],
         locale: locale,
+        uploadsOrigin: uploadsOrigin,
         onStart: () => context.push(AppRoute.scenarioBrief(filtered[i].id)),
       ),
     );
@@ -250,11 +263,18 @@ class _ScenarioTile extends StatelessWidget {
   const _ScenarioTile({
     required this.scenario,
     required this.locale,
+    required this.uploadsOrigin,
     required this.onStart,
   });
   final Scenario scenario;
   final String locale;
+  final String uploadsOrigin;
   final VoidCallback onStart;
+
+  String _resolveImage(String url) {
+    if (url.startsWith('http') || url.startsWith('asset:')) return url;
+    return '$uploadsOrigin$url';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +283,8 @@ class _ScenarioTile extends StatelessWidget {
     final levelLabel = (lvl >= 1 && lvl <= 6)
         ? ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'][lvl - 1]
         : 'Lv $lvl';
+    final heroUrl = scenario.imageUrl;
+    final hasHero = heroUrl != null && heroUrl.isNotEmpty;
     return InkWell(
       onTap: onStart,
       borderRadius: BorderRadius.circular(16),
@@ -275,20 +297,21 @@ class _ScenarioTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: scheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                levelLabel,
-                style: TextStyle(
-                  color: scheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: hasHero
+                    ? Image.network(
+                        _resolveImage(heroUrl),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => _LevelBadge(
+                          label: levelLabel,
+                          scheme: scheme,
+                        ),
+                      )
+                    : _LevelBadge(label: levelLabel, scheme: scheme),
               ),
             ),
             const SizedBox(width: 12),
@@ -350,4 +373,25 @@ class _ScenarioTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LevelBadge extends StatelessWidget {
+  const _LevelBadge({required this.label, required this.scheme});
+  final String label;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 48,
+        height: 48,
+        alignment: Alignment.center,
+        color: scheme.primaryContainer,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: scheme.onPrimaryContainer,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
 }

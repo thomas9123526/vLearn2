@@ -391,31 +391,13 @@ class _HeroCard extends StatelessWidget {
     // gradient hero. /uploads/... URLs are absolute against the API
     // origin — Dio's baseUrl is /vfls/api on prod, but the static
     // mount lives at the server root, so we strip the suffix here.
-    final imageUrl = scenario.imageUrl;
     final bgImageUrl = scenario.backgroundImageUrl;
-    final hasHero = imageUrl != null && imageUrl.isNotEmpty;
     final hasBg = bgImageUrl != null && bgImageUrl.isNotEmpty;
-    final cardRadius = BorderRadius.vertical(
-      top: hasHero ? Radius.zero : const Radius.circular(20),
-      bottom: const Radius.circular(20),
+    const cardRadius = BorderRadius.vertical(
+      top: Radius.circular(20),
+      bottom: Radius.circular(20),
     );
-    return Column(
-      children: [
-        if (hasHero)
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: _imageWidget(
-                _resolveScenarioImage(imageUrl),
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  color: scheme.surfaceContainerHighest,
-                ),
-              ),
-            ),
-          ),
-        DecoratedBox(
+    return DecoratedBox(
           decoration: BoxDecoration(
             // Background image sits behind the gradient overlay.
             image: hasBg
@@ -490,9 +472,7 @@ class _HeroCard extends StatelessWidget {
         ],
       ),
     ),
-        ),
-      ],
-    );
+  );
   }
 
   /// Resolves a stored image URL to one the image widgets can load.
