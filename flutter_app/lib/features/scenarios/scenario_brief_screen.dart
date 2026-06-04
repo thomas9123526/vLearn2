@@ -176,7 +176,9 @@ class _ScenarioBriefScreenState extends ConsumerState<ScenarioBriefScreen> {
                                   ),
                                 ),
                           label: Text(speechReady
-                              ? 'Start speaking (${scenario.estimatedMinutes}m)'
+                              ? scenario.timeConstrained
+                                  ? 'Start speaking (${scenario.estimatedMinutes}m)'
+                                  : 'Start speaking'
                               : 'Loading engines…'),
                         ),
                       ),
@@ -360,7 +362,9 @@ class _ContinueDock extends StatelessWidget {
             Expanded(
               child: OutlinedButton(
                 onPressed: onStartFresh,
-                child: Text('Start fresh (${scenario.estimatedMinutes}m)'),
+                child: Text(scenario.timeConstrained
+                    ? 'Start fresh (${scenario.estimatedMinutes}m)'
+                    : 'Start fresh'),
               ),
             ),
           ],
@@ -466,7 +470,8 @@ class _HeroCard extends StatelessWidget {
             spacing: 8,
             children: [
               _Pill(text: 'CEFR · $levelLabel', scheme: scheme),
-              _Pill(text: '~${scenario.estimatedMinutes} min', scheme: scheme),
+              if (scenario.timeConstrained)
+                _Pill(text: '~${scenario.estimatedMinutes} min', scheme: scheme),
               _Pill(text: '+${scenario.xpReward} XP', scheme: scheme),
             ],
           ),

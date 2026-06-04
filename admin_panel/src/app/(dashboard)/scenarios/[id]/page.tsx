@@ -23,11 +23,16 @@ const i18nText = z.object({
 const schema = z.object({
   slug: z.string().min(2).max(100),
   category: z.enum(['travel', 'business', 'social', 'daily']),
+  cefr_level: z.coerce.number().int().min(1).max(6).optional().nullable(),
   title: i18nText,
   description: i18nText,
   scene_description: i18nText,
   user_role: i18nText,
   tutor_role: i18nText,
+  /** One objective per line — transformed to/from {en:string}[] on submit/reset */
+  objectives_text: z.string().default(''),
+  /** One phrase per line — transformed to/from {phrase:string}[] on submit/reset */
+  key_phrases_text: z.string().default(''),
   estimated_minutes: z.coerce.number().int().min(1).max(60).default(5),
   time_constrained: z.boolean().default(false),
   xp_reward: z.coerce.number().int().min(0).max(1000).default(50),
@@ -36,13 +41,15 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-interface Scenario extends FormValues {
+interface Scenario extends Omit<FormValues, 'objectives_text' | 'key_phrases_text'> {
   id: string;
   image_url: string | null;
   background_image_url: string | null;
   status: 'draft' | 'published' | 'archived';
   custom_prompt: string | null;
   var_overrides: Record<string, string>;
+  objectives: { en: string }[];
+  key_phrases: { phrase: string }[];
 }
 
 export default function EditScenarioPage({ params }: { params: { id: string } }) {
@@ -121,11 +128,14 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
     reset({
       slug: scenario.slug,
       category: scenario.category,
+      cefr_level: scenario.cefr_level ?? undefined,
       title: scenario.title,
       description: scenario.description,
       scene_description: scenario.scene_description,
       user_role: scenario.user_role,
       tutor_role: scenario.tutor_role,
+      objectives_text: (scenario.objectives ?? []).map((o) => o.en).join('\n'),
+      key_phrases_text: (scenario.key_phrases ?? []).map((k) => k.phrase).join('\n'),
       estimated_minutes: scenario.estimated_minutes,
       time_constrained: scenario.time_constrained ?? false,
       xp_reward: scenario.xp_reward,
@@ -138,15 +148,22 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
     mutationFn: (values: FormValues) =>
       api(`/admin/scenarios/${id}`, {
         method: 'PATCH',
-        body: { ...values, var_overrides: varOverrides },
+        body: values,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-scenario', id] }),
   });
 
   async function onSubmit(values: FormValues) {
     setError(null);
+    const { objectives_text, key_phrases_text, ...rest } = values;
+    const payload = {
+      ...rest,
+      var_overrides: varOverrides,
+      objectives: objectives_text.split('\n').map(s => s.trim()).filter(Boolean).map(en => ({ en })),
+      key_phrases: key_phrases_text.split('\n').map(s => s.trim()).filter(Boolean).map(phrase => ({ phrase })),
+    };
     try {
-      await save.mutateAsync(values);
+      await save.mutateAsync(payload as unknown as FormValues);
 
       if (imageFile) {
         const fd = new FormData();
@@ -217,6 +234,19 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
                 <label htmlFor="time_constrained" className="text-sm font-medium">Time constraint</label>
               </div>
             </div>
+            <div>
+              <Label htmlFor="cefr_level">CEFR level</Label>
+              <select
+                id="cefr_level"
+                className="h-9 w-32 rounded-md border border-border bg-background px-2 text-sm"
+                {...register('cefr_level')}
+              >
+                <option value="">— not set —</option>
+                {['A1','A2','B1','B2','C1','C2'].map((l, i) => (
+                  <option key={l} value={i + 1}>{l}</option>
+                ))}
+              </select>
+            </div>
             <Field id="xp_reward" label="XP reward" type="number" {...register('xp_reward')} />
 
             <Section title="Title">
@@ -252,6 +282,28 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
                 label="Tutor role (EN)"
                 {...register('tutor_role.en')}
                 error={errors.tutor_role?.en?.message}
+              />
+            </Section>
+
+            <Section title="Objectives">
+              <p className="text-xs text-muted-foreground">One objective per line (English).</p>
+              <textarea
+                id="objectives_text"
+                rows={5}
+                placeholder="Greet politely&#10;Check bags&#10;Ask about your seat"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                {...register('objectives_text')}
+              />
+            </Section>
+
+            <Section title="Key phrases">
+              <p className="text-xs text-muted-foreground">One phrase per line.</p>
+              <textarea
+                id="key_phrases_text"
+                rows={5}
+                placeholder="I'd like to check in.&#10;Could I have a window seat?"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                {...register('key_phrases_text')}
               />
             </Section>
 

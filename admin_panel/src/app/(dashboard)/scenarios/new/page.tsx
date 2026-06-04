@@ -20,11 +20,14 @@ const i18nText = z.object({
 const schema = z.object({
   slug: z.string().min(2).max(100),
   category: z.enum(['travel', 'business', 'social', 'daily']),
+  cefr_level: z.coerce.number().int().min(1).max(6).optional().nullable(),
   title: i18nText,
   description: i18nText,
   scene_description: i18nText,
   user_role: i18nText,
   tutor_role: i18nText,
+  objectives_text: z.string().default(''),
+  key_phrases_text: z.string().default(''),
   estimated_minutes: z.coerce.number().int().min(1).max(60).default(5),
   time_constrained: z.boolean().default(false),
   xp_reward: z.coerce.number().int().min(0).max(1000).default(50),
@@ -43,18 +46,19 @@ export default function NewScenarioPage() {
     formState: { isSubmitting, errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { category: 'daily', estimated_minutes: 5, time_constrained: false, xp_reward: 50 },
+    defaultValues: { category: 'daily', estimated_minutes: 5, time_constrained: false, xp_reward: 50, objectives_text: '', key_phrases_text: '' },
   });
 
   async function onSubmit(values: FormValues) {
     setError(null);
+    const { objectives_text, key_phrases_text, ...rest } = values;
     try {
       const created = await api<{ id: string }>('/admin/scenarios', {
         method: 'POST',
         body: {
-          ...values,
-          objectives: [],
-          key_phrases: [],
+          ...rest,
+          objectives: objectives_text.split('\n').map(s => s.trim()).filter(Boolean).map(en => ({ en })),
+          key_phrases: key_phrases_text.split('\n').map(s => s.trim()).filter(Boolean).map(phrase => ({ phrase })),
         },
       });
       if (imageFile) {
@@ -109,6 +113,19 @@ export default function NewScenarioPage() {
               <label htmlFor="time_constrained" className="text-sm font-medium">Time constraint</label>
             </div>
           </div>
+          <div>
+            <Label htmlFor="cefr_level">CEFR level</Label>
+            <select
+              id="cefr_level"
+              className="h-9 w-32 rounded-md border border-border bg-background px-2 text-sm"
+              {...register('cefr_level')}
+            >
+              <option value="">— not set —</option>
+              {['A1','A2','B1','B2','C1','C2'].map((l, i) => (
+                <option key={l} value={i + 1}>{l}</option>
+              ))}
+            </select>
+          </div>
           <Field id="xp_reward" label="XP reward" type="number" {...register('xp_reward')} />
 
           <Section title="Title">
@@ -125,6 +142,28 @@ export default function NewScenarioPage() {
           <Section title="Roles">
             <Field id="user_role.en" label="User role (EN)" {...register('user_role.en')} error={errors.user_role?.en?.message} />
             <Field id="tutor_role.en" label="Tutor role (EN)" {...register('tutor_role.en')} error={errors.tutor_role?.en?.message} />
+          </Section>
+
+          <Section title="Objectives">
+            <p className="text-xs text-muted-foreground">One objective per line (English).</p>
+            <textarea
+              id="objectives_text"
+              rows={5}
+              placeholder="Greet politely&#10;Check bags&#10;Ask about your seat"
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              {...register('objectives_text')}
+            />
+          </Section>
+
+          <Section title="Key phrases">
+            <p className="text-xs text-muted-foreground">One phrase per line.</p>
+            <textarea
+              id="key_phrases_text"
+              rows={5}
+              placeholder="I'd like to check in.&#10;Could I have a window seat?"
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              {...register('key_phrases_text')}
+            />
           </Section>
 
           <div>
