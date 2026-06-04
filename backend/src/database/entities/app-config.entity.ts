@@ -12,6 +12,7 @@ export type AppConfigCategory =
   | 'progress'
   | 'conversation'
   | 'scenarios'
+  | 'scenario_detail'
   | 'settings'
   | 'prompts'
   | 'system';
