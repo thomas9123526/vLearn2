@@ -5,7 +5,7 @@ import { ScenarioEntity } from '../../entities/scenario.entity';
 interface ScenarioSeed {
   slug: string;
   category: 'travel' | 'business' | 'social' | 'daily';
-  difficulty: number;
+  cefr_level: number;
   estimated_minutes: number;
   xp_reward: number;
   title_en: string;
@@ -24,7 +24,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'airport-check-in',
     category: 'travel',
-    difficulty: 2,
+    cefr_level:2,
     estimated_minutes: 5,
     xp_reward: 50,
     title_en: 'Airport check-in',
@@ -49,7 +49,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'hotel-reservation',
     category: 'travel',
-    difficulty: 2,
+    cefr_level:2,
     estimated_minutes: 5,
     xp_reward: 50,
     title_en: 'Hotel reservation',
@@ -74,7 +74,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'restaurant-ordering',
     category: 'travel',
-    difficulty: 1,
+    cefr_level:1,
     estimated_minutes: 5,
     xp_reward: 40,
     title_en: 'Ordering at a restaurant',
@@ -99,7 +99,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'shopping-clothes',
     category: 'travel',
-    difficulty: 2,
+    cefr_level:2,
     estimated_minutes: 5,
     xp_reward: 50,
     title_en: 'Shopping for clothes',
@@ -124,7 +124,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'taxi-ride',
     category: 'travel',
-    difficulty: 1,
+    cefr_level:1,
     estimated_minutes: 4,
     xp_reward: 40,
     title_en: 'Taking a taxi',
@@ -150,7 +150,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'business-meeting-intro',
     category: 'business',
-    difficulty: 3,
+    cefr_level:3,
     estimated_minutes: 6,
     xp_reward: 60,
     title_en: 'Introducing yourself at a meeting',
@@ -175,7 +175,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'email-followup',
     category: 'business',
-    difficulty: 3,
+    cefr_level:3,
     estimated_minutes: 5,
     xp_reward: 60,
     title_en: 'Writing a follow-up email',
@@ -200,7 +200,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'business-presentation',
     category: 'business',
-    difficulty: 4,
+    cefr_level:4,
     estimated_minutes: 7,
     xp_reward: 70,
     title_en: 'Giving a short presentation',
@@ -225,7 +225,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'price-negotiation',
     category: 'business',
-    difficulty: 4,
+    cefr_level:4,
     estimated_minutes: 6,
     xp_reward: 70,
     title_en: 'Negotiating a price',
@@ -250,7 +250,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'networking-event',
     category: 'business',
-    difficulty: 3,
+    cefr_level:3,
     estimated_minutes: 5,
     xp_reward: 60,
     title_en: 'Networking at an event',
@@ -276,7 +276,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'greeting-strangers',
     category: 'social',
-    difficulty: 1,
+    cefr_level:1,
     estimated_minutes: 4,
     xp_reward: 40,
     title_en: 'Greeting someone new',
@@ -302,7 +302,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'house-party',
     category: 'social',
-    difficulty: 2,
+    cefr_level:2,
     estimated_minutes: 5,
     xp_reward: 50,
     title_en: 'At a house party',
@@ -327,7 +327,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'first-date',
     category: 'social',
-    difficulty: 3,
+    cefr_level:3,
     estimated_minutes: 6,
     xp_reward: 60,
     title_en: 'On a first date',
@@ -352,7 +352,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'sports-talk',
     category: 'social',
-    difficulty: 2,
+    cefr_level:2,
     estimated_minutes: 5,
     xp_reward: 50,
     title_en: 'Talking about sports',
@@ -377,7 +377,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'hobby-discussion',
     category: 'social',
-    difficulty: 2,
+    cefr_level:2,
     estimated_minutes: 5,
     xp_reward: 50,
     title_en: 'Sharing your hobby',
@@ -403,7 +403,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'grocery-shopping',
     category: 'daily',
-    difficulty: 1,
+    cefr_level:1,
     estimated_minutes: 4,
     xp_reward: 40,
     title_en: 'Grocery shopping',
@@ -428,7 +428,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'doctor-visit',
     category: 'daily',
-    difficulty: 3,
+    cefr_level:3,
     estimated_minutes: 6,
     xp_reward: 60,
     title_en: 'Visiting the doctor',
@@ -453,7 +453,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'bank-account',
     category: 'daily',
-    difficulty: 3,
+    cefr_level:3,
     estimated_minutes: 6,
     xp_reward: 60,
     title_en: 'Opening a bank account',
@@ -478,7 +478,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'asking-directions',
     category: 'daily',
-    difficulty: 1,
+    cefr_level:1,
     estimated_minutes: 4,
     xp_reward: 40,
     title_en: 'Asking for directions',
@@ -503,7 +503,7 @@ const SCENARIOS: ScenarioSeed[] = [
   {
     slug: 'phone-call',
     category: 'daily',
-    difficulty: 2,
+    cefr_level:2,
     estimated_minutes: 5,
     xp_reward: 50,
     title_en: 'A phone call to customer service',
@@ -553,7 +553,7 @@ export async function seedScenarios(ds: DataSource): Promise<void> {
       slug: s.slug,
       category: s.category,
       category_id: categoryId,
-      difficulty: s.difficulty,
+      cefr_level: s.cefr_level,
       title: { en: s.title_en, ko: s.title_ko, zh: s.title_zh },
       description: { en: s.description_en },
       scene_description: { en: s.scene_en },
