@@ -115,7 +115,20 @@ export class ConversationsService {
       order: { started_at: 'DESC' },
       take: limit,
     });
-    return rows.map((s) => this.toSessionDto(s));
+
+    // Batch-load scenario titles in one query to avoid N+1.
+    const scenarioIds = [...new Set(rows.map((r) => r.scenario_id).filter((id): id is string => !!id))];
+    const scenarioMap = new Map<string, string>();
+    if (scenarioIds.length) {
+      const scenarios = await this.scenarios.findBy({ id: In(scenarioIds) });
+      for (const sc of scenarios) {
+        scenarioMap.set(sc.id, (sc.title as { en: string }).en ?? '');
+      }
+    }
+
+    return rows.map((s) =>
+      this.toSessionDto(s, s.scenario_id ? (scenarioMap.get(s.scenario_id) ?? null) : null),
+    );
   }
 
   async getSession(
@@ -466,10 +479,14 @@ export class ConversationsService {
     return text.trim().split(/\s+/).filter(Boolean).length;
   }
 
-  private toSessionDto(s: ConversationSessionEntity): SessionDto {
+  private toSessionDto(
+    s: ConversationSessionEntity,
+    scenarioTitle: string | null = null,
+  ): SessionDto {
     return {
       id: s.id,
       scenarioId: s.scenario_id,
+      scenarioTitle,
       personaId: s.persona_id,
       mode: s.mode,
       status: s.status,

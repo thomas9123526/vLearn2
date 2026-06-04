@@ -73,6 +73,7 @@ export class MessageDto {
 export class SessionDto {
   @ApiProperty() id!: string;
   @ApiProperty() scenarioId!: string | null;
+  @ApiProperty({ nullable: true }) scenarioTitle!: string | null;
   @ApiProperty() personaId!: string;
   @ApiProperty() mode!: 'chat' | 'face';
   @ApiProperty() status!: 'active' | 'completed' | 'abandoned';

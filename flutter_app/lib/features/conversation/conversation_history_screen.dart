@@ -135,33 +135,68 @@ class _SessionTile extends ConsumerStatefulWidget {
 class _SessionTileState extends ConsumerState<_SessionTile> {
   bool _deleting = false;
 
+  static const _cefrLabels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final personaAsync = ref.watch(
-      personaByIdProvider(widget.session.personaId),
-    );
+    final session = widget.session;
 
-    final (statusLabel, statusColor) = switch (widget.session.status) {
-      'active' => ('Active', scheme.primary),
-      'completed' => ('Completed', Colors.green.shade700),
-      _ => ('Abandoned', scheme.outline),
-    };
-
+    final personaAsync = ref.watch(personaByIdProvider(session.personaId));
     final personaName = personaAsync.maybeWhen(
       data: (p) => p?.name ?? 'Tutor',
       orElse: () => 'Tutor',
     );
 
+    final title = session.scenarioTitle ?? 'Free conversation';
+    final cefrLevel = session.cefrLevel;
+    final cefrLabel = (cefrLevel != null && cefrLevel >= 1 && cefrLevel <= 6)
+        ? _cefrLabels[cefrLevel - 1]
+        : null;
+
+    final (statusLabel, statusColor) = switch (session.status) {
+      'active'    => ('Active',    scheme.primary),
+      'completed' => ('Completed', Colors.green.shade700),
+      _           => ('Abandoned', scheme.outline),
+    };
+
     return ListTile(
       onTap: _deleting
           ? null
-          : () => context.push(AppRoute.conversation(widget.session.id)),
-      title: Text(
-        '$personaName · ${widget.session.mode == 'face' ? 'Tutor mode' : 'Chat'}',
+          : () => context.push(AppRoute.conversation(session.id)),
+      title: Row(
+        children: [
+          if (cefrLabel != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: scheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                cefrLabel,
+                style: TextStyle(
+                  fontFamily: 'EditorialMono',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSecondaryContainer,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
       subtitle: Text(
-        '${_formatDate(widget.session.startedAt)} · ${widget.session.turnCount} turns · ${widget.session.xpEarned} XP',
+        '$personaName · ${_formatDate(session.startedAt)} · ${session.turnCount} turns',
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,

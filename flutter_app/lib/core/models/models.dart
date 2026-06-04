@@ -254,6 +254,8 @@ class ConversationSession {
     required this.turnCount,
     required this.xpEarned,
     this.scenarioId,
+    this.scenarioTitle,
+    this.cefrLevel,
     this.endedAt,
     this.timeConstrained = false,
     this.estimatedMinutes = 5,
@@ -269,6 +271,8 @@ class ConversationSession {
         turnCount: (j['turnCount'] as num? ?? 0).toInt(),
         xpEarned: (j['xpEarned'] as num? ?? 0).toInt(),
         scenarioId: j['scenarioId'] as String?,
+        scenarioTitle: j['scenarioTitle'] as String?,
+        cefrLevel: (j['cefrLevel'] as num?)?.toInt(),
         endedAt: j['endedAt'] == null
             ? null
             : DateTime.parse(j['endedAt'] as String),
@@ -278,6 +282,8 @@ class ConversationSession {
 
   final String id;
   final String? scenarioId;
+  final String? scenarioTitle;
+  final int? cefrLevel;
   final String personaId;
   final String mode;
   final String status;
