@@ -17,10 +17,12 @@ export const typeormConfigFactory = (
   password: config.get<string>('DB_PASSWORD') ?? '',
   database: config.get<string>('DB_NAME') ?? 'vlearn2',
   entities: ALL_ENTITIES,
+  autoLoadEntities: true,
   migrations: [join(__dirname, 'migrations', '*.{ts,js}').replace(/\\/g, '/')],
   migrationsTableName: 'vl_migrations',
   migrationsRun: false,
-  synchronize: false,
+  // Allow tests to auto-create schema (set DB_SYNCHRONIZE=true in .env.test)
+  synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
   logging:
     config.get<string>('DB_LOGGING') === 'true'
       ? ['error', 'query']

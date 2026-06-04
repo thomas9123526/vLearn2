@@ -329,6 +329,17 @@ single JSON object conforming to the EvaluationOutput schema \
 interaction, topic_adherence} in [1,5], specific_feedback, strengths, \
 suggested_practice).
 
+Score these five dimensions on a 1-5 scale (5 = best at this CEFR level):
+- fluency         : pacing, hesitation, naturalness of phrasing
+- accuracy        : grammar correctness, tense, articles, agreement
+- vocabulary      : range, appropriateness, collocation
+- interaction     : turn-taking, follow-up questions, engagement; judge \
+against what is appropriate for the LEARNER role
+- topic_adherence : did the learner actually engage with the assigned \
+topic and subtopics, or steer to easier ground? Use the LEARNER and TUTOR \
+roles to judge whether a pivot is a natural extension within role (high) \
+or true avoidance (low). AVOIDANCE scores low.
+
 When you suggest practice activities, anchor them in {country_adjective} \
 contexts the learner will recognize. Do not recommend \
 {avoid_cultures_phrase}-context exercises. Output no prose before <think>, \
