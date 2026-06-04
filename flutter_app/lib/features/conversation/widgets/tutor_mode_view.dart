@@ -42,7 +42,8 @@ class TutorModeView extends ConsumerStatefulWidget {
   ConsumerState<TutorModeView> createState() => _TutorModeViewState();
 }
 
-class _TutorModeViewState extends ConsumerState<TutorModeView> {
+class _TutorModeViewState extends ConsumerState<TutorModeView>
+    with SingleTickerProviderStateMixin {
   TutorMood _mood = TutorMood.idle;
   double _amplitude = 0.0;
   String? _idleSuggestion;
@@ -51,10 +52,19 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
   StreamSubscription<bool>? _ttsSub;
   StreamSubscription<double>? _ampSub;
   String? _lastSpokenId;
+  late final AnimationController _entryCtrl;
+  late final Animation<double> _entryFade;
 
   @override
   void initState() {
     super.initState();
+    _entryCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+    _entryFade = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut);
+    _entryCtrl.forward();
+
     final tts = ref.read(ttsServiceProvider);
     // Snapshot current state — broadcast stream only emits on changes, so a
     // widget mounted mid-TTS would never receive the "started" event.
@@ -93,6 +103,7 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
 
   @override
   void dispose() {
+    _entryCtrl.dispose();
     _idleTimer?.cancel();
     _disappointedTimer?.cancel();
     _ttsSub?.cancel();
@@ -285,7 +296,9 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
     final latestUser = _latestForRole('user');
     final recording = _mood == TutorMood.listening;
 
-    return ColoredBox(
+    return FadeTransition(
+      opacity: _entryFade,
+      child: ColoredBox(
       color: scheme.surface,
       child: Column(
         children: [
@@ -339,7 +352,8 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
           ),
         ],
       ),
-    );
+    ),   // ColoredBox
+    );   // FadeTransition
   }
 }
 
@@ -519,7 +533,9 @@ class _StatusPill extends StatelessWidget {
           )
         : Icon(icon, size: 18, color: fg);
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: bg,
@@ -528,14 +544,26 @@ class _StatusPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          leading,
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: SizedBox(
+              key: ValueKey(mood),
+              width: 18,
+              height: 18,
+              child: leading,
+            ),
+          ),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: fg,
-                  fontWeight: FontWeight.w600,
-                ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Text(
+              label,
+              key: ValueKey(label),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: fg,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
           ),
         ],
       ),
