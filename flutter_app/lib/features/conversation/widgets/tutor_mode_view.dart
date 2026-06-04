@@ -45,7 +45,7 @@ class TutorModeView extends ConsumerStatefulWidget {
 class _TutorModeViewState extends ConsumerState<TutorModeView>
     with SingleTickerProviderStateMixin {
   TutorMood _mood = TutorMood.idle;
-  double _amplitude = 0.0;
+  final _amplitude = ValueNotifier<double>(0.0);
   String? _idleSuggestion;
   Timer? _idleTimer;
   Timer? _disappointedTimer;
@@ -73,12 +73,11 @@ class _TutorModeViewState extends ConsumerState<TutorModeView>
       if (!mounted) return;
       setState(() {
         _mood = isSpeaking ? TutorMood.speaking : TutorMood.idle;
-        if (!isSpeaking) _amplitude = 0.0;
       });
+      if (!isSpeaking) _amplitude.value = 0.0;
     });
     _ampSub = tts.amplitudeStream.listen((double amp) {
-      if (!mounted) return;
-      setState(() => _amplitude = amp);
+      _amplitude.value = amp;
     });
     _resetIdleTimer();
     // Speak the tutor's opening greeting on first load.
@@ -108,6 +107,7 @@ class _TutorModeViewState extends ConsumerState<TutorModeView>
     _disappointedTimer?.cancel();
     _ttsSub?.cancel();
     _ampSub?.cancel();
+    _amplitude.dispose();
     super.dispose();
   }
 
@@ -313,10 +313,13 @@ class _TutorModeViewState extends ConsumerState<TutorModeView>
             child: Column(
               children: [
                 Expanded(
-                  child: _AvatarStage(
-                    persona: widget.persona,
-                    mood: _mood,
-                    amplitude: _amplitude,
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: _amplitude,
+                    builder: (context, amp, _) => _AvatarStage(
+                      persona: widget.persona,
+                      mood: _mood,
+                      amplitude: amp,
+                    ),
                   ),
                 ),
                 _SpeechStrip(

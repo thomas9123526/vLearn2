@@ -281,7 +281,7 @@ class SherpaOnnxTtsService extends TextToSpeechService {
 
     // Cache check.
     final cacheFile = await _cachePath(text, voiceId, rate);
-    if (cacheFile.existsSync()) {
+    if (await cacheFile.exists()) {
       return cacheFile.readAsBytes();
     }
 
@@ -295,8 +295,8 @@ class SherpaOnnxTtsService extends TextToSpeechService {
 
     // Persist to cache. Errors here are non-fatal — playback still works.
     try {
-      cacheFile.parent.createSync(recursive: true);
-      cacheFile.writeAsBytesSync(wav);
+      await cacheFile.parent.create(recursive: true);
+      await cacheFile.writeAsBytes(wav);
     } catch (e) {
       _log.w('TTS: cache write failed for ${cacheFile.path}: $e');
     }
