@@ -88,6 +88,13 @@ class CreateScenarioDto {
   @IsInt()
   @Min(0)
   xp_reward?: number;
+  /** Target CEFR level (1=A1 … 6=C2). Used as [cefr_level] in the tutor prompt. */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(6)
+  cefr_level?: number;
 }
 
 class UpdateScenarioDto {
@@ -153,6 +160,13 @@ class UpdateScenarioDto {
   @IsOptional()
   @IsString()
   custom_prompt?: string | null;
+  /** Target CEFR level (1=A1 … 6=C2). Used as [cefr_level] in the tutor prompt. */
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(6)
+  cefr_level?: number | null;
 }
 
 /**
@@ -223,6 +237,7 @@ export class AdminScenariosController {
         key_phrases: dto.key_phrases,
         estimated_minutes: dto.estimated_minutes ?? 5,
         xp_reward: dto.xp_reward ?? 50,
+        cefr_level: dto.cefr_level ?? null,
         author_id: user.sub,
         status: 'draft',
       });

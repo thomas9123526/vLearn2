@@ -209,8 +209,8 @@ export class PromptBuilderService {
           .join('\n')
       : '- (no specific subtopics; follow the topic naturally)';
 
-    // [cefr_level]
-    const cefrLevel = ctx['user.level_label'];
+    // [cefr_level] — scenario target takes priority over learner's current level
+    const cefrLevel = ctx['scenario.cefr_level'] || ctx['user.level_label'];
 
     const guidelines = DEPLOYMENT_GUIDELINES
       .replace(/{modelRoleName}/g, modelRoleName)
@@ -271,6 +271,7 @@ export class PromptBuilderService {
       'scenario.user_role': sc ? en(sc.user_role) : '—',
       'scenario.objectives': objectives,
       'scenario.key_phrases': keyPhrases,
+      'scenario.cefr_level': sc?.cefr_level ? levelLabelFor(sc.cefr_level) : '',
       'user.level': String(userLevel),
       'user.level_label': levelLabelFor(userLevel),
       'user.native_language': userNativeLanguage,
@@ -284,7 +285,7 @@ export class PromptBuilderService {
       (_m, key: string) => ctx[key] ?? '',
     );
     // Pass 2: [cefr_level] inline variable in custom/DB prompts
-    out = out.replace(/\[cefr_level\]/g, ctx['user.level_label'] ?? '');
+    out = out.replace(/\[cefr_level\]/g, ctx['scenario.cefr_level'] || ctx['user.level_label'] ?? '');
     return out;
   }
 

@@ -190,6 +190,7 @@ class Scenario {
     required this.description,
     required this.estimatedMinutes,
     required this.xpReward,
+    this.cefrLevel,
     this.imageUrl,
     this.backgroundImageUrl,
   });
@@ -205,6 +206,7 @@ class Scenario {
         (j['estimated_minutes'] as num? ?? j['estimatedMinutes'] as num? ?? 5)
             .toInt(),
     xpReward: (j['xp_reward'] as num? ?? j['xpReward'] as num? ?? 50).toInt(),
+    cefrLevel: (j['cefr_level'] as num? ?? j['cefrLevel'] as num?)?.toInt(),
     imageUrl: j['image_url'] as String? ?? j['imageUrl'] as String?,
     backgroundImageUrl:
         j['background_image_url'] as String? ??
@@ -222,6 +224,7 @@ class Scenario {
     'description': description.toJson(),
     'estimated_minutes': estimatedMinutes,
     'xp_reward': xpReward,
+    if (cefrLevel != null) 'cefr_level': cefrLevel,
     if (imageUrl != null) 'image_url': imageUrl,
     if (backgroundImageUrl != null) 'background_image_url': backgroundImageUrl,
   };
@@ -234,6 +237,9 @@ class Scenario {
   final I18nText description;
   final int estimatedMinutes;
   final int xpReward;
+  /// Target CEFR level for this scenario (1=A1 … 6=C2). When set, the tutor
+  /// system prompt uses this level instead of the learner's current level.
+  final int? cefrLevel;
   final String? imageUrl;
   final String? backgroundImageUrl;
 }

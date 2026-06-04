@@ -60,6 +60,12 @@ export class ScenarioEntity {
   @Column({ type: 'smallint' })
   difficulty!: number;
 
+  /** Target CEFR level for this scenario (1=A1 … 6=C2). When set, the prompt
+   *  builder uses this as the [cefr_level] target instead of the learner's
+   *  current session level. Null = defer to the learner's own level. */
+  @Column({ type: 'smallint', nullable: true })
+  cefr_level!: number | null;
+
   @Column({ type: 'jsonb' })
   title!: I18nText;
 
