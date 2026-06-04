@@ -304,7 +304,7 @@ export class PromptBuilderService {
       (_m, key: string) => ctx[key] ?? '',
     );
     // Pass 2: [cefr_level] square-bracket form for backwards compatibility
-    out = out.replace(/\[cefr_level\]/g, ctx['scenario.cefr_level'] || ctx['user.level_label'] || '');
+    //out = out.replace(/\[cefr_level\]/g, ctx['scenario.cefr_level'] || ctx['user.level_label'] || '');
     return out;
   }
 
