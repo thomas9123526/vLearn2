@@ -27,6 +27,7 @@ import { UserInfoEntity } from './user-info.entity';
 import { UserNetworkStatsEntity } from './user-network-stats.entity';
 import { UserReportEntity } from './user-report.entity';
 import { PromptTemplateEntity } from './prompt-template.entity';
+import { PromptVarEntity } from './prompt-var.entity';
 
 export {
   AdminEntity,
@@ -57,6 +58,7 @@ export {
   UserNetworkStatsEntity,
   UserReportEntity,
   PromptTemplateEntity,
+  PromptVarEntity,
 };
 
 export const ALL_ENTITIES = [
@@ -88,4 +90,5 @@ export const ALL_ENTITIES = [
   UserNetworkStatsEntity,
   UserReportEntity,
   PromptTemplateEntity,
+  PromptVarEntity,
 ];
