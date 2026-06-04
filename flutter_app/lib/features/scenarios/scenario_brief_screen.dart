@@ -9,6 +9,7 @@ import '../../core/models/models.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/router/app_router.dart';
+import '../../core/speech/speech_service.dart';
 import '../settings/settings_screen.dart';
 
 final _scenarioProvider =
@@ -59,6 +60,7 @@ class _ScenarioBriefScreenState extends ConsumerState<ScenarioBriefScreen> {
     final uploadsOrigin = _resolveUploadsOrigin();
 
     final activeSession = activeSessionAsync.asData?.value;
+    final speechReady = ref.watch(speechReadyProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -160,10 +162,22 @@ class _ScenarioBriefScreenState extends ConsumerState<ScenarioBriefScreen> {
                       Expanded(
                         flex: 2,
                         child: FilledButton.icon(
-                          onPressed: () => _startSession(context, scenario),
-                          icon: const Icon(Icons.play_arrow),
-                          label: Text(
-                              'Start speaking (${scenario.estimatedMinutes}m)'),
+                          onPressed: speechReady
+                              ? () => _startSession(context, scenario)
+                              : null,
+                          icon: speechReady
+                              ? const Icon(Icons.play_arrow)
+                              : const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                          label: Text(speechReady
+                              ? 'Start speaking (${scenario.estimatedMinutes}m)'
+                              : 'Loading engines…'),
                         ),
                       ),
                     ],
