@@ -20,7 +20,7 @@ def proxy(path):
 
     r = requests.request(request.method, f"{UPSTREAM}/{path}",
                          data=body, headers={k: v for k, v in request.headers
-                         if k.lower() != "host"})
+                         if k.lower() != "host"}, timeout=300)
     # ---- OUTPUT ----
     print(f"[{ts()}] ----- RESPONSE", r.status_code, "-----")
     try:

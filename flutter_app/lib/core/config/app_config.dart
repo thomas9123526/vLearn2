@@ -121,7 +121,7 @@ class AppConfig {
   static AppConfig get defaults => AppConfig(
         backendBaseUrl:
             'http://$_defaultBackendHost:$_defaultBackendPort/vfls',
-        requestTimeout: 30,
+        requestTimeout: 180,
         topicSyncInterval: 60,
         environment: 'dev',
       );
