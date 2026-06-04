@@ -196,32 +196,6 @@ export class PromptBuilderService {
     return `${base}\n/think`;
   }
 
-  async buildFeedbackPrompt(summary: {
-    scenarioTitle?: string;
-    overallScore: number;
-    fluencyScore: number;
-    vocabularyScore: number;
-    grammarScore: number;
-    engagementScore: number;
-    levelLabel: string;
-    strongestSkill: string;
-    weakestSkill: string;
-  }): Promise<string> {
-    const ctx: Record<string, string> = {
-      'session.scenario_title': summary.scenarioTitle ?? 'Free conversation',
-      'session.overall_score': String(summary.overallScore),
-      'session.fluency_score': String(summary.fluencyScore),
-      'session.vocabulary_score': String(summary.vocabularyScore),
-      'session.grammar_score': String(summary.grammarScore),
-      'session.engagement_score': String(summary.engagementScore),
-      'session.strongest_skill': summary.strongestSkill,
-      'session.weakest_skill': summary.weakestSkill,
-      'user.level_label': summary.levelLabel,
-    };
-    const tpl = await this.loadTemplate('feedback');
-    return this.render(tpl ?? DEFAULT_FEEDBACK, ctx);
-  }
-
   // ── Private helpers ──────────────────────────────────────────────────────
 
   /**
@@ -427,7 +401,8 @@ JSON schema (no markdown fences, no prose outside the JSON after </think>):
     {"turn_index": <int>, "user_text": "...", "issue": "...", "correction": "...", "severity": "minor|moderate|major"}
   ],
   "strengths": ["...", "..."],
-  "suggested_practice": "..."
+  "suggested_practice": "...",
+  "session_feedback": "..."
 }
 
 Score definitions:
@@ -437,19 +412,6 @@ Score definitions:
 - interaction: turn-taking, follow-up questions, engagement relative to learner role
 - topic_adherence: genuine engagement with the assigned topic vs steering to easier ground (avoidance scores LOW)
 
+session_feedback: A warm, encouraging paragraph (2-3 sentences, max 60 words) addressed directly to the learner in second person ("You showed…", "Try to…"). Mention one specific strength from the session, acknowledge one area to improve, and close with a motivating note.
+
 Output no prose before <think>, no prose between </think> and the opening "{", and no markdown code fences.`;
-
-const DEFAULT_FEEDBACK = `Write a 2-3 sentence encouraging feedback paragraph for an English learner.
-
-Session data:
-- Scenario: {{session.scenario_title}}
-- Overall score: {{session.overall_score}}/100
-- Fluency: {{session.fluency_score}}/100
-- Vocabulary: {{session.vocabulary_score}}/100
-- Grammar: {{session.grammar_score}}/100
-- Engagement: {{session.engagement_score}}/100
-- User level: {{user.level_label}}
-- Strongest area: {{session.strongest_skill}}
-- Area to improve: {{session.weakest_skill}}
-
-Write in a warm, motivating tone. Mention 1 specific thing they did well. Keep it concise — max 60 words.`;

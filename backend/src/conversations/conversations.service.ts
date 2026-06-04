@@ -434,7 +434,7 @@ export class ConversationsService {
       cefr_estimate:         result.overall_cefr_estimate,
       strengths:             result.strengths,
       improvements:          result.specific_feedback.map((f) => f.issue).slice(0, 5),
-      ai_feedback:           result.suggested_practice,
+      ai_feedback:           result.session_feedback || result.suggested_practice,
       fluency_metrics:       { specific_feedback: result.specific_feedback } as Record<string, unknown>,
       evaluator_versions:    { provider: 'ai' } as Record<string, string>,
     };

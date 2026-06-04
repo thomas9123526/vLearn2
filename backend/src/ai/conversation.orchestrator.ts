@@ -34,6 +34,7 @@ export interface EvaluationResult {
   specific_feedback: SpecificFeedbackItem[];
   strengths: string[];
   suggested_practice: string;
+  session_feedback: string;
 }
 
 /**
