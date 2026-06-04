@@ -96,8 +96,9 @@ export class PromptBuilderService {
 
     // Priority 1: per-scenario custom prompt
     if (scenario?.custom_prompt?.trim()) {
+      const vars = await this.resolvePromptVars(scenario);
       return {
-        prompt: this.render(scenario.custom_prompt, ctx),
+        prompt: this.render(scenario.custom_prompt, this.mergeVars(ctx, vars)),
         source: 'custom_prompt (per-scenario override)',
       };
     }
@@ -105,8 +106,9 @@ export class PromptBuilderService {
     // Priority 2: global full-template override from DB
     const tpl = await this.loadTemplate('tutor_system');
     if (tpl) {
+      const vars = await this.resolvePromptVars(scenario);
       return {
-        prompt: this.render(tpl, ctx),
+        prompt: this.render(tpl, this.mergeVars(ctx, vars)),
         source: 'DB template: tutor_system (vl_prompt_templates)',
       };
     }
@@ -278,13 +280,30 @@ export class PromptBuilderService {
     };
   }
 
+  /**
+   * Merges prompt-var flat values (country, country_adjective, …) into the
+   * group-keyed ctx so that {{country}} resolves the same as {{persona.name}}.
+   * Also injects a bare `cefr_level` key so {{cefr_level}} in DB/custom
+   * templates resolves like [cefr_level] does in the section builder.
+   */
+  private mergeVars(
+    ctx: Record<string, string>,
+    vars: Record<string, string>,
+  ): Record<string, string> {
+    return {
+      ...ctx,
+      ...vars,
+      cefr_level: ctx['scenario.cefr_level'] || ctx['user.level_label'] || '',
+    };
+  }
+
   private render(template: string, ctx: Record<string, string>): string {
-    // Pass 1: {{group.field}} placeholders
+    // Pass 1: {{group.field}} and {{bare_key}} placeholders
     let out = template.replace(
       /\{\{\s*([\w.]+)\s*\}\}/g,
       (_m, key: string) => ctx[key] ?? '',
     );
-    // Pass 2: [cefr_level] inline variable in custom/DB prompts
+    // Pass 2: [cefr_level] square-bracket form for backwards compatibility
     out = out.replace(/\[cefr_level\]/g, ctx['scenario.cefr_level'] || ctx['user.level_label'] || '');
     return out;
   }
