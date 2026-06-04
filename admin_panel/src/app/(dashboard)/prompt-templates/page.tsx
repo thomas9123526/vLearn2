@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { PromptVar } from '../prompt-vars/page';
 import { Save, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +58,11 @@ export default function PromptTemplatesPage() {
     queryFn: () => api<PromptTemplate[]>('/admin/prompt-templates'),
   });
 
+  const { data: promptVars } = useQuery<PromptVar[]>({
+    queryKey: ['admin-prompt-vars'],
+    queryFn: () => api<PromptVar[]>('/admin/prompt-vars'),
+  });
+
   return (
     <div className="space-y-4">
       <div>
@@ -75,7 +81,16 @@ export default function PromptTemplatesPage() {
       {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
 
       {(data ?? []).map((tpl) => (
-        <TemplateCard key={tpl.id} template={tpl} canEdit={canEdit} />
+        <TemplateCard
+          key={tpl.id}
+          template={tpl}
+          canEdit={canEdit}
+          dynamicVarKeys={
+            tpl.kind === 'tutor_system'
+              ? (promptVars ?? []).map((v) => `{${v.key}}`)
+              : []
+          }
+        />
       ))}
     </div>
   );
@@ -84,9 +99,11 @@ export default function PromptTemplatesPage() {
 function TemplateCard({
   template,
   canEdit,
+  dynamicVarKeys = [],
 }: {
   template: PromptTemplate;
   canEdit: boolean;
+  dynamicVarKeys?: string[];
 }) {
   const qc = useQueryClient();
   const [text, setText] = useState(template.template);
@@ -155,6 +172,18 @@ function TemplateCard({
               disabled={!canEdit}
               className="rounded bg-muted px-2 py-0.5 font-mono text-xs hover:bg-muted-foreground/20 disabled:opacity-50"
               title="Click to append at cursor"
+            >
+              {p}
+            </button>
+          ))}
+          {dynamicVarKeys.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => canEdit && insertPlaceholder(p)}
+              disabled={!canEdit}
+              className="rounded bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary hover:bg-primary/20 disabled:opacity-50"
+              title="Dynamic variable (from Variables page)"
             >
               {p}
             </button>

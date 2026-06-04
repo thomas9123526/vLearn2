@@ -7,10 +7,10 @@ import { OpenAICompatibleProvider } from './providers/openai-compatible.provider
 import { PromptBuilderService } from './prompt-builder.service';
 import { ConversationOrchestrator } from './conversation.orchestrator';
 import { PromptTemplateEntity } from '../database/entities/prompt-template.entity';
-import { AppConfigEntity } from '../database/entities/app-config.entity';
+import { PromptVarEntity } from '../database/entities/prompt-var.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PromptTemplateEntity, AppConfigEntity])],
+  imports: [TypeOrmModule.forFeature([PromptTemplateEntity, PromptVarEntity])],
   providers: [
     AnthropicProvider,
     OpenAICompatibleProvider,

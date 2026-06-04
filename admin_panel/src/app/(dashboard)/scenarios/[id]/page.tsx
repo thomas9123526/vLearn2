@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { api } from '@/lib/api';
 import { env } from '@/lib/env';
+import type { PromptVar } from '../../prompt-vars/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -40,6 +41,7 @@ interface Scenario extends FormValues {
   background_image_url: string | null;
   status: 'draft' | 'published' | 'archived';
   custom_prompt: string | null;
+  var_overrides: Record<string, string>;
 }
 
 export default function EditScenarioPage({ params }: { params: { id: string } }) {
@@ -48,6 +50,7 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
   const qc = useQueryClient();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
+  const [varOverrides, setVarOverrides] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   const imagePreviewUrl = useMemo(
@@ -100,6 +103,11 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
     queryFn: () => api(`/admin/scenarios/${id}`),
   });
 
+  const { data: promptVars } = useQuery<PromptVar[]>({
+    queryKey: ['admin-prompt-vars'],
+    queryFn: () => api<PromptVar[]>('/admin/prompt-vars'),
+  });
+
   const {
     register,
     handleSubmit,
@@ -121,13 +129,14 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
       xp_reward: scenario.xp_reward,
       custom_prompt: scenario.custom_prompt ?? '',
     });
+    setVarOverrides(scenario.var_overrides ?? {});
   }, [scenario, reset]);
 
   const save = useMutation({
     mutationFn: (values: FormValues) =>
       api(`/admin/scenarios/${id}`, {
         method: 'PATCH',
-        body: values,
+        body: { ...values, var_overrides: varOverrides },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-scenario', id] }),
   });
@@ -239,6 +248,43 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
                 error={errors.tutor_role?.en?.message}
               />
             </Section>
+
+            {promptVars && promptVars.filter((v) => v.scenario_overridable).length > 0 && (
+              <Section title="Prompt variable overrides (optional)">
+                <p className="text-xs text-muted-foreground">
+                  Override global variable values for this scenario only. Leave blank to use the
+                  global default set in the{' '}
+                  <a href="/prompt-vars" className="underline">Variables</a> page.
+                </p>
+                <div className="mt-2 space-y-2">
+                  {promptVars.filter((v) => v.scenario_overridable).map((v) => (
+                    <div key={v.key} className="space-y-0.5">
+                      <Label htmlFor={`var-${v.key}`} className="text-xs">
+                        {v.label}{' '}
+                        <span className="font-mono text-muted-foreground">{`{${v.key}}`}</span>
+                        {v.description && (
+                          <span className="ml-1 text-muted-foreground">— {v.description}</span>
+                        )}
+                      </Label>
+                      <Input
+                        id={`var-${v.key}`}
+                        value={varOverrides[v.key] ?? ''}
+                        onChange={(e) =>
+                          setVarOverrides((prev) => {
+                            const next = { ...prev };
+                            if (e.target.value) next[v.key] = e.target.value;
+                            else delete next[v.key];
+                            return next;
+                          })
+                        }
+                        placeholder={`Global default: ${v.global_value ?? '(empty)'}`}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
 
             <Section title="Custom prompt (optional)">
               <p className="text-xs text-muted-foreground">

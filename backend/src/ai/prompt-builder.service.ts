@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import type { PersonaEntity } from '../database/entities/persona.entity';
 import type {
   ScenarioEntity,
@@ -11,74 +11,8 @@ import {
   PromptKind,
   PromptTemplateEntity,
 } from '../database/entities/prompt-template.entity';
-import { AppConfigEntity } from '../database/entities/app-config.entity';
+import { PromptVarEntity } from '../database/entities/prompt-var.entity';
 import type { PromptVariable } from './ai-call-logger';
-
-// ---------------------------------------------------------------------------
-// Locale table — mirrors ConversationModel config/locale.yaml
-// ---------------------------------------------------------------------------
-
-interface LocaleData {
-  country: string;
-  countryAdj: string;
-  learnerDesc: string;
-  avoidCulturesPhrase: string;
-  avoidedTopicsSentence: string;
-}
-
-const LOCALE_TABLE: Record<string, LocaleData> = {
-  china: {
-    country: 'China',
-    countryAdj: 'Chinese',
-    learnerDesc: 'adult learners of English',
-    avoidCulturesPhrase: 'American and European',
-    avoidedTopicsSentence:
-      'Stay clear of politics, religion, alcohol dating, partisan history, violence harm, distress self harm, yankee culture, western culture, and law and national economy.',
-  },
-  japan: {
-    country: 'Japan',
-    countryAdj: 'Japanese',
-    learnerDesc: 'adult learners of English',
-    avoidCulturesPhrase: 'American, European, Chinese, or Singaporean',
-    avoidedTopicsSentence:
-      'Stay clear of politics, religion, alcohol dating, partisan history, violence harm, distress self harm, yankee culture, western culture, and law and national economy.',
-  },
-  italy: {
-    country: 'Italy',
-    countryAdj: 'Italian',
-    learnerDesc: 'adult learners of English',
-    avoidCulturesPhrase: 'American or British',
-    avoidedTopicsSentence:
-      'Stay clear of politics, religion, alcohol dating, partisan history, violence harm, distress self harm, yankee culture, western culture, and law and national economy.',
-  },
-};
-
-// Fallback used when locale is unknown
-const GENERIC_LOCALE: LocaleData = {
-  country: '',
-  countryAdj: '',
-  learnerDesc: 'adult learners of English',
-  avoidCulturesPhrase: '',
-  avoidedTopicsSentence:
-    'Stay clear of politics, religion, violence, and other sensitive topics.',
-};
-
-// Maps user native-language code/name (lowercase) → locale key
-const LANG_TO_LOCALE: Record<string, string> = {
-  zh: 'china', 'zh-cn': 'china', 'zh-tw': 'china',
-  chinese: 'china', mandarin: 'china', cantonese: 'china',
-  ja: 'japan', japanese: 'japan',
-  it: 'italy', italian: 'italy',
-};
-
-// DB config keys we read for admin-panel locale overrides
-const LOCALE_CONFIG_KEYS = [
-  'prompt.locale.country',
-  'prompt.locale.country_adjective',
-  'prompt.locale.learner_audience',
-  'prompt.locale.avoid_cultures',
-  'prompt.avoided_topics',
-] as const;
 
 // ---------------------------------------------------------------------------
 // Deployment guidelines — verbatim from ConversationModel prompts.py
@@ -121,8 +55,8 @@ export class PromptBuilderService {
     config: ConfigService,
     @InjectRepository(PromptTemplateEntity)
     private readonly templates: Repository<PromptTemplateEntity>,
-    @InjectRepository(AppConfigEntity)
-    private readonly configRepo: Repository<AppConfigEntity>,
+    @InjectRepository(PromptVarEntity)
+    private readonly promptVars: Repository<PromptVarEntity>,
   ) {
     this.disableThinking = config.get<string>('AI_DISABLE_THINKING') === 'true';
   }
@@ -179,7 +113,7 @@ export class PromptBuilderService {
 
     // Priority 3: ConversationModel section builder
     return {
-      prompt: await this.buildCchPrompt(ctx),
+      prompt: await this.buildCchPrompt(ctx, scenario),
       source: 'section-builder ([role]/[learner]/[topic]/…)',
     };
   }
@@ -200,42 +134,43 @@ export class PromptBuilderService {
   // ── Private helpers ──────────────────────────────────────────────────────
 
   /**
+   * Resolves all prompt variables for a scenario.
+   * Priority: scenario.var_overrides[key] → vl_prompt_vars.global_value → ''
+   */
+  private async resolvePromptVars(
+    scenario: ScenarioEntity | null,
+  ): Promise<Record<string, string>> {
+    let rows: PromptVarEntity[] = [];
+    try {
+      rows = await this.promptVars.find({ order: { sort_order: 'ASC' } });
+    } catch (e) {
+      this.logger.warn(
+        `Could not load prompt vars, template variables will be empty: ${(e as Error).message}`,
+      );
+    }
+    const overrides: Record<string, string> = scenario?.var_overrides ?? {};
+    const result: Record<string, string> = {};
+    for (const row of rows) {
+      result[row.key] = (overrides[row.key] ?? row.global_value ?? '').trim();
+    }
+    return result;
+  }
+
+  /**
    * Builds the system prompt in ConversationModel's structured section format,
    * matching the _SCENARIO_DEPLOYMENT_SYSTEM_PROMPT_TEMPLATE used at training
    * time so the model stays inside its trained distribution.
    */
-  private async buildCchPrompt(ctx: Record<string, string>): Promise<string> {
-    // Load DB locale overrides (admin panel can override per-instance)
-    let cfg: Record<string, unknown> = {};
-    try {
-      const rows = await this.configRepo.find({
-        where: { key: In([...LOCALE_CONFIG_KEYS]) },
-      });
-      cfg = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-    } catch (e) {
-      this.logger.warn(
-        `Could not load locale config, using built-in defaults: ${(e as Error).message}`,
-      );
-    }
-    const dbStr = (key: string, def = ''): string => {
-      const v = cfg[key];
-      return typeof v === 'string' && v.trim() ? v.trim() : def;
-    };
-
-    // Resolve locale: scenario.locale > user native language > china default
-    const scenarioLocale = ctx['scenario.locale'];
-    const nativeLang = ctx['user.native_language']?.toLowerCase() ?? '';
-    const localeName =
-      scenarioLocale ||
-      LANG_TO_LOCALE[nativeLang] ||
-      'china';
-    const loc = LOCALE_TABLE[localeName] ?? GENERIC_LOCALE;
-
-    const country        = dbStr('prompt.locale.country',           loc.country);
-    const countryAdj     = dbStr('prompt.locale.country_adjective', loc.countryAdj);
-    const audience       = dbStr('prompt.locale.learner_audience',  loc.learnerDesc);
-    const avoidCultures  = dbStr('prompt.locale.avoid_cultures',    loc.avoidCulturesPhrase);
-    const avoidedTopics  = dbStr('prompt.avoided_topics',           loc.avoidedTopicsSentence);
+  private async buildCchPrompt(
+    ctx: Record<string, string>,
+    scenario: ScenarioEntity | null,
+  ): Promise<string> {
+    const vars = await this.resolvePromptVars(scenario);
+    const country       = vars['country'] ?? '';
+    const countryAdj    = vars['country_adjective'] ?? '';
+    const audience      = vars['learner_audience'] ?? '';
+    const avoidCultures = vars['avoid_cultures_phrase'] ?? '';
+    const avoidedTopics = vars['avoided_topics_sentence'] ?? '';
 
     // [role] — model character name + description
     const modelRoleName = ctx['persona.name'];
@@ -324,7 +259,6 @@ export class PromptBuilderService {
       'persona.specialties': specialties,
       'persona.gender': persona.gender ?? 'neutral',
       'persona.accent': persona.accent ?? '',
-      'scenario.locale': sc?.locale ?? '',
       'scenario.title': sc ? en(sc.title) : 'Free conversation practice',
       'scenario.setting': sc ? en(sc.scene_description) : '—',
       'scenario.tutor_role': sc ? en(sc.tutor_role) : '—',

@@ -20,6 +20,7 @@ import {
   KeyRound,
   BarChart2,
   MessageCircleWarning,
+  Variable,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { tokenStore, currentClaims } from '@/lib/auth';
@@ -37,6 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/', label: t('dashboard'), icon: LayoutDashboard, perm: null },
     { href: '/teachers', label: t('teachers'), icon: Sparkles, perm: 'personas.edit' },
     { href: '/prompt-templates', label: t('prompts'), icon: MessageSquareCode, perm: 'prompts.view' },
+    { href: '/prompt-vars', label: t('variables'), icon: Variable, perm: 'prompts.view' },
     { href: '/scenarios', label: t('scenarios'), icon: BookOpen, perm: 'scenarios.view' },
     { href: '/categories', label: t('categories'), icon: ListTree, perm: 'categories.view' },
     { href: '/users', label: t('users'), icon: Users, perm: 'users.view' },

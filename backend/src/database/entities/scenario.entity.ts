@@ -107,11 +107,11 @@ export class ScenarioEntity {
   image_alt_text!: string | null;
 
   /**
-   * Locale key for AI prompt grounding (china | japan | italy …).
-   * Null means auto-detect from the user's native language at runtime.
+   * Per-scenario prompt variable overrides. Keys match `vl_prompt_vars.key`.
+   * Resolution order: this map → vl_prompt_vars.global_value → ''
    */
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  locale!: string | null;
+  @Column({ type: 'jsonb', default: {} })
+  var_overrides!: Record<string, string>;
 
   /** Scenario-specific system prompt override. When set, this is sent to the
    *  AI provider instead of the globally assembled cch_prompt template.

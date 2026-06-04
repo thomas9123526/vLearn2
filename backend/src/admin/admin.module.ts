@@ -15,6 +15,7 @@ import { ScenarioEntity } from '../database/entities/scenario.entity';
 import { PersonaEntity } from '../database/entities/persona.entity';
 import { AppConfigEntity } from '../database/entities/app-config.entity';
 import { PromptTemplateEntity } from '../database/entities/prompt-template.entity';
+import { PromptVarEntity } from '../database/entities/prompt-var.entity';
 import { UserReportEntity } from '../database/entities/user-report.entity';
 import { AdminPermissionsService } from './permissions/admin-permissions.service';
 import { PermissionGuard } from './permissions/permission.guard';
@@ -29,6 +30,7 @@ import { AdminScenariosController } from './admin-scenarios.controller';
 import { AdminPersonasController } from './admin-personas.controller';
 import { AdminLeaderboardController } from './admin-leaderboard.controller';
 import { AdminPromptTemplatesController } from './admin-prompt-templates.controller';
+import { AdminPromptVarsController } from './admin-prompt-vars.controller';
 import { AdminCategoriesController } from './admin-categories.controller';
 import { AuthModule } from '../auth/auth.module';
 
@@ -48,6 +50,7 @@ import { AuthModule } from '../auth/auth.module';
       PersonaEntity,
       AppConfigEntity,
       PromptTemplateEntity,
+      PromptVarEntity,
       UserReportEntity,
       // Needed by admin users password-reset to revoke active user sessions
       RefreshTokenEntity,
@@ -76,6 +79,7 @@ import { AuthModule } from '../auth/auth.module';
     AdminPersonasController,
     AdminLeaderboardController,
     AdminPromptTemplatesController,
+    AdminPromptVarsController,
     AdminCategoriesController,
     AdminAuditController,
   ],
