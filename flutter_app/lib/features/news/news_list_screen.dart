@@ -48,45 +48,60 @@ class NewsListScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: list.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) {
-          logRawError('news_list_screen', e, st);
-          return PoliteErrorCenter(
-            error: e,
-            context: ErrorContext.loadList,
-            onRetry: () => ref.invalidate(newsListProvider),
-          );
-        },
-        data: (items) {
-          if (items.isEmpty) {
-            return const Center(child: Text('No news yet.'));
-          }
-          return RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(newsListProvider);
-              await ref.read(newsListProvider.future);
-              await ref.read(unreadNewsCountProvider.notifier).refresh();
-            },
-            child: ListView.separated(
-              padding: const EdgeInsets.all(12),
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (_, i) => _NewsListTile(
-                post: items[i],
-                lang: lang,
-                onTap: () => context.push('/news/${items[i].slug}'),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 280),
+        child: list.when(
+          loading: () => const Center(
+            key: ValueKey('loading'),
+            child: CircularProgressIndicator(),
+          ),
+          error: (e, st) {
+            logRawError('news_list_screen', e, st);
+            return PoliteErrorCenter(
+              key: const ValueKey('error'),
+              error: e,
+              context: ErrorContext.loadList,
+              onRetry: () => ref.invalidate(newsListProvider),
+            );
+          },
+          data: (items) {
+            if (items.isEmpty) {
+              return const Center(
+                key: ValueKey('empty'),
+                child: Text('No news yet.'),
+              );
+            }
+            return RefreshIndicator(
+              key: const ValueKey('list'),
+              onRefresh: () async {
+                ref.invalidate(newsListProvider);
+                await ref.read(newsListProvider.future);
+                await ref.read(unreadNewsCountProvider.notifier).refresh();
+              },
+              child: ListView.separated(
+                padding: const EdgeInsets.all(12),
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                itemBuilder: (_, i) => _NewsListTile(
+                  post: items[i],
+                  lang: lang,
+                  onTap: () => context.push('/news/${items[i].slug}'),
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
 }
 
 class _NewsListTile extends StatelessWidget {
-  const _NewsListTile({required this.post, required this.lang, required this.onTap});
+  const _NewsListTile({
+    required this.post,
+    required this.lang,
+    required this.onTap,
+  });
 
   final NewsPost post;
   final String lang;
@@ -132,8 +147,11 @@ class _NewsListTile extends StatelessWidget {
                         if (post.pinned)
                           Padding(
                             padding: const EdgeInsets.only(right: 6),
-                            child: Icon(Icons.push_pin,
-                                size: 14, color: scheme.primary),
+                            child: Icon(
+                              Icons.push_pin,
+                              size: 14,
+                              color: scheme.primary,
+                            ),
                           ),
                         if (!post.read)
                           Container(
@@ -161,8 +179,8 @@ class _NewsListTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),

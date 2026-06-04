@@ -18,6 +18,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../license/license_screen.dart';
 import 'change_password_dialog.dart';
 import 'edit_profile_dialog.dart';
+import '../../shared/widgets/fade_slide_in.dart';
 
 final _settingsPersonasProvider = personasListProvider;
 
@@ -36,9 +37,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // gate Settings rows on) lives in layoutConfigProvider's cache.
     // Re-fetch on every open so flipping "Enable License" in the
     // admin panel propagates without an app restart.
-    Future.microtask(
-      () => ref.read(layoutConfigProvider.notifier).refresh(),
-    );
+    Future.microtask(() => ref.read(layoutConfigProvider.notifier).refresh());
   }
 
   @override
@@ -51,121 +50,128 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settingsTitle)),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        children: [
-          if (user != null)
-            ListTile(
-              leading: _UserAvatarCircle(user: user),
-              title: Text(user.displayName),
-              subtitle: Text(user.email ?? ''),
-              trailing: const Icon(Icons.edit_outlined),
-              onTap: () => showEditProfileDialog(context),
-            ),
-          const Divider(),
-          _SectionHeader(text: l10n.settingsAppearance),
-          ListTile(
-            leading: const Icon(Icons.palette_outlined),
-            title: Text(l10n.settingsTheme),
-            subtitle: Text(settings.theme),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _pickTheme(context, ref),
-          ),
-          ListTile(
-            leading: const Icon(Icons.language_outlined),
-            title: Text(l10n.settingsLanguage),
-            subtitle: Text(_languageLabel(settings.uiLanguage)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _pickLanguage(context, ref),
-          ),
-          _SectionHeader(text: l10n.settingsFont),
-          ListTile(
-            leading: const Icon(Icons.text_fields_outlined),
-            title: Text(l10n.settingsFontGroup),
-            subtitle: Text(fontGroup.displayName),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _pickFontGroup(context, ref, fontGroup),
-          ),
-          _SectionHeader(text: l10n.settingsConversation),
-          const _ActiveTutorTile(),
-          ListTile(
-            leading: Icon(
-              settings.defaultConversationMode == 'face'
-                  ? Icons.face_retouching_natural
-                  : Icons.chat_bubble_outline,
-            ),
-            title: Text(l10n.settingsDefaultMode),
-            subtitle: Text(
-              settings.defaultConversationMode == 'face'
-                  ? l10n.conversationModeFace
-                  : l10n.conversationModeChat,
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _pickDefaultMode(
-              context,
-              ref,
-              settings.defaultConversationMode,
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.chat_bubble_outline),
-            title: Text(l10n.settingsBubbleStyle),
-            subtitle: Text(bubbleStyle.displayName),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _pickBubbleStyle(context, ref, bubbleStyle),
-          ),
-          const Divider(),
-          const _SectionHeader(text: 'Storage'),
-          const _ModelStorageTile(),
-          // License — only rendered when the admin has flipped
-          // `license.enabled` on. The flag rides on layoutConfigProvider
-          // (vl_app_config.is_visible_to_app = true).
-          if (ref.watch(layoutConfigProvider).maybeWhen(
-                data: (cfg) => cfg.get<bool>('license.enabled') ?? false,
-                orElse: () => false,
-              )) ...[
+      body: FadeSlideIn(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            if (user != null)
+              ListTile(
+                leading: _UserAvatarCircle(user: user),
+                title: Text(user.displayName),
+                subtitle: Text(user.email ?? ''),
+                trailing: const Icon(Icons.edit_outlined),
+                onTap: () => showEditProfileDialog(context),
+              ),
             const Divider(),
-            const _SectionHeader(text: 'License'),
+            _SectionHeader(text: l10n.settingsAppearance),
             ListTile(
-              leading: const Icon(Icons.key_outlined),
-              title: const Text('License'),
-              subtitle: const Text('Machine ID and license status'),
+              leading: const Icon(Icons.palette_outlined),
+              title: Text(l10n.settingsTheme),
+              subtitle: Text(settings.theme),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const LicenseScreen(),
-                ),
+              onTap: () => _pickTheme(context, ref),
+            ),
+            ListTile(
+              leading: const Icon(Icons.language_outlined),
+              title: Text(l10n.settingsLanguage),
+              subtitle: Text(_languageLabel(settings.uiLanguage)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _pickLanguage(context, ref),
+            ),
+            _SectionHeader(text: l10n.settingsFont),
+            ListTile(
+              leading: const Icon(Icons.text_fields_outlined),
+              title: Text(l10n.settingsFontGroup),
+              subtitle: Text(fontGroup.displayName),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _pickFontGroup(context, ref, fontGroup),
+            ),
+            _SectionHeader(text: l10n.settingsConversation),
+            const _ActiveTutorTile(),
+            ListTile(
+              leading: Icon(
+                settings.defaultConversationMode == 'face'
+                    ? Icons.face_retouching_natural
+                    : Icons.chat_bubble_outline,
+              ),
+              title: Text(l10n.settingsDefaultMode),
+              subtitle: Text(
+                settings.defaultConversationMode == 'face'
+                    ? l10n.conversationModeFace
+                    : l10n.conversationModeChat,
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _pickDefaultMode(
+                context,
+                ref,
+                settings.defaultConversationMode,
               ),
             ),
-          ],
-          if (ref.watch(layoutConfigProvider).maybeWhen(
-                data: (cfg) => cfg.get<bool>('system.user_report_enabled') ?? true,
-                orElse: () => true,
-              )) ...[
-            const Divider(),
-            const _SectionHeader(text: 'Feedback'),
             ListTile(
-              leading: const Icon(Icons.feedback_outlined),
-              title: const Text('Send feedback'),
-              subtitle: const Text('Report a bug or share your opinion'),
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: Text(l10n.settingsBubbleStyle),
+              subtitle: Text(bubbleStyle.displayName),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showReportDialog(context, ref),
+              onTap: () => _pickBubbleStyle(context, ref, bubbleStyle),
+            ),
+            const Divider(),
+            const _SectionHeader(text: 'Storage'),
+            const _ModelStorageTile(),
+            // License — only rendered when the admin has flipped
+            // `license.enabled` on. The flag rides on layoutConfigProvider
+            // (vl_app_config.is_visible_to_app = true).
+            if (ref
+                .watch(layoutConfigProvider)
+                .maybeWhen(
+                  data: (cfg) => cfg.get<bool>('license.enabled') ?? false,
+                  orElse: () => false,
+                )) ...[
+              const Divider(),
+              const _SectionHeader(text: 'License'),
+              ListTile(
+                leading: const Icon(Icons.key_outlined),
+                title: const Text('License'),
+                subtitle: const Text('Machine ID and license status'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const LicenseScreen(),
+                  ),
+                ),
+              ),
+            ],
+            if (ref
+                .watch(layoutConfigProvider)
+                .maybeWhen(
+                  data: (cfg) =>
+                      cfg.get<bool>('system.user_report_enabled') ?? true,
+                  orElse: () => true,
+                )) ...[
+              const Divider(),
+              const _SectionHeader(text: 'Feedback'),
+              ListTile(
+                leading: const Icon(Icons.feedback_outlined),
+                title: const Text('Send feedback'),
+                subtitle: const Text('Report a bug or share your opinion'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showReportDialog(context, ref),
+              ),
+            ],
+            const Divider(),
+            _SectionHeader(text: l10n.settingsAccount),
+            ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Change password'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => showChangePasswordDialog(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.redAccent),
+              title: Text(l10n.signOut),
+              onTap: () => ref.read(authProvider.notifier).signOut(),
             ),
           ],
-          const Divider(),
-          _SectionHeader(text: l10n.settingsAccount),
-          ListTile(
-            leading: const Icon(Icons.lock_outline),
-            title: const Text('Change password'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => showChangePasswordDialog(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: Text(l10n.signOut),
-            onTap: () => ref.read(authProvider.notifier).signOut(),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -186,8 +192,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 decoration: const InputDecoration(labelText: 'Type'),
                 items: const [
                   DropdownMenuItem(value: 'feedback', child: Text('Feedback')),
-                  DropdownMenuItem(value: 'bug',      child: Text('Bug report')),
-                  DropdownMenuItem(value: 'other',    child: Text('Other')),
+                  DropdownMenuItem(value: 'bug', child: Text('Bug report')),
+                  DropdownMenuItem(value: 'other', child: Text('Other')),
                 ],
                 onChanged: (v) => setState(() => type = v ?? 'feedback'),
               ),
@@ -215,19 +221,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 if (text.isEmpty) return;
                 Navigator.of(ctx).pop();
                 try {
-                  await ref.read(usersApiProvider).sendReport(
-                    content: text,
-                    type: type,
-                  );
+                  await ref
+                      .read(usersApiProvider)
+                      .sendReport(content: text, type: type);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Feedback sent. Thank you!')),
+                      const SnackBar(
+                        content: Text('Feedback sent. Thank you!'),
+                      ),
                     );
                   }
                 } catch (_) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Failed to send feedback. Try again later.')),
+                      const SnackBar(
+                        content: Text(
+                          'Failed to send feedback. Try again later.',
+                        ),
+                      ),
                     );
                   }
                 }
@@ -242,11 +253,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   String _languageLabel(String code) => switch (code) {
-        'zh' => '中文',
-        'ru' => 'Русский',
-        'ko' => '한국어',
-        _ => 'English',
-      };
+    'zh' => '中文',
+    'ru' => 'Русский',
+    'ko' => '한국어',
+    _ => 'English',
+  };
 
   Future<void> _pickTheme(BuildContext context, WidgetRef ref) async {
     final current = ref.read(appSettingsProvider).theme;
@@ -265,8 +276,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Text(
                   'Choose theme',
                   style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               for (final key in const ['apricot', 'sage', 'iris', 'obsidian'])
@@ -337,7 +348,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       Text(
                         'The quick brown fox jumps',
-                        style: TextStyle(fontFamily: g.families.body, fontSize: 14),
+                        style: TextStyle(
+                          fontFamily: g.families.body,
+                          fontSize: 14,
+                        ),
                       ),
                       Text(
                         'v1.0.0  •  ${g.description}',
@@ -442,7 +456,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               for (final s in BubbleStyle.values)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   child: InkWell(
                     onTap: () => Navigator.pop(sheetContext, s),
                     borderRadius: BorderRadius.circular(12),
@@ -463,14 +480,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               Expanded(
                                 child: Text(
                                   s.displayName,
-                                  style: Theme.of(sheetContext)
-                                      .textTheme
-                                      .titleMedium,
+                                  style: Theme.of(
+                                    sheetContext,
+                                  ).textTheme.titleMedium,
                                 ),
                               ),
                               if (s == current)
-                                Icon(Icons.check_circle,
-                                    color: scheme.primary, size: 20),
+                                Icon(
+                                  Icons.check_circle,
+                                  color: scheme.primary,
+                                  size: 20,
+                                ),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -513,9 +533,9 @@ Future<void> pickActivePersona(BuildContext context, WidgetRef ref) async {
   }
   if (personas.isEmpty) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No tutors available')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No tutors available')));
     }
     return;
   }
@@ -536,9 +556,9 @@ Future<void> pickActivePersona(BuildContext context, WidgetRef ref) async {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: Text(
                 'Choose your tutor',
-                style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  sheetCtx,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             Flexible(
@@ -697,7 +717,8 @@ class _ModelStorageTile extends ConsumerWidget {
         final totalCount = s.verifications.length;
         final subtitle = switch (s.status) {
           ModelRegistryStatus.ready => '$okCount/$totalCount files verified',
-          ModelRegistryStatus.corrupt => 'Bundle corrupted ($okCount/$totalCount ok)',
+          ModelRegistryStatus.corrupt =>
+            'Bundle corrupted ($okCount/$totalCount ok)',
           ModelRegistryStatus.manifestMissing => 'manifest.json not found',
           ModelRegistryStatus.notReady => 'Not ready',
         };
@@ -705,7 +726,9 @@ class _ModelStorageTile extends ConsumerWidget {
           children: [
             ListTile(
               leading: Icon(
-                s.isReady ? Icons.check_circle_outline : Icons.warning_amber_outlined,
+                s.isReady
+                    ? Icons.check_circle_outline
+                    : Icons.warning_amber_outlined,
                 color: s.isReady ? Colors.green : scheme.error,
               ),
               title: const Text('Speech models'),
@@ -768,8 +791,9 @@ class _UserAvatarCircleState extends State<_UserAvatarCircle> {
     final base = AppConfig.defaults.backendBaseUrl;
     final idx = base.indexOf('/api');
     final idx2 = base.indexOf('/vfls');
-    final origin =
-        idx > 0 ? base.substring(0, idx) : (idx2 > 0 ? base.substring(0, idx2) : base);
+    final origin = idx > 0
+        ? base.substring(0, idx)
+        : (idx2 > 0 ? base.substring(0, idx2) : base);
     return '$origin$relative';
   }
 
@@ -777,7 +801,9 @@ class _UserAvatarCircleState extends State<_UserAvatarCircle> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final url = widget.user.avatarUrl;
-    final fullUrl = (!_imageError && url != null && url.isNotEmpty) ? _resolveUrl(url) : null;
+    final fullUrl = (!_imageError && url != null && url.isNotEmpty)
+        ? _resolveUrl(url)
+        : null;
 
     return CircleAvatar(
       radius: 22,
@@ -804,9 +830,9 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         text.toUpperCase(),
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              letterSpacing: 1.2,
-            ),
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
@@ -857,7 +883,11 @@ class _ThemeTile extends StatelessWidget {
               const SizedBox(width: 6),
               _Dot(color: palette.accent, size: 20),
               const SizedBox(width: 6),
-              _Dot(color: palette.surfaceVariant, size: 14, border: palette.outline),
+              _Dot(
+                color: palette.surfaceVariant,
+                size: 14,
+                border: palette.outline,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
@@ -870,7 +900,11 @@ class _ThemeTile extends StatelessWidget {
                 ),
               ),
               if (isSelected)
-                Icon(Icons.check_circle_rounded, color: palette.primary, size: 22),
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: palette.primary,
+                  size: 22,
+                ),
             ],
           ),
         ),

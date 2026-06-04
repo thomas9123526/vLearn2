@@ -122,14 +122,14 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
       final platform = Platform.isAndroid
           ? 'android'
           : Platform.isWindows
-              ? 'windows'
-              : Platform.isIOS
-                  ? 'ios'
-                  : Platform.isMacOS
-                      ? 'macos'
-                      : Platform.isLinux
-                          ? 'linux'
-                          : null;
+          ? 'windows'
+          : Platform.isIOS
+          ? 'ios'
+          : Platform.isMacOS
+          ? 'macos'
+          : Platform.isLinux
+          ? 'linux'
+          : null;
 
       if (Platform.isAndroid) {
         // 1) Make sure we have MANAGE_EXTERNAL_STORAGE. Without it the
@@ -139,7 +139,8 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
           setState(() {
             _loading = false;
             _needsAllFilesAccess = true;
-            _error = 'Storage access required to find your .lic file. '
+            _error =
+                'Storage access required to find your .lic file. '
                 'Tap "Grant access", flip "Allow access to manage all '
                 'files" on for this app, then come back and retry.';
           });
@@ -152,7 +153,8 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
         if (files.isEmpty) {
           setState(() {
             _loading = false;
-            _error = 'No .lic file found. Drop one into\n'
+            _error =
+                'No .lic file found. Drop one into\n'
                 '  /storage/emulated/0/룡마/가상외국어회화/license/\n'
                 '(an inserted SD card is also scanned), then retry.';
           });
@@ -165,7 +167,9 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
         Object? lastError;
         for (final f in files) {
           try {
-            final raw = await ref.read(licenseApiProvider).verify(
+            final raw = await ref
+                .read(licenseApiProvider)
+                .verify(
                   licenseContent: f.base64Content,
                   machineId: machineId,
                   userId: userId,
@@ -185,7 +189,8 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
         if (winningFile == null || winningResult == null) {
           setState(() {
             _loading = false;
-            _error = 'Found ${files.length} .lic file(s) but none verified. '
+            _error =
+                'Found ${files.length} .lic file(s) but none verified. '
                 'They may be expired, machine-bound to a different '
                 'device, or signed by a different Leaf CA.'
                 '${lastError != null ? '\nLast error: $lastError' : ''}';
@@ -194,7 +199,9 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
         }
 
         // Persist the winning file as the auto-verify cache.
-        await ref.read(licenseStateProvider.notifier).setVerifiedContent(
+        await ref
+            .read(licenseStateProvider.notifier)
+            .setVerifiedContent(
               base64Content: winningFile.base64Content,
               result: winningResult,
               sourcePath: winningFile.path,
@@ -210,14 +217,17 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
       if (loaded == null) {
         setState(() {
           _loading = false;
-          _error = 'No .lic file found. Place one in '
+          _error =
+              'No .lic file found. Place one in '
               r'%USERPROFILE%\룡마\가상외국어회화\ '
               r'(or its \lic\ subfolder) and tap Load .lic again.';
         });
         return;
       }
 
-      final raw = await ref.read(licenseApiProvider).verify(
+      final raw = await ref
+          .read(licenseApiProvider)
+          .verify(
             licenseContent: loaded.base64Content,
             machineId: machineId,
             userId: userId,
@@ -228,7 +238,9 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
       // (a) other parts of the app see the new status without polling
       // and (b) the auto-verify-on-startup notifier replays this exact
       // payload on every future launch.
-      await ref.read(licenseStateProvider.notifier).setVerifiedContent(
+      await ref
+          .read(licenseStateProvider.notifier)
+          .setVerifiedContent(
             base64Content: loaded.base64Content,
             result: result,
             sourcePath: loaded.sourcePath,
@@ -237,7 +249,8 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
       if (e.code == 'PERMISSION_DENIED') {
         setState(() {
           _needsAllFilesAccess = true;
-          _error = 'Storage access required. Tap "Grant access" to '
+          _error =
+              'Storage access required. Tap "Grant access" to '
               'enable it for this app, then retry.';
         });
       } else {
@@ -275,7 +288,8 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
         setState(() {
           _loading = false;
           _needsAllFilesAccess = true;
-          _error = 'Storage access required to read QR PNGs from the '
+          _error =
+              'Storage access required to read QR PNGs from the '
               'license folder. Tap "Grant access" and retry.';
         });
         return;
@@ -289,7 +303,8 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
       if (decoded.isEmpty) {
         setState(() {
           _loading = false;
-          _error = 'No decodable QR PNG found under\n  $dir\n'
+          _error =
+              'No decodable QR PNG found under\n  $dir\n'
               'Make sure the .png the KeyGenerator produced is there.';
         });
         return;
@@ -301,7 +316,9 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
       Object? lastError;
       for (final qrText in decoded) {
         try {
-          final raw = await ref.read(licenseApiProvider).verify(
+          final raw = await ref
+              .read(licenseApiProvider)
+              .verify(
                 licenseContent: qrText,
                 machineId: machineId,
                 userId: userId,
@@ -321,13 +338,16 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
       if (winningContent == null || winningResult == null) {
         setState(() {
           _loading = false;
-          _error = 'Decoded ${decoded.length} QR PNG(s) but none verified.'
+          _error =
+              'Decoded ${decoded.length} QR PNG(s) but none verified.'
               '${lastError != null ? '\nLast error: $lastError' : ''}';
         });
         return;
       }
 
-      await ref.read(licenseStateProvider.notifier).setVerifiedContent(
+      await ref
+          .read(licenseStateProvider.notifier)
+          .setVerifiedContent(
             base64Content: winningContent,
             result: winningResult,
             sourcePath: dir,
@@ -367,7 +387,10 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Machine ID', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Machine ID',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 6),
                   machineId.when(
                     loading: () => const SizedBox(
@@ -375,11 +398,16 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
                       width: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                    error: (e, _) => Text('Could not read: $e',
-                        style: TextStyle(color: scheme.error)),
+                    error: (e, _) => Text(
+                      'Could not read: $e',
+                      style: TextStyle(color: scheme.error),
+                    ),
                     data: (id) => SelectableText(
                       id,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
@@ -414,8 +442,13 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_error!,
-                        style: TextStyle(color: scheme.onErrorContainer, fontSize: 13)),
+                    Text(
+                      _error!,
+                      style: TextStyle(
+                        color: scheme.onErrorContainer,
+                        fontSize: 13,
+                      ),
+                    ),
                     if (_needsAllFilesAccess) ...[
                       const SizedBox(height: 8),
                       FilledButton.tonalIcon(
@@ -435,23 +468,37 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
           const SizedBox(height: 16),
 
           // ── CTA ───────────────────────────────────────────────────────────
-          if (_loading)
-            const Center(child: CircularProgressIndicator())
-          else ...[
-            FilledButton.icon(
-              icon: const Icon(Icons.folder_open),
-              label: Text(Platform.isAndroid ? 'Find License' : 'Load .lic file'),
-              onPressed: _getLicense,
-            ),
-            if (Platform.isAndroid) ...[
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Scan QR Code'),
-                onPressed: _scanQrPngs,
-              ),
-            ],
-          ],
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: _loading
+                ? const Center(
+                    key: ValueKey('loading'),
+                    child: CircularProgressIndicator(),
+                  )
+                : Column(
+                    key: const ValueKey('buttons'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FilledButton.icon(
+                        icon: const Icon(Icons.folder_open),
+                        label: Text(
+                          Platform.isAndroid
+                              ? 'Find License'
+                              : 'Load .lic file',
+                        ),
+                        onPressed: _getLicense,
+                      ),
+                      if (Platform.isAndroid) ...[
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.qr_code_scanner),
+                          label: const Text('Scan QR Code'),
+                          onPressed: _scanQrPngs,
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
         ],
       ),
     );
@@ -459,9 +506,9 @@ class _LicenseScreenState extends ConsumerState<LicenseScreen> {
 
   TextStyle? _sectionLabel(BuildContext context) =>
       Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
-          );
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
+      );
 }
 
 // ─── Status card ─────────────────────────────────────────────────────────────
@@ -488,10 +535,15 @@ class _StatusCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('No license installed', style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(
+                      'No license installed',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     SizedBox(height: 2),
-                    Text('Scan a license QR or drop a .lic file to activate.',
-                        style: TextStyle(fontSize: 12)),
+                    Text(
+                      'Scan a license QR or drop a .lic file to activate.',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ],
                 ),
               ),
@@ -515,12 +567,21 @@ class _StatusCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('License invalid',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w600, color: scheme.onErrorContainer)),
+                    Text(
+                      'License invalid',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onErrorContainer,
+                      ),
+                    ),
                     if (result!.reason != null)
-                      Text(result!.reason!,
-                          style: TextStyle(fontSize: 12, color: scheme.onErrorContainer)),
+                      Text(
+                        result!.reason!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onErrorContainer,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -550,12 +611,21 @@ class _StatusCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(label,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, color: scheme.onPrimaryContainer)),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onPrimaryContainer,
+                    ),
+                  ),
                   if (sub.isNotEmpty)
-                    Text(sub,
-                        style: TextStyle(fontSize: 12, color: scheme.onPrimaryContainer)),
+                    Text(
+                      sub,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onPrimaryContainer,
+                      ),
+                    ),
                 ],
               ),
             ),

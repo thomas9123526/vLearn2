@@ -75,22 +75,26 @@ class _ModelsNotInstalledScreenState
     return Scaffold(
       appBar: AppBar(title: const Text('Speech setup')),
       body: SafeArea(
-        child: switch (group.phase) {
-          DataPackGroupPhase.running => DataPackProgressView(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: switch (group.phase) {
+            DataPackGroupPhase.running => DataPackProgressView(
+              key: const ValueKey('running'),
               fraction: group.fraction,
               status: group.status,
               title: 'Setting up speech…',
             ),
-          DataPackGroupPhase.error => _ErrorBody(
+            DataPackGroupPhase.error => _ErrorBody(
+              key: const ValueKey('error'),
               message: group.error ?? 'Speech setup failed.',
               onRetry: _retry,
             ),
-          // idle (before the post-frame fires) or done → defer to the
-          // model registry, which now reflects the unpacked location.
-          DataPackGroupPhase.idle ||
-          DataPackGroupPhase.done =>
-            _registryBody(context),
-        },
+            DataPackGroupPhase.idle || DataPackGroupPhase.done => KeyedSubtree(
+              key: const ValueKey('registry'),
+              child: _registryBody(context),
+            ),
+          },
+        ),
       ),
     );
   }
@@ -140,24 +144,23 @@ class _ReadyBody extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(Icons.check_circle_outline,
-              size: 56, color: Colors.green),
+          const Icon(Icons.check_circle_outline, size: 56, color: Colors.green),
           const SizedBox(height: 16),
           Text(
             'Speech is ready',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
             'The speech models are installed and verified. '
             'You can start a conversation now.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 24),
           FilledButton(onPressed: onContinue, child: const Text('Continue')),
@@ -196,9 +199,9 @@ class _NotFoundBody extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           'Speech models not installed',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         Text(
@@ -220,18 +223,15 @@ class _NotFoundBody extends StatelessWidget {
               Text(
                 'Models would unpack to',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 4),
               // Friendly placeholder — never the real internal path.
               // The actual path is logged to the console in debug mode.
               const Text(
                 'App data › Speech models',
-                style: TextStyle(
-                  fontFamily: 'EditorialMono',
-                  fontSize: 13,
-                ),
+                style: TextStyle(fontFamily: 'EditorialMono', fontSize: 13),
               ),
             ],
           ),
@@ -263,7 +263,7 @@ class _NotFoundBody extends StatelessWidget {
 
 /// Speech setup hit an error (bad pack, unpack failure, …).
 class _ErrorBody extends StatelessWidget {
-  const _ErrorBody({required this.message, required this.onRetry});
+  const _ErrorBody({super.key, required this.message, required this.onRetry});
   final String message;
   final VoidCallback onRetry;
 
@@ -281,18 +281,18 @@ class _ErrorBody extends StatelessWidget {
           Text(
             'Speech setup failed',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
             message,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontFamily: 'EditorialMono',
-                  color: scheme.onSurfaceVariant,
-                ),
+              fontFamily: 'EditorialMono',
+              color: scheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 24),
           FilledButton.icon(

@@ -13,10 +13,8 @@ import '../../core/router/app_router.dart';
 /// The list intentionally fetches *every* status: active rows resume into
 /// [ConversationScreen]; completed/abandoned rows open the same screen,
 /// which now switches to read-only when `status != 'active'`.
-final _historyProvider =
-    FutureProvider<List<ConversationSession>>((ref) async {
-  final raw =
-      await ref.read(conversationsApiProvider).listSessions(limit: 100);
+final _historyProvider = FutureProvider<List<ConversationSession>>((ref) async {
+  final raw = await ref.read(conversationsApiProvider).listSessions(limit: 100);
   return raw.map(ConversationSession.fromJson).toList();
 });
 
@@ -54,8 +52,7 @@ class ConversationHistoryScreen extends ConsumerWidget {
       ref.invalidate(_historyProvider);
     } on Exception catch (e, st) {
       if (context.mounted) {
-        showPoliteErrorSnack(context, e,
-            tag: 'history.clear_all', stack: st);
+        showPoliteErrorSnack(context, e, tag: 'history.clear_all', stack: st);
       }
     }
   }
@@ -80,38 +77,47 @@ class ConversationHistoryScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: history.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) {
-          logRawError('conversation_history.load', e, st);
-          return PoliteErrorCenter(
-            error: e,
-            context: ErrorContext.loadList,
-            onRetry: () => ref.invalidate(_historyProvider),
-          );
-        },
-        data: (sessions) {
-          if (sessions.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Text(
-                  'No conversations yet. Pick a topic to start your first session.',
-                  textAlign: TextAlign.center,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 280),
+        child: history.when(
+          loading: () => const Center(
+            key: ValueKey('loading'),
+            child: CircularProgressIndicator(),
+          ),
+          error: (e, st) {
+            logRawError('conversation_history.load', e, st);
+            return PoliteErrorCenter(
+              key: const ValueKey('error'),
+              error: e,
+              context: ErrorContext.loadList,
+              onRetry: () => ref.invalidate(_historyProvider),
+            );
+          },
+          data: (sessions) {
+            if (sessions.isEmpty) {
+              return const Center(
+                key: ValueKey('empty'),
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text(
+                    'No conversations yet. Pick a topic to start your first session.',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
+              );
+            }
+            return RefreshIndicator(
+              key: const ValueKey('list'),
+              onRefresh: () async => ref.invalidate(_historyProvider),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: sessions.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (_, i) => _SessionTile(session: sessions[i]),
               ),
             );
-          }
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(_historyProvider),
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: sessions.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
-              itemBuilder: (_, i) => _SessionTile(session: sessions[i]),
-            ),
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -132,8 +138,9 @@ class _SessionTileState extends ConsumerState<_SessionTile> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final personaAsync =
-        ref.watch(personaByIdProvider(widget.session.personaId));
+    final personaAsync = ref.watch(
+      personaByIdProvider(widget.session.personaId),
+    );
 
     final (statusLabel, statusColor) = switch (widget.session.status) {
       'active' => ('Active', scheme.primary),
@@ -225,9 +232,7 @@ class _SessionTileState extends ConsumerState<_SessionTile> {
 
     setState(() => _deleting = true);
     try {
-      await ref
-          .read(conversationsApiProvider)
-          .deleteSession(widget.session.id);
+      await ref.read(conversationsApiProvider).deleteSession(widget.session.id);
       // Refresh the parent list — the provider lives outside this widget.
       if (mounted) {
         ref.invalidate(_historyProvider);

@@ -20,68 +20,78 @@ class NewsDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('News')),
-      body: detail.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) {
-          logRawError('news_detail_screen', e, st);
-          return PoliteErrorCenter(
-            error: e,
-            context: ErrorContext.loadDetail,
-            onRetry: () => ref.invalidate(newsDetailProvider(idOrSlug)),
-          );
-        },
-        data: (post) {
-          final title = post.titleFor(lang);
-          final body = post.bodyFor(lang);
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (post.imageUrl != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: Image.network(
-                        post.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          color: scheme.primaryContainer,
-                          alignment: Alignment.center,
-                          child: Icon(Icons.image_not_supported,
-                              color: scheme.onPrimaryContainer),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 280),
+        child: detail.when(
+          loading: () => const Center(
+            key: ValueKey('loading'),
+            child: CircularProgressIndicator(),
+          ),
+          error: (e, st) {
+            logRawError('news_detail_screen', e, st);
+            return PoliteErrorCenter(
+              key: const ValueKey('error'),
+              error: e,
+              context: ErrorContext.loadDetail,
+              onRetry: () => ref.invalidate(newsDetailProvider(idOrSlug)),
+            );
+          },
+          data: (post) {
+            final title = post.titleFor(lang);
+            final body = post.bodyFor(lang);
+            return SingleChildScrollView(
+              key: const ValueKey('data'),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (post.imageUrl != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Image.network(
+                          post.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            color: scheme.primaryContainer,
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: scheme.onPrimaryContainer,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                const SizedBox(height: 16),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                if (post.publishedAt != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 16),
                   Text(
-                    DateFormat.yMMMMd().format(post.publishedAt!.toLocal()),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                    title,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (post.publishedAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      DateFormat.yMMMMd().format(post.publishedAt!.toLocal()),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Text(
+                    body,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(height: 1.5),
                   ),
                 ],
-                const SizedBox(height: 16),
-                Text(
-                  body,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        height: 1.5,
-                      ),
-                ),
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }

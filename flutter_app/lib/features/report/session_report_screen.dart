@@ -9,8 +9,10 @@ import '../../core/router/app_router.dart';
 
 // ─── Providers ──────────────────────────────────────────────────────────────
 
-final _sessionProvider =
-    FutureProvider.family<Map<String, dynamic>, String>((ref, id) async {
+final _sessionProvider = FutureProvider.family<Map<String, dynamic>, String>((
+  ref,
+  id,
+) async {
   return ref.read(conversationsApiProvider).getSession(id);
 });
 
@@ -80,21 +82,28 @@ class _SessionReportScreenState extends ConsumerState<SessionReportScreen> {
           onPressed: () => context.go(AppRoute.home),
         ),
       ),
-      body: sessionAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) {
-          logRawError('session_report_screen', e, st);
-          return PoliteErrorCenter(
-            error: e,
-            context: ErrorContext.loadDetail,
-            onRetry: () =>
-                ref.invalidate(_sessionProvider(widget.sessionId)),
-          );
-        },
-        data: (session) => _Body(
-          session: session,
-          scoreData: _scoreData,
-          evaluationDone: _evaluationDone,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: sessionAsync.when(
+          loading: () => const Center(
+            key: ValueKey('loading'),
+            child: CircularProgressIndicator(),
+          ),
+          error: (e, st) {
+            logRawError('session_report_screen', e, st);
+            return PoliteErrorCenter(
+              key: const ValueKey('error'),
+              error: e,
+              context: ErrorContext.loadDetail,
+              onRetry: () => ref.invalidate(_sessionProvider(widget.sessionId)),
+            );
+          },
+          data: (session) => _Body(
+            key: const ValueKey('data'),
+            session: session,
+            scoreData: _scoreData,
+            evaluationDone: _evaluationDone,
+          ),
         ),
       ),
     );
@@ -105,6 +114,7 @@ class _SessionReportScreenState extends ConsumerState<SessionReportScreen> {
 
 class _Body extends StatelessWidget {
   const _Body({
+    super.key,
     required this.session,
     required this.scoreData,
     required this.evaluationDone,
@@ -128,29 +138,41 @@ class _Body extends StatelessWidget {
         const SizedBox(height: 16),
         // ── XP badge ──────────────────────────────────────────
         Center(
-          child: Container(
-            width: 160,
-            height: 160,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: [scheme.primary, scheme.primaryContainer]),
-              shape: BoxShape.circle,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('$xp',
+          child: TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: xp),
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeOut,
+            builder: (_, value, _) => Container(
+              width: 160,
+              height: 160,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [scheme.primary, scheme.primaryContainer],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '$value',
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 56,
-                        fontWeight: FontWeight.w800)),
-                const Text('XP',
+                      color: Colors.white,
+                      fontSize: 56,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const Text(
+                    'XP',
                     style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600)),
-              ],
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -158,28 +180,30 @@ class _Body extends StatelessWidget {
         Center(
           child: Text(
             status == 'completed' ? 'Great work!' : 'Session ended',
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
         const SizedBox(height: 8),
         Center(
           child: Text(
             'You spoke $words words across $turns turns.',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: scheme.onSurfaceVariant),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ),
         const SizedBox(height: 32),
         // ── AI evaluation section ──────────────────────────────
-        _EvaluationSection(
-          scoreData: scoreData,
-          evaluationDone: evaluationDone,
-          scheme: scheme,
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          child: _EvaluationSection(
+            key: ValueKey('${evaluationDone}_${scoreData != null}'),
+            scoreData: scoreData,
+            evaluationDone: evaluationDone,
+            scheme: scheme,
+          ),
         ),
         const SizedBox(height: 32),
         FilledButton(
@@ -200,6 +224,7 @@ class _Body extends StatelessWidget {
 
 class _EvaluationSection extends StatelessWidget {
   const _EvaluationSection({
+    super.key,
     required this.scoreData,
     required this.evaluationDone,
     required this.scheme,
@@ -249,10 +274,9 @@ class _PendingCard extends StatelessWidget {
           Expanded(
             child: Text(
               'AI is evaluating your session… this takes a few seconds.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
         ],
@@ -277,10 +301,9 @@ class _UnavailableCard extends StatelessWidget {
       ),
       child: Text(
         'AI evaluation is not available for this session.',
-        style: Theme.of(context)
-            .textTheme
-            .bodyMedium
-            ?.copyWith(color: scheme.onSurfaceVariant),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
       ),
     );
   }
@@ -305,13 +328,12 @@ class _ScoreCard extends StatelessWidget {
     final topicAdherence = (score['topicAdherenceScore'] as num?)?.toInt();
     final strengths = (score['strengths'] as List?)?.cast<String>() ?? [];
     final rawSpecific = (score['specificFeedback'] as List?) ?? [];
-    final specificFeedback = rawSpecific
-        .cast<Map<String, dynamic>>()
-        .where((f) {
-          final issue = f['issue'] as String?;
-          return issue != null && issue.isNotEmpty && issue != 'None';
-        })
-        .toList();
+    final specificFeedback = rawSpecific.cast<Map<String, dynamic>>().where((
+      f,
+    ) {
+      final issue = f['issue'] as String?;
+      return issue != null && issue.isNotEmpty && issue != 'None';
+    }).toList();
     final practice = score['suggestedPractice'] as String?;
 
     return Column(
@@ -325,10 +347,9 @@ class _ScoreCard extends StatelessWidget {
             Expanded(
               child: Text(
                 'AI Evaluation',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
             if (cefr != null) _CefrBadge(label: cefr, scheme: scheme),
@@ -348,10 +369,9 @@ class _ScoreCard extends StatelessWidget {
             ),
             child: Text(
               sessionFeedback,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(height: 1.55),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(height: 1.55),
             ),
           ),
           const SizedBox(height: 16),
@@ -367,20 +387,40 @@ class _ScoreCard extends StatelessWidget {
           child: Column(
             children: [
               if (fluency != null)
-                _ScoreRow('Fluency', fluency, scheme,
-                    'Pacing, hesitation, naturalness'),
+                _ScoreRow(
+                  'Fluency',
+                  fluency,
+                  scheme,
+                  'Pacing, hesitation, naturalness',
+                ),
               if (accuracy != null)
-                _ScoreRow('Accuracy', accuracy, scheme,
-                    'Grammar, tense, articles'),
+                _ScoreRow(
+                  'Accuracy',
+                  accuracy,
+                  scheme,
+                  'Grammar, tense, articles',
+                ),
               if (vocabulary != null)
-                _ScoreRow('Vocabulary', vocabulary, scheme,
-                    'Range, appropriateness'),
+                _ScoreRow(
+                  'Vocabulary',
+                  vocabulary,
+                  scheme,
+                  'Range, appropriateness',
+                ),
               if (interaction != null)
-                _ScoreRow('Interaction', interaction, scheme,
-                    'Turn-taking, engagement'),
+                _ScoreRow(
+                  'Interaction',
+                  interaction,
+                  scheme,
+                  'Turn-taking, engagement',
+                ),
               if (topicAdherence != null)
-                _ScoreRow('Topic focus', topicAdherence, scheme,
-                    'Engagement with assigned topic'),
+                _ScoreRow(
+                  'Topic focus',
+                  topicAdherence,
+                  scheme,
+                  'Engagement with assigned topic',
+                ),
             ],
           ),
         ),
@@ -442,9 +482,9 @@ class _CefrBadge extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: scheme.onPrimaryContainer,
-              fontWeight: FontWeight.w700,
-            ),
+          color: scheme.onPrimaryContainer,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -471,16 +511,18 @@ class _ScoreRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w600)),
-                Text(subtitle,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: scheme.onSurfaceVariant)),
+                Text(
+                  label,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
               ],
             ),
           ),
@@ -515,11 +557,12 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: scheme.primary),
         const SizedBox(width: 6),
-        Text(title,
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
       ],
     );
   }
@@ -542,8 +585,7 @@ class _BulletLine extends StatelessWidget {
             child: Icon(Icons.circle, size: 6, color: scheme.primary),
           ),
           Expanded(
-            child: Text(text,
-                style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
           ),
         ],
       ),
@@ -565,9 +607,9 @@ class _TurnFeedbackItem extends StatelessWidget {
     final severity = item['severity'] as String? ?? 'minor';
 
     final severityColor = switch (severity) {
-      'major'    => scheme.error,
+      'major' => scheme.error,
       'moderate' => const Color(0xFFE67E22),
-      _          => scheme.onSurfaceVariant,
+      _ => scheme.onSurfaceVariant,
     };
 
     return Container(
@@ -576,9 +618,7 @@ class _TurnFeedbackItem extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: BorderSide(color: severityColor, width: 3),
-        ),
+        border: Border(left: BorderSide(color: severityColor, width: 3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,9 +628,9 @@ class _TurnFeedbackItem extends StatelessWidget {
               Text(
                 'Turn $turnIndex',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(width: 8),
               Container(
@@ -602,9 +642,9 @@ class _TurnFeedbackItem extends StatelessWidget {
                 child: Text(
                   severity,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: severityColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: severityColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -614,21 +654,23 @@ class _TurnFeedbackItem extends StatelessWidget {
             Text(
               '"$userText"',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontStyle: FontStyle.italic,
-                  ),
+                color: scheme.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
           const SizedBox(height: 6),
           Text(issue, style: Theme.of(context).textTheme.bodyMedium),
-          if (correction != null && correction.isNotEmpty && correction != 'None') ...[
+          if (correction != null &&
+              correction.isNotEmpty &&
+              correction != 'None') ...[
             const SizedBox(height: 4),
             Text(
               '→ $correction',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
+                color: scheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ],

@@ -28,7 +28,8 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
     // The full scenario list is cached; filtering runs client-side, so
     // typing a query or tapping a chip is instant — no network per filter.
     final all = cached.value ?? const <Scenario>[];
-    final categories = categoriesAsync.value ??
+    final categories =
+        categoriesAsync.value ??
         all.map((s) => s.category).toSet().map((slug) {
           return Category(
             slug: slug,
@@ -103,9 +104,19 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => ref.read(scenariosProvider.notifier).refresh(),
-              child: _list(context, cached, filtered, locale),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              child: RefreshIndicator(
+                key: ValueKey(
+                  cached.hasValue
+                      ? 'data'
+                      : cached.error != null
+                      ? 'error'
+                      : 'loading',
+                ),
+                onRefresh: () => ref.read(scenariosProvider.notifier).refresh(),
+                child: _list(context, cached, filtered, locale),
+              ),
             ),
           ),
         ],
@@ -167,12 +178,10 @@ class _Chip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
-    this.compact = false,
   });
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -180,10 +189,12 @@ class _Chip extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
         padding: EdgeInsets.symmetric(
           horizontal: 14,
-          vertical: compact ? 4 : 8,
+          vertical: 8,
         ),
         decoration: BoxDecoration(
           color: selected ? scheme.primary : scheme.surfaceContainerHighest,
@@ -195,7 +206,7 @@ class _Chip extends StatelessWidget {
           style: TextStyle(
             color: selected ? Colors.white : scheme.onSurface,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            fontSize: compact ? 12 : 14,
+            fontSize: 14,
           ),
         ),
       ),
