@@ -11,7 +11,7 @@ import { usePermission } from '@/hooks/use-permission';
 
 interface PromptTemplate {
   id: string;
-  kind: 'tutor_system' | 'grammar' | 'feedback';
+  kind: 'tutor_system' | 'evaluation_system' | 'feedback';
   label: string;
   description: string | null;
   template: string;
@@ -42,7 +42,10 @@ const PLACEHOLDERS: Record<PromptTemplate['kind'], string[]> = {
     '{{user.level_label}}',
     '{{user.native_language}}',
   ],
-  grammar: ['{{user.level}}', '{{user.level_label}}', '{{user.messages}}'],
+  // evaluation_system has no dynamic placeholders — the transcript and target
+  // CEFR label are injected as the user message, not the system prompt.
+  // /think is always appended automatically; do not include it in the template.
+  evaluation_system: [],
   feedback: [
     '{{session.scenario_title}}',
     '{{session.overall_score}}',

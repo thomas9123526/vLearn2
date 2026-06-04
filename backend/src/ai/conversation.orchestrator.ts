@@ -117,71 +117,6 @@ export class ConversationOrchestrator {
   }
 
   /**
-   * Generates a grammar analysis. Returns null when AI is unavailable so the
-   * scoring pipeline can use algorithmic-only scores.
-   */
-  async scoreGrammar(
-    userMessages: string[],
-    level: number,
-  ): Promise<{
-    grammar_score: number;
-    errors_found: string[];
-    strengths: string[];
-  } | null> {
-    const userPrompt = await this.prompts.buildGrammarPrompt(userMessages, level);
-    const noThink = this.prompts.disableThinking ? '\n/no_think' : '';
-    const systemPrompt = `You are an expert English grammar evaluator.${noThink}`;
-
-    AiCallLogger.request({
-      callType:     'scoreGrammar',
-      timestamp:    new Date().toISOString(),
-      promptSource: 'DB template: grammar (or built-in default)',
-      variables: {
-        'user.level':    { value: String(level), from: 'user_progress.current_level' },
-        'user.messages': { value: `${userMessages.length} messages`, from: 'session history' },
-      },
-      systemPrompt,
-      history: [{ role: 'user', content: userPrompt }],
-    });
-
-    try {
-      const res = await this.ai.structured<{
-        grammar_score: number;
-        errors_found: string[];
-        strengths: string[];
-      }>({
-        systemPrompt,
-        userPrompt,
-        jsonSchema: {
-          type: 'object',
-          properties: {
-            grammar_score: { type: 'integer', minimum: 0, maximum: 100 },
-            errors_found: { type: 'array', items: { type: 'string' } },
-            strengths: { type: 'array', items: { type: 'string' } },
-          },
-          required: ['grammar_score', 'errors_found', 'strengths'],
-          additionalProperties: false,
-        },
-        maxTokens: 500,
-      });
-
-      AiCallLogger.response({
-        callType:     'scoreGrammar',
-        latencyMs:    0,
-        modelUsed:    res.modelUsed,
-        inputTokens:  res.inputTokens,
-        outputTokens: res.outputTokens,
-        content:      JSON.stringify(res.data, null, 2),
-      });
-
-      return res.data;
-    } catch (e) {
-      this.logger.warn(`Grammar scoring unavailable: ${(e as Error).message}`);
-      return null;
-    }
-  }
-
-  /**
    * Idle-prompt suggestion: the user has been silent in tutor mode for a
    * while; we ask the LLM for a short, conversational sentence the user can
    * read aloud (or tap to send) to keep things moving.
@@ -282,33 +217,8 @@ export class ConversationOrchestrator {
     const transcript = lines.join('\n');
     const topicLine = args.scenarioTopic ? `\nTopic: ${args.scenarioTopic}` : '';
 
-    const systemPrompt = `You are an English examiner assessing the CEFR level of a learner from a short conversation transcript.
-Given the transcript and a target CEFR level, produce a <think>...</think> block in which you reason carefully about the learner's USER turns (citing turn indices and short quotations), followed immediately by a single JSON object.
-
-JSON schema (no markdown fences, no prose outside the JSON after </think>):
-{
-  "overall_cefr_estimate": "A1|A2|B1|B2|C1|C2",
-  "scores": {
-    "fluency": <1-5>,
-    "accuracy": <1-5>,
-    "vocabulary": <1-5>,
-    "interaction": <1-5>,
-    "topic_adherence": <1-5>
-  },
-  "specific_feedback": [
-    {"turn_index": <int>, "user_text": "...", "issue": "...", "correction": "...", "severity": "minor|moderate|major"}
-  ],
-  "strengths": ["...", "..."],
-  "suggested_practice": "..."
-}
-
-Score definitions:
-- fluency: pacing, hesitation, naturalness of phrasing
-- accuracy: grammar correctness, tense, articles, agreement
-- vocabulary: range, appropriateness, collocation
-- interaction: turn-taking, follow-up questions, engagement relative to learner role
-- topic_adherence: genuine engagement with the assigned topic vs steering to easier ground (avoidance scores LOW)
-/think`;
+    // Load from DB (admin-editable); /think is always appended by buildEvaluationSystemPrompt
+    const systemPrompt = await this.prompts.buildEvaluationSystemPrompt();
 
     const userPrompt = `Target CEFR: ${cefrLabel}${topicLine}
 

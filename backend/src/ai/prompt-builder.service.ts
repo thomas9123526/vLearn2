@@ -183,20 +183,17 @@ export class PromptBuilderService {
     };
   }
 
-  async buildGrammarPrompt(
-    userMessages: string[],
-    level: number,
-  ): Promise<string> {
-    const ctx: Record<string, string> = {
-      'user.level': String(level),
-      'user.level_label': levelLabelFor(level),
-      'user.messages': userMessages
-        .map((m, i) => `${i + 1}. "${m.replace(/"/g, '\\"')}"`)
-        .join('\n'),
-    };
-    const tpl = await this.loadTemplate('grammar');
-    const base = this.render(tpl ?? DEFAULT_GRAMMAR, ctx);
-    return this.disableThinking ? `${base}\n/no_think` : base;
+  /**
+   * Loads the evaluation system prompt from DB (evaluation_system template) or
+   * falls back to the built-in default. Always appends /think so the model
+   * produces a <think>…</think> reasoning block before the JSON output.
+   * The per-call transcript and target CEFR label are injected as the user
+   * message by the orchestrator — they do not go into this system prompt.
+   */
+  async buildEvaluationSystemPrompt(): Promise<string> {
+    const tpl = await this.loadTemplate('evaluation_system');
+    const base = tpl ?? DEFAULT_EVALUATION_SYSTEM;
+    return `${base}\n/think`;
   }
 
   async buildFeedbackPrompt(summary: {
@@ -413,16 +410,34 @@ function trimDesc(s: string): string {
   return s.trim().replace(/\.\s*$/, '').trimEnd();
 }
 
-const DEFAULT_GRAMMAR = `Analyze the grammar quality of these English messages from a level {{user.level}}/6 English learner.
+const DEFAULT_EVALUATION_SYSTEM = `You are an English examiner assessing the CEFR level of a learner from a short conversation transcript.
+Given the transcript and a target CEFR level, produce a <think>...</think> block in which you reason carefully about the learner's USER turns (citing turn indices and short quotations), followed immediately by a single JSON object.
 
-Messages:
-{{user.messages}}
+JSON schema (no markdown fences, no prose outside the JSON after </think>):
+{
+  "overall_cefr_estimate": "A1|A2|B1|B2|C1|C2",
+  "scores": {
+    "fluency": <1-5>,
+    "accuracy": <1-5>,
+    "vocabulary": <1-5>,
+    "interaction": <1-5>,
+    "topic_adherence": <1-5>
+  },
+  "specific_feedback": [
+    {"turn_index": <int>, "user_text": "...", "issue": "...", "correction": "...", "severity": "minor|moderate|major"}
+  ],
+  "strengths": ["...", "..."],
+  "suggested_practice": "..."
+}
 
-Grammar score guidelines:
-- 0-30: Many basic errors (wrong tense, subject-verb, articles)
-- 31-60: Some errors, mostly understandable
-- 61-80: Few errors, good grammatical control
-- 81-100: Very few/no errors, sophisticated usage`;
+Score definitions:
+- fluency: pacing, hesitation, naturalness of phrasing
+- accuracy: grammar correctness, tense, articles, agreement
+- vocabulary: range, appropriateness, collocation
+- interaction: turn-taking, follow-up questions, engagement relative to learner role
+- topic_adherence: genuine engagement with the assigned topic vs steering to easier ground (avoidance scores LOW)
+
+Output no prose before <think>, no prose between </think> and the opening "{", and no markdown code fences.`;
 
 const DEFAULT_FEEDBACK = `Write a 2-3 sentence encouraging feedback paragraph for an English learner.
 

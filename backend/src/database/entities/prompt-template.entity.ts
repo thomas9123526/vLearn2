@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-export type PromptKind = 'tutor_system' | 'grammar' | 'feedback';
+export type PromptKind = 'tutor_system' | 'evaluation_system' | 'feedback';
 
 /**
  * Editable prompt templates used by the AI orchestration layer.
