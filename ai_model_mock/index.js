@@ -12,9 +12,10 @@
 
 require('dotenv').config();
 
-const express = require('express');
+const express  = require('express');
 const Anthropic = require('@anthropic-ai/sdk');
 const { v4: uuidv4 } = require('uuid');
+const { findPreCannedResponse } = require('./data/conversations');
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -160,6 +161,24 @@ app.post('/v1/chat/completions', async (req, res) => {
 
   console.log(`[${new Date().toISOString()}] ${isEval ? 'EVAL' : 'CHAT'} → ${model}  max_tokens=${maxTok}`);
 
+  // ── Pre-canned dataset lookup (conversation turns only) ───────────────────
+  if (!isEval) {
+    const canned = findPreCannedResponse(messages);
+    if (canned !== null) {
+      console.log(`[${new Date().toISOString()}] CHAT → dataset hit  (${canned.length} chars)`);
+      if (LOG_BODIES) {
+        console.log('\n── RESPONSE (pre-canned) ───────────────');
+        console.log(canned.slice(0, 500));
+      }
+      // Estimate tokens: ~1 token per 4 chars (rough llama.cpp parity)
+      const promptTokens     = Math.ceil(JSON.stringify(messages).length / 4);
+      const completionTokens = Math.ceil(canned.length / 4);
+      return res.json(openAiResponse(canned, promptTokens, completionTokens));
+    }
+    console.log(`[${new Date().toISOString()}] CHAT → no dataset match, falling back to Claude`);
+  }
+
+  // ── Claude API fallback ────────────────────────────────────────────────────
   const { system, messages: anthropicMessages } = isEval
     ? buildEvaluationPayload(messages, body.response_format?.json_schema?.schema)
     : buildConversationPayload(messages);
