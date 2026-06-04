@@ -129,3 +129,13 @@ gitBundle/
 flutter_app/windows/nuget/
 flutter_app/windows/nuget_feed/
 flutter_app/windows/sqlite3_src/
+
+# Playwright browser binaries — large (~683 MB), share via USB/network, not git.
+# The scripts that use them are tracked; only the binaries are excluded.
+installers/playwright-browsers/
+
+# Playwright auth state (login cookies saved by e2e tests)
+admin_panel/.playwright/
+
+# Test result artifacts
+test-results/
