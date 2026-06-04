@@ -254,7 +254,7 @@ export class AdminScenariosController {
           newValue: {
             slug: saved.slug,
             category: saved.category,
-            difficulty: saved.difficulty,
+            cefr_level: saved.cefr_level,
             status: saved.status,
           },
         },
