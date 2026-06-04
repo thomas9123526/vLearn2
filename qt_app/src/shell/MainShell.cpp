@@ -133,6 +133,42 @@ MainShell::MainShell(ApiClient* api, QWidget* parent)
     static_cast<QPushButton*>(m_navGroup->button(PageHome))->setChecked(true);
     showPage(PageHome);
     m_home->refresh();
+
+    // Apply remote tab-visibility flags (tabs.*). Default: all visible; hide
+    // only those the admin explicitly turned off via Layout flags.
+    m_api->getAppConfig([this](bool ok, const QJsonValue& d, const QString&) {
+        if (ok && d.isObject())
+            applyTabFlags(d.toObject().value("flags").toObject());
+    });
+}
+
+void MainShell::applyTabFlags(const QJsonObject& flags)
+{
+    struct Tab { int idx; const char* key; };
+    static const Tab tabs[] = {
+        {PageHome,      "tabs.home"},
+        {PageScenarios, "tabs.scenarios"},
+        {PageHistory,   "tabs.history"},
+        {PageProgress,  "tabs.progress"},
+        {PageSettings,  "tabs.settings"},
+    };
+    for (const Tab& t : tabs) {
+        const QJsonValue v = flags.value(QLatin1String(t.key));
+        const bool visible = v.isBool() ? v.toBool() : true;   // fallback: visible
+        if (auto* b = m_navGroup->button(t.idx))
+            b->setVisible(visible);
+        // If we're currently on a now-hidden tab, fall back to the first visible.
+        if (!visible && m_stack->currentIndex() == t.idx)
+            showPage(firstVisibleTab());
+    }
+}
+
+int MainShell::firstVisibleTab() const
+{
+    for (int i = PageHome; i <= PageSettings; ++i)
+        if (auto* b = m_navGroup->button(i))
+            if (b->isVisible()) return i;
+    return PageHome;
 }
 
 void MainShell::addNav(const QString& text, int pageIndex)

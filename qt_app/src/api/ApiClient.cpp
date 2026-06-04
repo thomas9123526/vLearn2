@@ -92,6 +92,11 @@ void ApiClient::signIn(const QString& cidUsername,
             /*auth=*/false);
 }
 
+void ApiClient::getAppConfig(Callback cb)
+{
+    request("GET", "/app-config", nullptr, std::move(cb), /*auth=*/true);
+}
+
 void ApiClient::getProfile(Callback cb)
 {
     request("GET", "/users/profile", nullptr, std::move(cb), /*auth=*/true);

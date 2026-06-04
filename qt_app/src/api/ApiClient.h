@@ -29,6 +29,9 @@ public:
     // Auth
     void signIn(const QString& cidUsername, const QString& password, Callback cb);
 
+    // Layout flags (tab visibility etc.)
+    void getAppConfig(Callback cb);   // GET /app-config -> { flags: {...} }
+
     // Profile / dashboard data
     void getProfile(Callback cb);     // GET /users/profile
     void getProgress(Callback cb);    // GET /progress

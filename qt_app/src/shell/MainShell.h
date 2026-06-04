@@ -15,6 +15,7 @@ class QPushButton;
 class QButtonGroup;
 class QLabel;
 class QWidget;
+class QJsonObject;
 
 // Desktop shell matching the running VFLS app: a 220px sidebar (FreeTalk logo,
 // Home / Scenarios / Conversation history / Progress / Settings, profile footer)
@@ -28,6 +29,9 @@ private:
     void addNav(const QString& text, int pageIndex);
     void showPage(int index);
     void updateProfile(const UserProfile& p);
+    void applyTabFlags(const QJsonObject& flags);   // hide nav items per tabs.* flags
+
+    int firstVisibleTab() const;
 
     ApiClient*      m_api;
     QStackedWidget* m_stack;
