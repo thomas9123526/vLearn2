@@ -70,8 +70,35 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   /// (set at start time) but the user can flip it via the AppBar toggle.
   String? _viewMode;
 
+  // ── Time constraint countdown ──────────────────────────────────────────
+  Timer? _countdownTimer;
+  int _secondsLeft = 0;
+  bool _timerStarted = false;
+
+  void _startCountdown(int minutes) {
+    if (_timerStarted) return;
+    _timerStarted = true;
+    _secondsLeft = minutes * 60;
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _secondsLeft--);
+      if (_secondsLeft <= 0) {
+        _countdownTimer?.cancel();
+        _end();
+      }
+    });
+  }
+
+  String get _countdownLabel {
+    final m = _secondsLeft ~/ 60;
+    final s = _secondsLeft % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+  // ── End time constraint ────────────────────────────────────────────────
+
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -177,6 +204,12 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         );
       }
       _lastMessageCount = count;
+
+      // Start the countdown once when session first loads and time_constrained is on.
+      final session = next.valueOrNull?.session;
+      if (session != null && session.timeConstrained && session.status == 'active') {
+        _startCountdown(session.estimatedMinutes);
+      }
     });
 
     final scheme = Theme.of(context).colorScheme;
@@ -221,6 +254,29 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 orElse: () => const Text('Conversation'),
               ),
               actions: [
+                if (_timerStarted)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Chip(
+                      avatar: Icon(
+                        Icons.timer_outlined,
+                        size: 16,
+                        color: _secondsLeft <= 60
+                            ? Theme.of(context).colorScheme.error
+                            : null,
+                      ),
+                      label: Text(
+                        _countdownLabel,
+                        style: TextStyle(
+                          fontFamily: 'EditorialMono',
+                          fontSize: 13,
+                          color: _secondsLeft <= 60
+                              ? Theme.of(context).colorScheme.error
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ),
                 // Toggle to tutor mode — only shown when both modes are enabled.
                 if (!isReadOnly && conversationMode == 'both')
                   data.maybeWhen(

@@ -90,6 +90,10 @@ export class ScenarioEntity {
   @Column({ type: 'smallint', default: 5 })
   estimated_minutes!: number;
 
+  /** When true, the session timer counts down from estimated_minutes and auto-ends on expiry. */
+  @Column({ type: 'boolean', default: false })
+  time_constrained!: boolean;
+
   @Column({ type: 'smallint', default: 50 })
   xp_reward!: number;
 

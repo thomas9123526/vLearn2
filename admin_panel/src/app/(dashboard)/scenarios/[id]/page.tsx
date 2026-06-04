@@ -29,6 +29,7 @@ const schema = z.object({
   user_role: i18nText,
   tutor_role: i18nText,
   estimated_minutes: z.coerce.number().int().min(1).max(60).default(5),
+  time_constrained: z.boolean().default(false),
   xp_reward: z.coerce.number().int().min(0).max(1000).default(50),
   custom_prompt: z.string().optional().nullable(),
 });
@@ -126,6 +127,7 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
       user_role: scenario.user_role,
       tutor_role: scenario.tutor_role,
       estimated_minutes: scenario.estimated_minutes,
+      time_constrained: scenario.time_constrained ?? false,
       xp_reward: scenario.xp_reward,
       custom_prompt: scenario.custom_prompt ?? '',
     });
@@ -210,6 +212,10 @@ export default function EditScenarioPage({ params }: { params: { id: string } })
                 </select>
               </div>
               <Field id="estimated_minutes" label="Estimated minutes" type="number" {...register('estimated_minutes')} />
+              <div className="flex items-center gap-2 pt-5">
+                <input type="checkbox" id="time_constrained" className="h-4 w-4" {...register('time_constrained')} />
+                <label htmlFor="time_constrained" className="text-sm font-medium">Time constraint</label>
+              </div>
             </div>
             <Field id="xp_reward" label="XP reward" type="number" {...register('xp_reward')} />
 

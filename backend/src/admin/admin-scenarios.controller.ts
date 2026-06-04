@@ -19,6 +19,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ApiBearerAuth, ApiProperty, ApiTags } from '@nestjs/swagger';
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -85,6 +86,10 @@ class CreateScenarioDto {
   estimated_minutes?: number;
   @ApiProperty({ required: false })
   @IsOptional()
+  @IsBoolean()
+  time_constrained?: boolean;
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsInt()
   @Min(0)
   xp_reward?: number;
@@ -144,6 +149,10 @@ class UpdateScenarioDto {
   @IsInt()
   @Min(1)
   estimated_minutes?: number;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  time_constrained?: boolean;
   @ApiProperty({ required: false })
   @IsOptional()
   @IsInt()
@@ -236,6 +245,7 @@ export class AdminScenariosController {
         objectives: dto.objectives,
         key_phrases: dto.key_phrases,
         estimated_minutes: dto.estimated_minutes ?? 5,
+        time_constrained: dto.time_constrained ?? false,
         xp_reward: dto.xp_reward ?? 50,
         cefr_level: dto.cefr_level ?? null,
         author_id: user.sub,

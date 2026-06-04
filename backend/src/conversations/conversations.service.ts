@@ -121,18 +121,22 @@ export class ConversationsService {
   async getSession(
     userId: string,
     id: string,
-  ): Promise<SessionDto & { messages: MessageDto[] }> {
+  ): Promise<SessionDto & { messages: MessageDto[]; timeConstrained: boolean; estimatedMinutes: number }> {
     const session = await this.sessions.findOne({ where: { id } });
     if (!session) throw new NotFoundException({ i18nKey: 'session.not_found' });
     if (session.user_id !== userId) throw new ForbiddenException();
 
-    const msgs = await this.messages.find({
-      where: { session_id: id },
-      order: { sequence: 'ASC' },
-    });
+    const [msgs, scenario] = await Promise.all([
+      this.messages.find({ where: { session_id: id }, order: { sequence: 'ASC' } }),
+      session.scenario_id
+        ? this.scenarios.findOne({ where: { id: session.scenario_id } })
+        : Promise.resolve(null),
+    ]);
     return {
       ...this.toSessionDto(session),
       messages: msgs.map((m) => this.toMessageDto(m)),
+      timeConstrained: scenario?.time_constrained ?? false,
+      estimatedMinutes: scenario?.estimated_minutes ?? 5,
     };
   }
 

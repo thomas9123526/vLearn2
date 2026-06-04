@@ -255,6 +255,8 @@ class ConversationSession {
     required this.xpEarned,
     this.scenarioId,
     this.endedAt,
+    this.timeConstrained = false,
+    this.estimatedMinutes = 5,
   });
 
   factory ConversationSession.fromJson(Map<String, dynamic> j) =>
@@ -270,6 +272,8 @@ class ConversationSession {
         endedAt: j['endedAt'] == null
             ? null
             : DateTime.parse(j['endedAt'] as String),
+        timeConstrained: j['timeConstrained'] as bool? ?? false,
+        estimatedMinutes: (j['estimatedMinutes'] as num? ?? 5).toInt(),
       );
 
   final String id;
@@ -281,6 +285,8 @@ class ConversationSession {
   final DateTime? endedAt;
   final int turnCount;
   final int xpEarned;
+  final bool timeConstrained;
+  final int estimatedMinutes;
 }
 
 class ConversationMessage {

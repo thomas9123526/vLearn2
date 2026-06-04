@@ -26,6 +26,7 @@ const schema = z.object({
   user_role: i18nText,
   tutor_role: i18nText,
   estimated_minutes: z.coerce.number().int().min(1).max(60).default(5),
+  time_constrained: z.boolean().default(false),
   xp_reward: z.coerce.number().int().min(0).max(1000).default(50),
 });
 
@@ -42,7 +43,7 @@ export default function NewScenarioPage() {
     formState: { isSubmitting, errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { category: 'daily', estimated_minutes: 5, xp_reward: 50 },
+    defaultValues: { category: 'daily', estimated_minutes: 5, time_constrained: false, xp_reward: 50 },
   });
 
   async function onSubmit(values: FormValues) {
@@ -103,6 +104,10 @@ export default function NewScenarioPage() {
               </select>
             </div>
             <Field id="estimated_minutes" label="Estimated minutes" type="number" {...register('estimated_minutes')} />
+            <div className="flex items-center gap-2 pt-5">
+              <input type="checkbox" id="time_constrained" className="h-4 w-4" {...register('time_constrained')} />
+              <label htmlFor="time_constrained" className="text-sm font-medium">Time constraint</label>
+            </div>
           </div>
           <Field id="xp_reward" label="XP reward" type="number" {...register('xp_reward')} />
 
