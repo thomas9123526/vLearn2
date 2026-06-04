@@ -8,3 +8,6 @@ Makefile
 .qmake.stash
 vlearn_chat
 *.pro.user
+build-deb/
+pkgroot/
+dist/

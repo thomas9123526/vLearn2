@@ -3,6 +3,8 @@
 #include <QApplication>
 #include <QFontDatabase>
 #include <QLabel>
+#include <QPalette>
+#include <QStyleFactory>
 
 namespace Theme {
 
@@ -71,6 +73,30 @@ void install(QApplication& app)
 
     const Palette& p = palette();
 
+    // Fusion + a dark palette so that EVERY widget (including unstyled scroll
+    // viewports, popups, combo dropdowns, message boxes) renders dark — the
+    // stylesheet alone left some surfaces on the light default palette.
+    app.setStyle(QStyleFactory::create("Fusion"));
+    QPalette pal;
+    pal.setColor(QPalette::Window,          p.bg);
+    pal.setColor(QPalette::WindowText,      p.ink);
+    pal.setColor(QPalette::Base,            p.surface);
+    pal.setColor(QPalette::AlternateBase,   p.surfaceAlt);
+    pal.setColor(QPalette::Text,            p.ink);
+    pal.setColor(QPalette::PlaceholderText, p.inkSoft);
+    pal.setColor(QPalette::Button,          p.surface);
+    pal.setColor(QPalette::ButtonText,      p.ink);
+    pal.setColor(QPalette::BrightText,      Qt::white);
+    pal.setColor(QPalette::Highlight,       p.accent);
+    pal.setColor(QPalette::HighlightedText, Qt::white);
+    pal.setColor(QPalette::ToolTipBase,     p.surface);
+    pal.setColor(QPalette::ToolTipText,     p.ink);
+    pal.setColor(QPalette::Link,            p.accent2);
+    pal.setColor(QPalette::Disabled, QPalette::Text,       p.inkFaint);
+    pal.setColor(QPalette::Disabled, QPalette::WindowText, p.inkFaint);
+    pal.setColor(QPalette::Disabled, QPalette::ButtonText, p.inkFaint);
+    app.setPalette(pal);
+
     // Global stylesheet built from the Apricot tokens. Widgets opt into
     // specific looks via objectName (#Name) or dynamic property [variant="x"].
     const QString qss = QStringLiteral(R"(
@@ -133,10 +159,11 @@ void install(QApplication& app)
             padding: 4px 12px; font-family: '%mono%'; font-size: 11px;
         }
         QPushButton[variant="chip"] {
-            background: %surface%; color: %inkSoft%; border: 1px solid %border%;
-            border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600;
+            background: %surfaceAlt%; color: %ink%; border: none;
+            border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 600;
         }
-        QPushButton[variant="chip"]:hover { background: %accentSoft%; color: %accentInk%; }
+        QPushButton[variant="chip"]:hover   { background: %surfaceDeep%; }
+        QPushButton[variant="chip"]:checked { background: %accent%; color: white; }
         QPushButton#SendBtn {
             background: %accent%; color: white; border: none; border-radius: 22px;
             min-width: 44px; min-height: 44px; font-size: 18px; font-weight: 700;

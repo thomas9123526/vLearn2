@@ -15,6 +15,10 @@ QStringList AppConfig::searchPaths(const QString& explicitPath)
         paths << explicitPath;
     paths << QDir(QCoreApplication::applicationDirPath()).filePath("app_config.json");
     paths << QDir::current().filePath("app_config.json");
+    // Installed locations (used by the .deb): per-user override first, then
+    // the system-wide config shipped under /etc.
+    paths << QDir::home().filePath(".config/vlearn/app_config.json");
+    paths << QStringLiteral("/etc/vlearn/app_config.json");
     paths.removeDuplicates();
     return paths;
 }
