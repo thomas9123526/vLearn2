@@ -16,10 +16,14 @@
       Share it via USB drive, network share, or internal file server.
     - If you have internet access, you can skip this and run:
         cd admin_panel && npx playwright install chromium
+    - Saved as ASCII-only (UTF-8 subset). Safe on Windows 10 PowerShell 5.1 and later.
 #>
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Force UTF-8 console output so paths with non-ASCII characters display correctly.
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $ScriptDir   = $PSScriptRoot
 $SourceDir   = Join-Path $ScriptDir 'playwright-browsers'
@@ -27,7 +31,7 @@ $TargetDir   = "$env:LOCALAPPDATA\ms-playwright"
 $ProjectRoot = Split-Path $ScriptDir -Parent
 $AdminPanel  = Join-Path $ProjectRoot 'admin_panel'
 
-# ── Validation ─────────────────────────────────────────────────────────────
+# -- Validation ---------------------------------------------------------------
 
 if (-not (Test-Path $SourceDir)) {
     Write-Host ""
@@ -43,7 +47,7 @@ if ($browsers.Count -eq 0) {
     exit 1
 }
 
-# ── Install ─────────────────────────────────────────────────────────────────
+# -- Install ------------------------------------------------------------------
 
 Write-Host ""
 Write-Host "  Installing Playwright browsers" -ForegroundColor Cyan
@@ -67,7 +71,7 @@ Get-ChildItem $TargetDir -Directory | Where-Object { $_.Name -notlike '.*' } | F
     Write-Host "    $($_.Name)  (${sizeMB} MB)" -ForegroundColor Gray
 }
 
-# ── Set environment variable ─────────────────────────────────────────────────
+# -- Set environment variable -------------------------------------------------
 
 # Playwright automatically looks in %LOCALAPPDATA%\ms-playwright, but setting
 # this env var makes it explicit and supports custom locations.
@@ -81,7 +85,7 @@ $env:PLAYWRIGHT_BROWSERS_PATH = $TargetDir
 Write-Host ""
 Write-Host "  PLAYWRIGHT_BROWSERS_PATH set to: $TargetDir" -ForegroundColor Green
 
-# ── Verify Playwright can see the browsers ───────────────────────────────────
+# -- Verify Playwright can see the browsers -----------------------------------
 
 Write-Host ""
 Write-Host "  Verifying Playwright can find the browsers..." -ForegroundColor Cyan
@@ -97,7 +101,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host $verifyOutput -ForegroundColor Gray
 }
 
-# ── Done ─────────────────────────────────────────────────────────────────────
+# -- Done ---------------------------------------------------------------------
 
 Write-Host ""
 Write-Host "  Done. You can now run:" -ForegroundColor White
