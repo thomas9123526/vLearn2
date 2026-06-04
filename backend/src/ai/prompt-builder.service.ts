@@ -92,7 +92,8 @@ const DEPLOYMENT_GUIDELINES = `- Sound like a real person, not a textbook. Stay 
 - Subtopics above are starting points, not a checklist. Cover them as they come up naturally; feel free to extend organically into adjacent practical content within the topic.
 - Brief daily-life small talk is welcome -- a passing comment about the weather, a one-line exchange about how the day is going, a quick in-character personal answer. Accept warmly with one short sentence and let the conversation breathe. Do NOT redirect for these.
 - Redirect only on HARD drift: the learner abandons the topic for a different setting, an explicit topic swap, sustained personal inquiry beyond one line, or a tangent into an unrelated domain. In those cases briefly acknowledge what they said and guide the dialogue back to the topic. One or two sentences is enough; do not lecture about staying on topic.
-- If the learner brings up an avoided topic, briefly acknowledge what they said and pivot to a safe adjacent topic without lecturing or breaking the conversational frame.{localeGrounding}
+- If the learner brings up an avoided topic, briefly acknowledge what they said and pivot to a safe adjacent topic without lecturing or breaking the conversational frame.
+- Ground cultural items in {country}. Do not default to {avoidCultures} names, places, foods, or brands.
 - When the learner makes a small mistake: at A1-A2 gently recast the correct form inside your reply; at B1 and above you may briefly explain or ask a clarifying question if it would help.
 - Ask follow-up questions, share small reactions.
 - Do not use bullet lists, headings, or numbered steps in your replies.`;
@@ -270,17 +271,11 @@ export class PromptBuilderService {
     // [cefr_level]
     const cefrLevel = ctx['user.level_label'];
 
-    // [guidelines] — locale grounding bullet is only included when we have a country
-    const localeGrounding = country
-      ? `\n- Ground cultural items in ${country}. Do not default to ${avoidCultures} names, places, foods, or brands.`
-      : '';
-
     const guidelines = DEPLOYMENT_GUIDELINES
       .replace(/{modelRoleName}/g, modelRoleName)
       .replace(/{cefrLevel}/g, cefrLevel)
       .replace(/{country}/g, country)
-      .replace(/{avoidCultures}/g, avoidCultures)
-      .replace(/{localeGrounding}/g, localeGrounding);
+      .replace(/{avoidCultures}/g, avoidCultures);
 
     const sections = [
       `[role]\nYou are ${modelRoleName}: ${modelRoleDesc}.`,
@@ -294,17 +289,13 @@ export class PromptBuilderService {
         subtopicsBlock,
       ].join('\n'),
       `[cefr_level]\n${cefrLevel}`,
-      ...(country
-        ? [
-            [
-              '[locale]',
-              `country: ${country}`,
-              `country_adjective: ${countryAdj}`,
-              `learner_audience: ${audience}`,
-              `avoid_default_cultures: ${avoidCultures}`,
-            ].join('\n'),
-          ]
-        : []),
+      [
+        '[locale]',
+        `country: ${country}`,
+        `country_adjective: ${countryAdj}`,
+        `learner_audience: ${audience}`,
+        `avoid_default_cultures: ${avoidCultures}`,
+      ].join('\n'),
       `[avoided_topics]\n${avoidedTopics}`,
       `[guidelines]\n${guidelines}`,
     ].join('\n\n');
