@@ -120,15 +120,21 @@ export class PromptBuilderService {
 
   /**
    * Loads the evaluation system prompt from DB (evaluation_system template) or
-   * falls back to the built-in default. Always appends /think so the model
-   * produces a <think>…</think> reasoning block before the JSON output.
-   * The per-call transcript and target CEFR label are injected as the user
-   * message by the orchestrator — they do not go into this system prompt.
+   * falls back to the built-in default. Resolves {key} prompt-var placeholders
+   * (country_adjective, learner_description, avoid_cultures_phrase) using the
+   * scenario's var_overrides → global defaults. Always appends /think.
    */
-  async buildEvaluationSystemPrompt(): Promise<string> {
+  async buildEvaluationSystemPrompt(
+    scenario: ScenarioEntity | null = null,
+  ): Promise<string> {
     const tpl = await this.loadTemplate('evaluation_system');
     const base = tpl ?? DEFAULT_EVALUATION_SYSTEM;
-    return `${base}\n/think`;
+    const vars = await this.resolvePromptVars(scenario);
+    const rendered = base.replace(
+      /\{(\w+)\}/g,
+      (_m, key: string) => vars[key] ?? '',
+    );
+    return `${rendered}\n/think`;
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
@@ -168,7 +174,7 @@ export class PromptBuilderService {
     const vars = await this.resolvePromptVars(scenario);
     const country       = vars['country'] ?? '';
     const countryAdj    = vars['country_adjective'] ?? '';
-    const audience      = vars['learner_audience'] ?? '';
+    const audience      = vars['learner_description'] ?? '';
     const avoidCultures = vars['avoid_cultures_phrase'] ?? '';
     const avoidedTopics = vars['avoided_topics_sentence'] ?? '';
 
@@ -309,34 +315,21 @@ function trimDesc(s: string): string {
   return s.trim().replace(/\.\s*$/, '').trimEnd();
 }
 
-const DEFAULT_EVALUATION_SYSTEM = `You are an English examiner assessing the CEFR level of a learner from a short conversation transcript.
-Given the transcript and a target CEFR level, produce a <think>...</think> block in which you reason carefully about the learner's USER turns (citing turn indices and short quotations), followed immediately by a single JSON object.
+// Matches ConversationModel _EVALUATION_SYSTEM_PROMPT exactly.
+// {country_adjective}, {learner_description}, {avoid_cultures_phrase} are resolved
+// from vl_prompt_vars at call time by buildEvaluationSystemPrompt().
+const DEFAULT_EVALUATION_SYSTEM =
+`You are an English examiner assessing the CEFR level of {country_adjective} \
+{learner_description} from a short conversation transcript.
+Given the transcript and a target CEFR level, produce a <think>...</think> \
+block in which you reason carefully about the learner's USER turns \
+(citing turn indices and short quotations), followed immediately by a \
+single JSON object conforming to the EvaluationOutput schema \
+(overall_cefr_estimate, scores {fluency, accuracy, vocabulary, \
+interaction, topic_adherence} in [1,5], specific_feedback, strengths, \
+suggested_practice).
 
-JSON schema (no markdown fences, no prose outside the JSON after </think>):
-{
-  "overall_cefr_estimate": "A1|A2|B1|B2|C1|C2",
-  "scores": {
-    "fluency": <1-5>,
-    "accuracy": <1-5>,
-    "vocabulary": <1-5>,
-    "interaction": <1-5>,
-    "topic_adherence": <1-5>
-  },
-  "specific_feedback": [
-    {"turn_index": <int>, "user_text": "...", "issue": "...", "correction": "...", "severity": "minor|moderate|major"}
-  ],
-  "strengths": ["...", "..."],
-  "suggested_practice": "...",
-  "session_feedback": "..."
-}
-
-Score definitions:
-- fluency: pacing, hesitation, naturalness of phrasing
-- accuracy: grammar correctness, tense, articles, agreement
-- vocabulary: range, appropriateness, collocation
-- interaction: turn-taking, follow-up questions, engagement relative to learner role
-- topic_adherence: genuine engagement with the assigned topic vs steering to easier ground (avoidance scores LOW)
-
-session_feedback: A warm, encouraging paragraph (2-3 sentences, max 60 words) addressed directly to the learner in second person ("You showed…", "Try to…"). Mention one specific strength from the session, acknowledge one area to improve, and close with a motivating note.
-
-Output no prose before <think>, no prose between </think> and the opening "{", and no markdown code fences.`;
+When you suggest practice activities, anchor them in {country_adjective} \
+contexts the learner will recognize. Do not recommend \
+{avoid_cultures_phrase}-context exercises. Output no prose before <think>, \
+no prose between </think> and the opening "{", and no markdown code fences.`;

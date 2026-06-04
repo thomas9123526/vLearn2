@@ -17,7 +17,7 @@ export class PromptVars1782700000000 implements MigrationInterface {
       INSERT INTO vl_prompt_vars (key, label, description, global_value, scenario_overridable, sort_order) VALUES
         ('country',               'Country',             'Country name for cultural grounding (e.g. China)',                                      'China',              true, 10),
         ('country_adjective',     'Country adjective',   'Adjective form of the country (e.g. Chinese)',                                          'Chinese',            true, 20),
-        ('learner_audience',      'Learner audience',    'Description of the learner audience',                                                   'adult learners of English', true, 30),
+        ('learner_description',   'Learner description', 'Description of the learner audience used in the evaluation prompt (e.g. adult learners of English)', 'adult learners of English', true, 30),
         ('avoid_cultures_phrase', 'Avoid cultures',      'Cultures to avoid defaulting to in names, places, foods or brands (e.g. American and European)', 'American and European', true, 40),
         ('avoided_topics_sentence','Avoided topics',     'Full sentence describing topics the tutor should steer clear of',                       'Stay clear of politics, religion, alcohol dating, partisan history, violence harm, distress self harm, yankee culture, western culture, and law and national economy.', true, 50)
       ON CONFLICT (key) DO NOTHING;

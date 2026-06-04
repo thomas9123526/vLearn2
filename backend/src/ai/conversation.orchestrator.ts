@@ -8,7 +8,7 @@ import {
 import { PromptBuilderService } from './prompt-builder.service';
 import { AiCallLogger } from './ai-call-logger';
 import type { PersonaEntity } from '../database/entities/persona.entity';
-import type { ScenarioEntity } from '../database/entities/scenario.entity';
+import type { ScenarioEntity, I18nText } from '../database/entities/scenario.entity';
 
 const CEFR_LABELS = ['', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 
@@ -34,7 +34,6 @@ export interface EvaluationResult {
   specific_feedback: SpecificFeedbackItem[];
   strengths: string[];
   suggested_practice: string;
-  session_feedback: string;
 }
 
 /**
@@ -198,9 +197,12 @@ export class ConversationOrchestrator {
   async evaluateSession(args: {
     messages: Array<{ role: string; content: string }>;
     cefrLevel: number;
-    scenarioTopic: string | null;
+    scenario: ScenarioEntity | null;
+    persona: PersonaEntity;
   }): Promise<EvaluationResult | null> {
     const cefrLabel = CEFR_LABELS[args.cefrLevel] ?? 'B1';
+    const sc = args.scenario;
+    const en = (v: unknown) => (v as I18nText | undefined)?.en ?? '';
 
     // Build transcript in [USER turn N] / [TUTOR] format
     let userTurnIdx = 0;
@@ -216,27 +218,40 @@ export class ConversationOrchestrator {
     if (userTurnIdx < 2) return null; // too short to evaluate meaningfully
 
     const transcript = lines.join('\n');
-    const topicLine = args.scenarioTopic ? `\nTopic: ${args.scenarioTopic}` : '';
 
-    // Load from DB (admin-editable); /think is always appended by buildEvaluationSystemPrompt
-    const systemPrompt = await this.prompts.buildEvaluationSystemPrompt();
+    // Build user message in ConversationModel eval format
+    const tutorRoleDesc = sc ? en(sc.tutor_role) : args.persona.style;
+    const userRoleDesc  = sc ? en(sc.user_role)  : 'an adult English learner';
+    const topic         = sc ? en(sc.title)       : 'open-ended conversation';
+    const subtopicsBlock = sc?.objectives?.length
+      ? sc.objectives.map((o) => `- ${en(o)}`).join('\n')
+      : '- (open-ended conversation)';
 
-    const userPrompt = `Target CEFR: ${cefrLabel}${topicLine}
+    const userPrompt =
+`Target CEFR level: ${cefrLabel}
+Tutor role: ${args.persona.name} -- ${tutorRoleDesc}
+Learner role: ${userRoleDesc}
+
+Assigned topic: ${topic}
+
+Assigned subtopics:
+${subtopicsBlock}
 
 Transcript:
-${transcript}
+${transcript}`;
 
-Score the LEARNER's USER turns.`;
+    // Load from DB (admin-editable); prompt vars resolved; /think always appended
+    const systemPrompt = await this.prompts.buildEvaluationSystemPrompt(sc);
 
     AiCallLogger.request({
       callType:     'evaluateSession',
       timestamp:    new Date().toISOString(),
-      promptSource: 'inline (built-in CEFR evaluator)',
+      promptSource: 'evaluation_system template (vl_prompt_templates)',
       variables: {
-        'session.cefrLevel':    { value: cefrLabel,                             from: 'session.cefr_level' },
-        'session.topic':        { value: args.scenarioTopic ?? '(none)',        from: 'scenario.title' },
-        'session.userTurns':    { value: String(userTurnIdx),                   from: 'session messages' },
-        'session.totalMessages':{ value: String(args.messages.length),          from: 'session messages' },
+        'session.cefrLevel':    { value: cefrLabel,                   from: 'session.cefr_level' },
+        'session.topic':        { value: topic,                       from: 'scenario.title' },
+        'session.userTurns':    { value: String(userTurnIdx),         from: 'session messages' },
+        'session.totalMessages':{ value: String(args.messages.length), from: 'session messages' },
       },
       systemPrompt,
       history: [{ role: 'user', content: userPrompt }],

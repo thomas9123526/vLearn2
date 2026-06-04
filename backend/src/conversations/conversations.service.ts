@@ -399,21 +399,18 @@ export class ConversationsService {
       order: { sequence: 'ASC' },
     });
 
-    let scenarioTopic: string | null = null;
-    if (session.scenario_id) {
-      const scenario = await this.scenarios.findOne({
-        where: { id: session.scenario_id },
-        select: ['title'],
-      });
-      if (scenario?.title) {
-        scenarioTopic = scenario.title.en ?? Object.values(scenario.title)[0] ?? null;
-      }
-    }
+    const persona = await this.personas.findOne({ where: { id: session.persona_id } });
+    if (!persona) return;
+
+    const scenario = session.scenario_id
+      ? await this.scenarios.findOne({ where: { id: session.scenario_id } })
+      : null;
 
     const result: EvaluationResult | null = await this.orchestrator.evaluateSession({
       messages: msgs.map((m) => ({ role: m.role, content: m.content })),
       cefrLevel: session.cefr_level ?? 3,
-      scenarioTopic,
+      scenario,
+      persona,
     });
     if (!result) return;
 
@@ -434,7 +431,7 @@ export class ConversationsService {
       cefr_estimate:         result.overall_cefr_estimate,
       strengths:             result.strengths,
       improvements:          result.specific_feedback.map((f) => f.issue).slice(0, 5),
-      ai_feedback:           result.session_feedback || result.suggested_practice,
+      ai_feedback:           result.suggested_practice,
       fluency_metrics:       { specific_feedback: result.specific_feedback } as Record<string, unknown>,
       evaluator_versions:    { provider: 'ai' } as Record<string, string>,
     };
