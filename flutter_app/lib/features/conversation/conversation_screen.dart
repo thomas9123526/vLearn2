@@ -343,6 +343,11 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
     _ttsSub = tts.isSpeakingStream.listen((speaking) {
       if (mounted) setState(() => _ttsSpeaking = speaking);
     });
+    // The opening assistant message arrives with the initial getSession
+    // response, so didUpdateWidget never fires for it. Trigger TTS here.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeSpeakLatestAssistantReply();
+    });
   }
 
   @override
@@ -489,6 +494,12 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
 
   @override
   Widget build(BuildContext context) {
+    // If speech models finish loading after the screen appears, retry speaking
+    // the opening message that was skipped because models weren't ready yet.
+    ref.listen<bool>(speechReadyProvider, (prev, next) {
+      if (next && prev != true) _maybeSpeakLatestAssistantReply();
+    });
+
     final scheme = widget.scheme;
     final busy = widget.sending || _transcribing || _ttsSpeaking;
     return Column(

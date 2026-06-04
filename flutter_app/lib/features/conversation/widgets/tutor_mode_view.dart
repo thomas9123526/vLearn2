@@ -71,6 +71,12 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
       setState(() => _amplitude = amp);
     });
     _resetIdleTimer();
+    // Speak the tutor's opening greeting on first load. The message is
+    // already in widget.messages when the screen is first built (it comes
+    // from the getSession response), so didUpdateWidget never fires for it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeSpeakLatestAssistantReply();
+    });
   }
 
   @override
@@ -260,6 +266,12 @@ class _TutorModeViewState extends ConsumerState<TutorModeView> {
 
   @override
   Widget build(BuildContext context) {
+    // If speech models finish loading after the screen first appears, retry
+    // speaking the opening message that was skipped due to models not ready.
+    ref.listen<bool>(speechReadyProvider, (prev, next) {
+      if (next && prev != true) _maybeSpeakLatestAssistantReply();
+    });
+
     final scheme = Theme.of(context).colorScheme;
     final latestTutor = _latestForRole('assistant');
     final latestUser = _latestForRole('user');
