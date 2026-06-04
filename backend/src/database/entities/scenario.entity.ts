@@ -36,7 +36,6 @@ export interface KeyPhrase {
 @Entity({ name: 'vl_scenarios' })
 @Index(['status'])
 @Index(['category'])
-@Index(['difficulty'])
 @Index(['category_id'])
 export class ScenarioEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -56,9 +55,6 @@ export class ScenarioEntity {
 
   @Column({ type: 'uuid' })
   category_id!: string;
-
-  @Column({ type: 'smallint' })
-  difficulty!: number;
 
   /** Target CEFR level for this scenario (1=A1 … 6=C2). When set, the prompt
    *  builder uses this as the [cefr_level] target instead of the learner's

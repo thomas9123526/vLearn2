@@ -384,8 +384,9 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final levelLabels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-    final levelLabel = scenario.difficulty >= 1 && scenario.difficulty <= 6
-        ? levelLabels[scenario.difficulty - 1]
+    final lvl = scenario.cefrLevel;
+    final levelLabel = (lvl != null && lvl >= 1 && lvl <= 6)
+        ? levelLabels[lvl - 1]
         : '—';
     // When the admin uploaded a scenario image, drop it in above the
     // gradient hero. /uploads/... URLs are absolute against the API

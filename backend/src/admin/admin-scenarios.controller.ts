@@ -56,7 +56,6 @@ class CreateScenarioDto {
   @ApiProperty() @IsString() slug!: string;
   /** Category slug — resolved server-side to category_id. Must reference an active row in vl_categories. */
   @ApiProperty() @IsString() category!: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(1) @Max(5) difficulty?: number;
   @ApiProperty({ type: I18nTextDto })
   @ValidateNested()
   @Type(() => I18nTextDto)
@@ -106,11 +105,6 @@ class UpdateScenarioDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() slug?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() category?: string;
   @ApiProperty({ required: false })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(5)
-  difficulty?: number;
   @ApiProperty({ type: I18nTextDto, required: false })
   @ValidateNested()
   @Type(() => I18nTextDto)
@@ -236,7 +230,6 @@ export class AdminScenariosController {
         slug: dto.slug,
         category: cat.slug,
         category_id: cat.id,
-        difficulty: dto.difficulty ?? 5,
         title: dto.title,
         description: dto.description,
         scene_description: dto.scene_description,

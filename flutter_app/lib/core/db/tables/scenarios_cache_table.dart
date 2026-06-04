@@ -6,7 +6,7 @@ class ScenariosCache extends Table {
   TextColumn get id => text()();
   TextColumn get slug => text()();
   TextColumn get category => text()();
-  IntColumn get difficulty => integer()();
+  IntColumn get cefrLevel => integer().nullable()();
   TextColumn get titleJson => text()();          // JSON-encoded I18nText
   TextColumn get descriptionJson => text()();
   TextColumn get sceneDescriptionJson => text()();

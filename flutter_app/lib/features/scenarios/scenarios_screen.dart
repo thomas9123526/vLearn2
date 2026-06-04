@@ -53,8 +53,7 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
     final filtered = all.where((s) {
       if (_category != null && s.category != _category) return false;
       if (_cefrLevel != null) {
-        final level = s.cefrLevel ?? s.difficulty;
-        if (level != _cefrLevel) return false;
+        if (s.cefrLevel != _cefrLevel) return false;
       }
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
@@ -279,10 +278,10 @@ class _ScenarioTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final lvl = scenario.cefrLevel ?? scenario.difficulty;
-    final levelLabel = (lvl >= 1 && lvl <= 6)
+    final lvl = scenario.cefrLevel;
+    final levelLabel = (lvl != null && lvl >= 1 && lvl <= 6)
         ? ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'][lvl - 1]
-        : 'Lv $lvl';
+        : '—';
     final heroUrl = scenario.imageUrl;
     final hasHero = heroUrl != null && heroUrl.isNotEmpty;
     return InkWell(

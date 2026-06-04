@@ -76,14 +76,14 @@ class ScenariosApi {
 
   Future<List<Map<String, dynamic>>> list({
     String? category,
-    int? difficulty,
+    int? cefrLevel,
     String? q,
   }) async {
     final res = await _dio.get<List<dynamic>>(
       '/scenarios',
       queryParameters: <String, Object?>{
         'category': category,
-        'difficulty': difficulty,
+        'cefr_level': cefrLevel,
         'q': q,
       }..removeWhere((_, v) => v == null),
     );

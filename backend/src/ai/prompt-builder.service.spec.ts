@@ -46,7 +46,7 @@ describe('PromptBuilderService', () => {
   it('uses DB template when one is active', async () => {
     mockTemplateRepo.findOne.mockResolvedValueOnce({
       kind: 'tutor_system',
-      template: 'Hello {{persona.name}} at {{user.level_label}}',
+      template: 'Hello {{persona.name}} at {{cefr_level}}',
       is_active: true,
     });
 

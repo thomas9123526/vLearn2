@@ -77,8 +77,7 @@ export class PromptBuilderService {
       let from: string;
       if (k.startsWith('persona.'))          from = 'persona DB row (vl_personas)';
       else if (k.startsWith('scenario.'))    from = scenario ? 'scenario DB row (vl_scenarios)' : 'default (no scenario)';
-      else if (k === 'user.level' || k === 'user.level_label')
-                                             from = 'user_progress.current_level';
+      else if (k === 'user.level')           from = 'session.cefr_level';
       else if (k === 'user.native_language') from = 'user_info.native_language';
       else                                   from = 'computed';
       annotated[k] = { value: v || '(empty)', from };
@@ -211,8 +210,8 @@ export class PromptBuilderService {
           .join('\n')
       : '- (no specific subtopics; follow the topic naturally)';
 
-    // [cefr_level] — scenario target takes priority over learner's current level
-    const cefrLevel = ctx['scenario.cefr_level'] || ctx['user.level_label'];
+    // [cefr_level] — scenario target takes priority over session CEFR level
+    const cefrLevel = ctx['scenario.cefr_level'] || levelLabelFor(parseInt(ctx['user.level'], 10));
 
     const guidelines = DEPLOYMENT_GUIDELINES
       .replace(/{modelRoleName}/g, modelRoleName)
@@ -275,7 +274,6 @@ export class PromptBuilderService {
       'scenario.key_phrases': keyPhrases,
       'scenario.cefr_level': sc?.cefr_level ? levelLabelFor(sc.cefr_level) : '',
       'user.level': String(userLevel),
-      'user.level_label': levelLabelFor(userLevel),
       'user.native_language': userNativeLanguage,
     };
   }
@@ -293,7 +291,7 @@ export class PromptBuilderService {
     return {
       ...ctx,
       ...vars,
-      cefr_level: ctx['scenario.cefr_level'] || ctx['user.level_label'] || '',
+      cefr_level: ctx['scenario.cefr_level'] || levelLabelFor(parseInt(ctx['user.level'], 10)) || '',
     };
   }
 

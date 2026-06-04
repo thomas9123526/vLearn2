@@ -185,7 +185,6 @@ class Scenario {
     required this.id,
     required this.slug,
     required this.category,
-    required this.difficulty,
     required this.title,
     required this.description,
     required this.estimatedMinutes,
@@ -199,7 +198,6 @@ class Scenario {
     id: j['id'] as String,
     slug: j['slug'] as String,
     category: j['category'] as String,
-    difficulty: (j['difficulty'] as num).toInt(),
     title: I18nText.fromJson(j['title'] as Map<String, dynamic>),
     description: I18nText.fromJson(j['description'] as Map<String, dynamic>),
     estimatedMinutes:
@@ -213,13 +211,10 @@ class Scenario {
         j['backgroundImageUrl'] as String?,
   );
 
-  /// Inverse of [Scenario.fromJson] — used to cache the list to SQLite.
-  /// Keys match the snake_case form `fromJson` reads back.
   Map<String, dynamic> toJson() => {
     'id': id,
     'slug': slug,
     'category': category,
-    'difficulty': difficulty,
     'title': title.toJson(),
     'description': description.toJson(),
     'estimated_minutes': estimatedMinutes,
@@ -232,7 +227,6 @@ class Scenario {
   final String id;
   final String slug;
   final String category;
-  final int difficulty;
   final I18nText title;
   final I18nText description;
   final int estimatedMinutes;

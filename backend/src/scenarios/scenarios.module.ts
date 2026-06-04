@@ -26,14 +26,14 @@ class ScenariosService {
     private readonly repo: Repository<ScenarioEntity>,
   ) {}
 
-  list(filters: { category?: string; difficulty?: number; q?: string }) {
+  list(filters: { category?: string; cefrLevel?: number; q?: string }) {
     const qb = this.repo
       .createQueryBuilder('s')
       .where("s.status = 'published'");
     if (filters.category)
       qb.andWhere('s.category = :c', { c: filters.category });
-    if (filters.difficulty !== undefined)
-      qb.andWhere('s.difficulty = :d', { d: filters.difficulty });
+    if (filters.cefrLevel !== undefined)
+      qb.andWhere('s.cefr_level = :lvl', { lvl: filters.cefrLevel });
     if (filters.q)
       qb.andWhere(`s.title ->> 'en' ILIKE :q`, { q: `%${filters.q}%` });
     return qb.orderBy('s.order_index', 'ASC').getMany();
@@ -61,16 +61,16 @@ class ScenariosController {
   @Get()
   @ApiOperation({ summary: 'List published scenarios with optional filters' })
   @ApiQuery({ name: 'category', required: false })
-  @ApiQuery({ name: 'difficulty', required: false, type: Number })
+  @ApiQuery({ name: 'cefr_level', required: false, type: Number })
   @ApiQuery({ name: 'q', required: false })
   list(
     @Query('category') category?: string,
-    @Query('difficulty') difficulty?: string,
+    @Query('cefr_level') cefrLevel?: string,
     @Query('q') q?: string,
   ) {
     return this.svc.list({
       category,
-      difficulty: difficulty ? parseInt(difficulty, 10) : undefined,
+      cefrLevel: cefrLevel ? parseInt(cefrLevel, 10) : undefined,
       q,
     });
   }
