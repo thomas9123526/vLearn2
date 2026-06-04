@@ -18,6 +18,9 @@ class ScenariosScreen extends ConsumerStatefulWidget {
 class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
   String? _category;
   String _query = '';
+  int? _cefrLevel;
+
+  static const _cefrLabels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +41,10 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
         }).toList();
     final filtered = all.where((s) {
       if (_category != null && s.category != _category) return false;
+      if (_cefrLevel != null) {
+        final level = s.cefrLevel ?? s.difficulty;
+        if (level != _cefrLevel) return false;
+      }
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
         final inTitle = s.title.forLocale(locale).toLowerCase().contains(q);
@@ -97,6 +104,31 @@ class _ScenariosScreenState extends ConsumerState<ScenariosScreen> {
                             ? null
                             : category.slug,
                       ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 44,
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              children: [
+                _Chip(
+                  label: 'All levels',
+                  selected: _cefrLevel == null,
+                  onTap: () => setState(() => _cefrLevel = null),
+                ),
+                for (var i = 0; i < _cefrLabels.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: _Chip(
+                      label: _cefrLabels[i],
+                      selected: _cefrLevel == i + 1,
+                      onTap: () => setState(() =>
+                          _cefrLevel = _cefrLevel == i + 1 ? null : i + 1),
                     ),
                   ),
               ],
@@ -227,7 +259,10 @@ class _ScenarioTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final levelLabel = 'Lv ${scenario.difficulty}';
+    final lvl = scenario.cefrLevel ?? scenario.difficulty;
+    final levelLabel = (lvl >= 1 && lvl <= 6)
+        ? ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'][lvl - 1]
+        : 'Lv $lvl';
     return InkWell(
       onTap: onStart,
       borderRadius: BorderRadius.circular(16),
