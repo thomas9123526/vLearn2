@@ -9,6 +9,7 @@
 export type AppTab =
   | 'home'
   | 'scenarios'
+  | 'scenario_detail'
   | 'conversation'
   | 'progress'
   | 'settings'
@@ -31,6 +32,7 @@ export interface FlagDescriptor {
 export const APP_TABS: { id: AppTab; label: string; hint: string }[] = [
   { id: 'home', label: 'Home', hint: 'Daily dashboard — what the user sees on launch.' },
   { id: 'scenarios', label: 'Scenarios', hint: 'Topic picker and category filters.' },
+  { id: 'scenario_detail', label: 'Scenario Detail', hint: 'Brief / detail screen shown before starting a session.' },
   { id: 'conversation', label: 'Conversation', hint: 'Live chat and Tutor (face) mode.' },
   { id: 'progress', label: 'Progress', hint: 'CEFR card, weekly chart, skills, completions.' },
   { id: 'settings', label: 'Settings', hint: 'Profile, theme, tutor, network, storage.' },
@@ -56,6 +58,14 @@ export const FLAG_CATALOG: FlagDescriptor[] = [
   { key: 'scenarios.search', label: 'Search bar', tier: 'big', tab: 'scenarios' },
   { key: 'scenarios.category_filter', label: 'Category filter chips', tier: 'big', tab: 'scenarios' },
   { key: 'scenarios.difficulty_filter', label: 'Difficulty filter row', tier: 'big', tab: 'scenarios' },
+
+  // ── Scenario Detail (brief screen) ──────────────────────────────────────
+  { key: 'scenario_detail.background_image', label: 'Background image', tier: 'big', tab: 'scenario_detail' },
+  { key: 'scenario_detail.description', label: 'Description text', tier: 'big', tab: 'scenario_detail' },
+  { key: 'scenario_detail.objectives', label: 'Objectives section', tier: 'big', tab: 'scenario_detail' },
+  { key: 'scenario_detail.key_phrases', label: 'Key phrases section', tier: 'big', tab: 'scenario_detail' },
+  { key: 'scenario_detail.cefr_pill', label: 'CEFR level pill', tier: 'fine', tab: 'scenario_detail' },
+  { key: 'scenario_detail.xp_pill', label: 'XP reward pill', tier: 'fine', tab: 'scenario_detail' },
 
   // ── Conversation ────────────────────────────────────────────────────────
   {
