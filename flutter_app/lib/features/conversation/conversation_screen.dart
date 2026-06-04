@@ -239,49 +239,56 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                   ),
               ],
             ),
-      body: data.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) {
-          logRawError('conversation_screen.load', e, st);
-          return PoliteErrorCenter(
-            error: e,
-            context: ErrorContext.loadDetail,
-            onRetry: () => ref.invalidate(_sessionProvider(widget.sessionId)),
-          );
-        },
-        data: (d) {
-          final readOnly = d.session.status != 'active';
-          final mode = effectiveMode(d);
-          if (mode == 'face' && !readOnly) {
-            return _TutorModeWrapper(
-              sessionId: widget.sessionId,
-              personaId: d.session.personaId,
-              messages: d.messages,
-              turnCount: d.session.turnCount,
-              onSendText: _send,
-              onIdleSuggestion: _fetchSuggestion,
-              // Hide the switch-to-chat button when locked to tutor-only mode.
-              onSwitchToChat: conversationMode == 'both'
-                  ? () => setState(() => _viewMode = 'chat')
-                  : null,
-              onEnd: _end,
-              ending: _ending,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 350),
+        transitionBuilder: (child, anim) =>
+            FadeTransition(opacity: anim, child: child),
+        child: data.when(
+          loading: () => const _SkeletonLoading(key: ValueKey('loading')),
+          error: (e, st) {
+            logRawError('conversation_screen.load', e, st);
+            return PoliteErrorCenter(
+              key: const ValueKey('error'),
+              error: e,
+              context: ErrorContext.loadDetail,
+              onRetry: () => ref.invalidate(_sessionProvider(widget.sessionId)),
             );
-          }
-          return _ChatModeBody(
-            scroll: _scroll,
-            messages: d.messages,
-            bubbleStyle: bubbleStyle,
-            sending: _sending,
-            scheme: scheme,
-            input: _input,
-            onSend: () => _send(_input.text),
-            onSendVoiceText: _send,
-            readOnly: readOnly,
-            status: d.session.status,
-            personaId: d.session.personaId,
-          );
-        },
+          },
+          data: (d) {
+            final readOnly = d.session.status != 'active';
+            final mode = effectiveMode(d);
+            if (mode == 'face' && !readOnly) {
+              return _TutorModeWrapper(
+                key: const ValueKey('content'),
+                sessionId: widget.sessionId,
+                personaId: d.session.personaId,
+                messages: d.messages,
+                turnCount: d.session.turnCount,
+                onSendText: _send,
+                onIdleSuggestion: _fetchSuggestion,
+                onSwitchToChat: conversationMode == 'both'
+                    ? () => setState(() => _viewMode = 'chat')
+                    : null,
+                onEnd: _end,
+                ending: _ending,
+              );
+            }
+            return _ChatModeBody(
+              key: const ValueKey('content'),
+              scroll: _scroll,
+              messages: d.messages,
+              bubbleStyle: bubbleStyle,
+              sending: _sending,
+              scheme: scheme,
+              input: _input,
+              onSend: () => _send(_input.text),
+              onSendVoiceText: _send,
+              readOnly: readOnly,
+              status: d.session.status,
+              personaId: d.session.personaId,
+            );
+          },
+        ),
       ),
     );
   }
@@ -292,6 +299,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 /// optional mic button for voice input.
 class _ChatModeBody extends ConsumerStatefulWidget {
   const _ChatModeBody({
+    super.key,
     required this.scroll,
     required this.messages,
     required this.bubbleStyle,
@@ -335,6 +343,10 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
   String? _lastSpokenId;
   StreamSubscription<bool>? _ttsSub;
 
+  /// Index threshold: bubbles at index >= _seenCount animate in on first render.
+  /// Bubbles below the threshold have already been seen and appear instantly.
+  int _seenCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -343,12 +355,15 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
     _ttsSub = tts.isSpeakingStream.listen((speaking) {
       if (mounted) setState(() => _ttsSpeaking = speaking);
     });
-    // Speak the opening assistant message, which arrives with getSession and
-    // so never triggers didUpdateWidget. Only applies at Turn 0 (no user
-    // messages yet) — resumed sessions must not replay old heard messages.
+
+    // For resumed sessions (user turns already exist), all current messages
+    // are pre-marked as seen so they appear instantly without animation.
+    final hasUserTurn = widget.messages.any((m) => m.role == 'user');
+    if (hasUserTurn) _seenCount = widget.messages.length;
+
+    // Speak the opening assistant message on first load (Turn 0 only).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final hasUserTurn = widget.messages.any((m) => m.role == 'user');
       if (!hasUserTurn) _maybeSpeakLatestAssistantReply();
     });
   }
@@ -358,6 +373,11 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
     super.didUpdateWidget(old);
     if (widget.messages.length > old.messages.length) {
       _maybeSpeakLatestAssistantReply();
+      // After new messages animate in, bump seenCount so a subsequent
+      // parent rebuild doesn't re-run their entry animation.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _seenCount = widget.messages.length);
+      });
     }
   }
 
@@ -524,10 +544,28 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
                   controller: widget.scroll,
                   padding: const EdgeInsets.all(16),
                   itemCount: widget.messages.length,
-                  itemBuilder: (_, i) => ChatBubble(
-                    message: widget.messages[i],
-                    style: widget.bubbleStyle,
-                  ),
+                  itemBuilder: (_, i) {
+                    final msg = widget.messages[i];
+                    final animate = i >= _seenCount;
+                    // Stagger only when several new messages land at once
+                    // (e.g. fresh session open). A single arriving reply
+                    // gets no delay so it feels instant.
+                    final newCount = widget.messages.length - _seenCount;
+                    final delay = animate && newCount > 1
+                        ? Duration(
+                            milliseconds:
+                                (i - _seenCount).clamp(0, 8) * 60)
+                        : Duration.zero;
+                    return _AnimatedBubble(
+                      key: ValueKey(msg.id),
+                      animate: animate,
+                      delay: delay,
+                      child: ChatBubble(
+                        message: msg,
+                        style: widget.bubbleStyle,
+                      ),
+                    );
+                  },
                 ),
         ),
         if (!widget.readOnly)
@@ -768,6 +806,7 @@ class _ReadOnlyBanner extends StatelessWidget {
 /// chat mode doesn't pay the lookup cost.
 class _TutorModeWrapper extends ConsumerWidget {
   const _TutorModeWrapper({
+    super.key,
     required this.sessionId,
     required this.personaId,
     required this.messages,
@@ -818,6 +857,144 @@ class _TutorModeWrapper extends ConsumerWidget {
           ending: ending,
         );
       },
+    );
+  }
+}
+
+// ─── Entry animation wrapper ─────────────────────────────────────────────────
+
+/// Wraps a chat bubble with a one-shot fade + slide-up entry animation.
+/// [animate] is read only at creation (`initState`) — subsequent rebuilds
+/// that keep the same [key] reuse the running animation state unchanged.
+class _AnimatedBubble extends StatefulWidget {
+  const _AnimatedBubble({
+    super.key,
+    required this.child,
+    required this.animate,
+    this.delay = Duration.zero,
+  });
+
+  final Widget child;
+  final bool animate;
+  final Duration delay;
+
+  @override
+  State<_AnimatedBubble> createState() => _AnimatedBubbleState();
+}
+
+class _AnimatedBubbleState extends State<_AnimatedBubble>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _ctrl;
+  Animation<double>? _fade;
+  Animation<Offset>? _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.animate) return;
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+    _fade = CurvedAnimation(parent: _ctrl!, curve: Curves.easeOut);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.15),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl!, curve: Curves.easeOutCubic));
+    if (widget.delay == Duration.zero) {
+      _ctrl!.forward();
+    } else {
+      Future<void>.delayed(widget.delay, () {
+        if (mounted) _ctrl!.forward();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ctrl == null) return widget.child;
+    return FadeTransition(
+      opacity: _fade!,
+      child: SlideTransition(position: _slide!, child: widget.child),
+    );
+  }
+}
+
+// ─── Skeleton loading ────────────────────────────────────────────────────────
+
+/// Pulsing chat-bubble skeleton shown while the session is loading.
+/// Gives the user visual feedback that content is on its way.
+class _SkeletonLoading extends StatefulWidget {
+  const _SkeletonLoading({super.key});
+
+  @override
+  State<_SkeletonLoading> createState() => _SkeletonLoadingState();
+}
+
+class _SkeletonLoadingState extends State<_SkeletonLoading>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  static const _shapes = [
+    (left: true,  widthFactor: 0.70, height: 60.0),
+    (left: false, widthFactor: 0.52, height: 44.0),
+    (left: true,  widthFactor: 0.82, height: 80.0),
+    (left: false, widthFactor: 0.48, height: 44.0),
+    (left: true,  widthFactor: 0.62, height: 56.0),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final base = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.10);
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, _) => Opacity(
+        opacity: 0.35 + _ctrl.value * 0.50,
+        child: ListView.separated(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+          itemCount: _shapes.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
+          itemBuilder: (_, i) {
+            final s = _shapes[i];
+            return Align(
+              alignment:
+                  s.left ? Alignment.centerLeft : Alignment.centerRight,
+              child: FractionallySizedBox(
+                widthFactor: s.widthFactor,
+                child: Container(
+                  height: s.height,
+                  decoration: BoxDecoration(
+                    color: base,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }
