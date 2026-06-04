@@ -16,6 +16,7 @@ interface ConfigSeed {
     | 'progress'
     | 'conversation'
     | 'scenarios'
+    | 'scenario_detail'
     | 'settings'
     | 'prompts'
     | 'system';
@@ -262,6 +263,14 @@ const CATALOG: ConfigSeed[] = [
     category: 'scenarios',
     description: 'Difficulty filter row',
   },
+
+  // ── Scenario Detail (brief screen) ───────────────────────
+  { key: 'scenario_detail.background_image', value: true, value_type: 'boolean', category: 'scenario_detail', description: 'Background image on the hero card' },
+  { key: 'scenario_detail.description',      value: true, value_type: 'boolean', category: 'scenario_detail', description: 'Description text' },
+  { key: 'scenario_detail.objectives',       value: true, value_type: 'boolean', category: 'scenario_detail', description: 'Objectives section' },
+  { key: 'scenario_detail.key_phrases',      value: true, value_type: 'boolean', category: 'scenario_detail', description: 'Key phrases section' },
+  { key: 'scenario_detail.cefr_pill',        value: true, value_type: 'boolean', category: 'scenario_detail', description: 'CEFR level pill' },
+  { key: 'scenario_detail.xp_pill',          value: true, value_type: 'boolean', category: 'scenario_detail', description: 'XP reward pill' },
 
   // ── Conversation ─────────────────────────────────────────
   {

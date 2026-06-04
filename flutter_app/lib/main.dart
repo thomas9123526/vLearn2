@@ -112,26 +112,24 @@ Future<void> main() async {
     // Treat unreadable config as "use defaults" — the service itself rewrites
     // a broken file on the next save, so this never leaves the app stuck.
   }
-  // On first install the user has no saved language preference. Fetch the
-  // admin-configured default (app.default_language) from the remote config
-  // and write it to SharedPreferences before AppSettingsNotifier loads, so
-  // the very first launch already uses the language the admin chose.
+  // Apply the admin-configured language (app.default_language) on every
+  // launch. This lets the admin control the UI language from the panel;
+  // it overrides any language the user previously stored in preferences.
+  // If the key is absent or the server is unreachable, the stored preference
+  // (or English) is kept.
   try {
     await container.read(layoutConfigProvider.notifier).refresh();
-    final prefs = await SharedPreferences.getInstance();
-    if (!prefs.containsKey('settings.ui_language')) {
-      const supportedLangs = {'en', 'zh', 'ru', 'ko'};
-      final lang = container
-          .read(layoutConfigProvider)
-          .valueOrNull
-          ?.get<String>('app.default_language');
-      if (lang != null && supportedLangs.contains(lang)) {
-        await prefs.setString('settings.ui_language', lang);
-      }
+    const supportedLangs = {'en', 'zh', 'ru', 'ko'};
+    final lang = container
+        .read(layoutConfigProvider)
+        .valueOrNull
+        ?.get<String>('app.default_language');
+    if (lang != null && supportedLangs.contains(lang)) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('settings.ui_language', lang);
     }
   } catch (_) {
-    // First-launch language detection is best-effort; the app defaults to
-    // English if the server is unreachable on the very first boot.
+    // Language sync is best-effort; keep whatever is stored locally.
   }
   // Pre-seed the local SQLite cache from bundled asset JSON files so the
   // scenario/category lists show instantly on first launch without a network

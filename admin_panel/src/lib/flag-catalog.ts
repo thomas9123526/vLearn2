@@ -134,7 +134,7 @@ export const FLAG_CATALOG: FlagDescriptor[] = [
   // ── System (always shown last; advanced-only by default) ───────────────
   {
     key: 'app.default_language',
-    label: 'Default UI language (first launch)',
+    label: 'UI language (applied on every app start)',
     tier: 'big',
     tab: 'system',
     type: 'select',
