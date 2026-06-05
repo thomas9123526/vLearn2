@@ -20,7 +20,7 @@ public:
 
 signals:
     void signOutRequested();
-    void themeChanged(const QString& slug);   // apply live (shell rebuilds)
+    void appearanceChanged();   // theme/font/language/bubble changed → rebuild shell
 
 private:
     QWidget*        sectionHeader(const QString& text);

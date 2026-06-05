@@ -5,6 +5,7 @@
 
 #include "config/AppConfig.h"
 #include "ui/Theme.h"
+#include "i18n/I18n.h"
 #include "api/ApiClient.h"
 #include "auth/LoginDialog.h"
 #include "shell/MainShell.h"
@@ -22,10 +23,12 @@ static QString configPathArg(const QApplication& app)
 int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
+    QApplication::setOrganizationName("vlearn");
     QApplication::setApplicationName("FreeTalk");
 
-    // FreeTalk look: load fonts + apply the Apricot stylesheet.
+    // FreeTalk look: load fonts + apply the active theme; install i18n.
     Theme::install(app);
+    I18n::install(app);
 
     // 1. Read the endpoint from app_config.json BEFORE any networking.
     const AppConfig cfg = AppConfig::load(configPathArg(app));
@@ -49,12 +52,11 @@ int main(int argc, char** argv)
     QPointer<MainShell> shell;
     std::function<void()> build = [&]() {
         shell = new MainShell(&api);
-        QObject::connect(shell, &MainShell::themeChangeRequested, &app,
-                         [&](const QString& slug) {
-            if (slug == Theme::currentTheme()) return;
-            Theme::setTheme(slug);          // re-applies QSS + QPalette
+        QObject::connect(shell, &MainShell::appearanceChangeRequested, &app, [&]() {
+            // The setting was already applied (Theme/I18n); rebuild so inline
+            // styles, fonts and tr() strings all refresh.
             MainShell* old = shell;
-            build();                        // new shell picks up the new palette
+            build();
             shell->show();
             if (old) { old->hide(); old->deleteLater(); }
         });

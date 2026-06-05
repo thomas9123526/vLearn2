@@ -5,12 +5,18 @@
 #include <QLabel>
 #include <QPalette>
 #include <QStyleFactory>
+#include <QSettings>
 
 namespace Theme {
 
 static QString g_display = "Georgia";
 static QString g_ui      = "sans-serif";
 static QString g_mono    = "monospace";
+
+// Loaded font families (resolved after addApplicationFont).
+static QString fLora, fInter, fJetBrains, fQuicksand, fNunito, fPlayfair, fSource;
+static QString g_fontGroup   = "Editorial";
+static QString g_bubbleStyle = "Classic";
 
 static void applyStyle(QApplication& app);   // fwd
 
@@ -75,6 +81,60 @@ void setTheme(const QString& name)
     if (s_app) applyStyle(*s_app);
 }
 
+QString currentFontGroup()   { return g_fontGroup; }
+QString currentBubbleStyle() { return g_bubbleStyle; }
+
+void setFontGroup(const QString& group)
+{
+    g_fontGroup = group;
+    if (group == QLatin1String("Modern"))        { g_display = fInter;     g_ui = fInter;  g_mono = fJetBrains; }
+    else if (group == QLatin1String("Friendly")) { g_display = fQuicksand; g_ui = fNunito; g_mono = fJetBrains; }
+    else if (group == QLatin1String("Classic"))  { g_display = fPlayfair;  g_ui = fSource; g_mono = fJetBrains; }
+    else /* Editorial */                         { g_display = fLora;      g_ui = fInter;  g_mono = fJetBrains; }
+    QSettings().setValue("appearance/fontGroup", group);
+    if (s_app) { s_app->setFont(QFont(g_ui, 10)); applyStyle(*s_app); }
+}
+
+void setBubbleStyle(const QString& style)
+{
+    g_bubbleStyle = style;
+    QSettings().setValue("appearance/bubbleStyle", style);
+}
+
+// Per-style bubble stylesheet using the active palette. `mine` = the user's
+// (right) bubble vs the tutor's (left).
+QString bubbleStyleSheet(bool mine)
+{
+    const Palette& p = palette();
+    const QString tutBg = p.surface.name(), meBg = p.accent.name();
+    const QString border = rgba(p.border), ink = p.ink.name();
+    auto base = [&](const QString& radius, const QString& extra) {
+        return mine
+            ? QStringLiteral("background:%1;border-radius:%2;padding:10px 14px;"
+                             "font-size:15px;color:white;%3").arg(meBg, radius, extra)
+            : QStringLiteral("background:%1;border:1px solid %2;border-radius:%3;"
+                             "padding:10px 14px;font-size:15px;color:%4;%5")
+                  .arg(tutBg, border, radius, ink, extra);
+    };
+    const QString s = g_bubbleStyle;
+    if (s == QLatin1String("Modern"))   return base("10px", QString());
+    if (s == QLatin1String("Soft"))     return base("22px", QString());
+    if (s == QLatin1String("Notebook")) {
+        // Squared, accent left rule.
+        return mine
+            ? QStringLiteral("background:%1;border-radius:6px;padding:10px 14px;font-size:15px;color:white;").arg(meBg)
+            : QStringLiteral("background:%1;border:1px solid %2;border-left:3px solid %3;"
+                             "border-radius:6px;padding:10px 14px;font-size:15px;color:%4;")
+                  .arg(tutBg, border, p.accent2.name(), ink);
+    }
+    if (s == QLatin1String("Tail")) {
+        // One squared bottom corner = a tail.
+        const QString r = mine ? "18px 18px 4px 18px" : "18px 18px 18px 4px";
+        return base(r, QString());
+    }
+    return base("18px", QString());   // Classic
+}
+
 QString fontDisplay() { return g_display; }
 QString fontUi()      { return g_ui; }
 QString fontMono()    { return g_mono; }
@@ -121,14 +181,19 @@ QLabel* makeAvatar(const QString& name, int size, const QColor& accent)
 
 void install(QApplication& app)
 {
-    g_display = loadFamily(":/fonts/Lora.ttf",          "Georgia");
-    g_ui      = loadFamily(":/fonts/Inter.ttf",         "sans-serif");
-    g_mono    = loadFamily(":/fonts/JetBrainsMono.ttf", "monospace");
-
-    QFont base(g_ui, 10);
-    app.setFont(base);
+    fLora      = loadFamily(":/fonts/Lora.ttf",            "Georgia");
+    fInter     = loadFamily(":/fonts/Inter.ttf",           "sans-serif");
+    fJetBrains = loadFamily(":/fonts/JetBrainsMono.ttf",   "monospace");
+    fQuicksand = loadFamily(":/fonts/Quicksand.ttf",       "sans-serif");
+    fNunito    = loadFamily(":/fonts/Nunito.ttf",          "sans-serif");
+    fPlayfair  = loadFamily(":/fonts/PlayfairDisplay.ttf", "Georgia");
+    fSource    = loadFamily(":/fonts/SourceSerif4.ttf",    "Georgia");
 
     s_app = &app;
+
+    QSettings s;
+    g_bubbleStyle = s.value("appearance/bubbleStyle", "Classic").toString();
+    setFontGroup(s.value("appearance/fontGroup", "Editorial").toString());
     setTheme(s_name);   // builds palettes + applies QSS/QPalette
 }
 

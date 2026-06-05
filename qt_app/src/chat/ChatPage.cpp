@@ -206,7 +206,7 @@ void ChatPage::appendBubble(const QString& role, const QString& content)
 {
     const bool mine = (role == QLatin1String("user"));
     auto* bubble = new QLabel(content);
-    bubble->setObjectName(mine ? "BubbleMe" : "BubbleTutor");
+    bubble->setStyleSheet(Theme::bubbleStyleSheet(mine));
     bubble->setWordWrap(true);
     bubble->setTextInteractionFlags(Qt::TextSelectableByMouse);
     bubble->setMaximumWidth(440);
@@ -220,7 +220,7 @@ void ChatPage::showTyping()
 {
     if (m_typingRow) return;
     m_typingBubble = new QLabel("•");
-    m_typingBubble->setObjectName("BubbleTutor");
+    m_typingBubble->setStyleSheet(Theme::bubbleStyleSheet(/*mine=*/false));
     m_typingBubble->setMinimumWidth(54);
     m_typingRow = new QWidget;
     m_typingRow->setLayout(rowWrapper(m_typingBubble, /*alignRight=*/false));

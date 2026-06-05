@@ -4,6 +4,7 @@
 #include "asr/TtsService.h"
 #include "ui/Theme.h"
 #include "ui/ClickableFrame.h"
+#include "i18n/I18n.h"
 #include "model/Models.h"
 
 #include <QVBoxLayout>
@@ -103,30 +104,38 @@ SettingsPage::SettingsPage(ApiClient* api, QWidget* parent)
         :                                                     tr("Not installed");
 
     // ---- Tiles (interactive) -------------------------------------------
-    auto* themeTile  = tile("🎨", tr("Theme"),         tr("Obsidian (dark)"), &m_themeValue);
-    auto* langTile   = tile("🌐", tr("Language"),      tr("English"),         &m_langValue);
-    auto* fontTile   = tile("🔤", tr("Font"),          tr("Editorial"),       &m_fontValue);
-    auto* tutorTile  = tile("🧑‍🏫", tr("Active tutor"), tr("Default"),         &m_tutorValue);
-    auto* modeTile   = tile("💬", tr("Default mode"),  tr("Chat"),            &m_modeValue);
-    auto* bubbleTile = tile("🗨", tr("Bubble style"),  tr("Classic"),         &m_bubbleValue);
+    const QString curTheme = Theme::currentTheme() == "obsidian" ? tr("Obsidian (dark)")
+                             : []{ QString t = Theme::currentTheme(); if(!t.isEmpty()) t[0]=t[0].toUpper(); return t; }();
+    const QString curLang = I18n::currentLanguage() == "ko" ? "한국어"
+                            : I18n::currentLanguage() == "zh" ? "中文" : "English";
+
+    auto* themeTile  = tile("🎨", tr("Theme"),         curTheme,                   &m_themeValue);
+    auto* langTile   = tile("🌐", tr("Language"),      curLang,                    &m_langValue);
+    auto* fontTile   = tile("🔤", tr("Font"),          Theme::currentFontGroup(),  &m_fontValue);
+    auto* tutorTile  = tile("🧑‍🏫", tr("Active tutor"), tr("Default"),             &m_tutorValue);
+    auto* bubbleTile = tile("🗨", tr("Bubble style"),  Theme::currentBubbleStyle(),&m_bubbleValue);
     auto* voiceTile  = tile("🔊", tr("Speech / voice"), voiceStatus, nullptr);
     auto* pwTile     = tile("🔒", tr("Change password"), QString(), nullptr);
     auto* outTile    = tile("⏻", tr("Sign out"),        QString(), nullptr, /*danger=*/true);
+    m_modeValue = nullptr;
 
-    // Wiring — each item now responds.
+    // Wiring — each item now responds and applies live.
     connect(themeTile, &ClickableFrame::clicked, this, &SettingsPage::pickTheme);
     connect(langTile,  &ClickableFrame::clicked, this, &SettingsPage::pickLanguage);
     connect(tutorTile, &ClickableFrame::clicked, this, &SettingsPage::pickTutor);
     connect(fontTile, &ClickableFrame::clicked, this, [this]() {
         pickFromList(m_fontValue, tr("Font"),
-                     {"Editorial", "Modern", "Friendly", "Classic"}, nullptr);
-    });
-    connect(modeTile, &ClickableFrame::clicked, this, [this]() {
-        pickFromList(m_modeValue, tr("Default mode"), {"Chat", "Face"}, nullptr);
+                     {"Editorial", "Modern", "Friendly", "Classic"}, [this](int) {
+            Theme::setFontGroup(m_fontValue->text());
+            emit appearanceChanged();
+        });
     });
     connect(bubbleTile, &ClickableFrame::clicked, this, [this]() {
         pickFromList(m_bubbleValue, tr("Bubble style"),
-                     {"Classic", "Modern", "Tail", "Soft", "Notebook"}, nullptr);
+                     {"Classic", "Modern", "Tail", "Soft", "Notebook"}, [this](int) {
+            Theme::setBubbleStyle(m_bubbleValue->text());
+            emit appearanceChanged();
+        });
     });
     connect(voiceTile, &ClickableFrame::clicked, this, [this]() {
         QMessageBox::information(this, tr("Speech / voice"),
@@ -151,7 +160,6 @@ SettingsPage::SettingsPage(ApiClient* api, QWidget* parent)
     col->addWidget(fontTile);
     col->addWidget(sectionHeader(tr("Conversation")));
     col->addWidget(tutorTile);
-    col->addWidget(modeTile);
     col->addWidget(bubbleTile);
     col->addWidget(sectionHeader(tr("Voice")));
     col->addWidget(voiceTile);
@@ -195,8 +203,9 @@ void SettingsPage::pickTheme()
     static const QStringList slugs{"apricot", "sage", "iris", "obsidian"};
     pickFromList(m_themeValue, tr("Theme"), names, [this](int i) {
         const QString slug = slugs.at(qBound(0, i, 3));
+        Theme::setTheme(slug);          // re-applies QSS + palette
         patchProfile({{"activeTheme", slug}});
-        emit themeChanged(slug);     // applied live by the shell
+        emit appearanceChanged();       // shell rebuilds so inline styles refresh
     });
 }
 
@@ -205,7 +214,10 @@ void SettingsPage::pickLanguage()
     static const QStringList names{"English", "한국어", "中文"};
     static const QStringList codes{"en", "ko", "zh"};
     pickFromList(m_langValue, tr("Language"), names, [this](int i) {
-        patchProfile({{"uiLanguage", codes.at(qBound(0, i, 2))}});
+        const QString code = codes.at(qBound(0, i, 2));
+        I18n::setLanguage(code);
+        patchProfile({{"uiLanguage", code}});
+        emit appearanceChanged();       // shell rebuilds → tr() re-evaluates
     });
 }
 
@@ -238,17 +250,20 @@ void SettingsPage::setProfile(const UserProfile& p)
     m_email->setText(p.email.isEmpty()
                          ? tr("%1 · %2 XP · %3🔥").arg(p.cefr()).arg(p.xpTotal).arg(p.streakDays)
                          : p.email);
+    // Apply the user's saved appearance on first load (no re-persist). The shell
+    // rebuild makes current==saved, so these won't re-fire.
+    bool changed = false;
     if (!p.activeTheme.isEmpty()) {
         QString t = p.activeTheme; t[0] = t[0].toUpper();
         m_themeValue->setText(p.activeTheme == "obsidian" ? tr("Obsidian (dark)") : t);
-        // Apply the user's saved theme on first load (no re-persist). The shell
-        // rebuild makes current==saved, so this won't re-fire.
-        if (p.activeTheme != Theme::currentTheme())
-            emit themeChanged(p.activeTheme);
+        if (p.activeTheme != Theme::currentTheme()) { Theme::setTheme(p.activeTheme); changed = true; }
     }
-    if (!p.uiLanguage.isEmpty())
+    if (!p.uiLanguage.isEmpty()) {
         m_langValue->setText(p.uiLanguage == "ko" ? "한국어"
                              : p.uiLanguage == "zh" ? "中文" : "English");
+        if (p.uiLanguage != I18n::currentLanguage()) { I18n::setLanguage(p.uiLanguage); changed = true; }
+    }
+    if (changed) emit appearanceChanged();
 
     auto* av = qobject_cast<QHBoxLayout*>(m_avatarHolder->layout());
     QLayoutItem* old;

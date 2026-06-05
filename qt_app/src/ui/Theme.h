@@ -38,6 +38,16 @@ void    setTheme(const QString& name);   // re-applies QSS + QPalette live
 QString currentTheme();
 bool    isDark();
 
+// Font group: Editorial | Modern | Friendly | Classic. Persisted (QSettings).
+void    setFontGroup(const QString& group);
+QString currentFontGroup();
+
+// Chat bubble style: Classic | Modern | Tail | Soft | Notebook. Persisted.
+void    setBubbleStyle(const QString& style);
+QString currentBubbleStyle();
+// Stylesheet for one bubble in the active style (uses the active palette).
+QString bubbleStyleSheet(bool mine);
+
 // Font family names resolved after loading the bundled TTFs (falls back to
 // Georgia / sans-serif / monospace if a face fails to load).
 QString fontDisplay();   // Lora     — headings, hero

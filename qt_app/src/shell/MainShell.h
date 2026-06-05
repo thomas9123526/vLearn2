@@ -27,7 +27,7 @@ public:
     explicit MainShell(ApiClient* api, QWidget* parent = nullptr);
 
 signals:
-    void themeChangeRequested(const QString& slug);
+    void appearanceChangeRequested();   // theme/font/language/bubble changed
 
 private:
     void addNav(const QString& text, int pageIndex);
