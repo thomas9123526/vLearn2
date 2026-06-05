@@ -1,6 +1,7 @@
 #include "chat/ChatPage.h"
 #include "api/ApiClient.h"
 #include "asr/AsrService.h"
+#include "asr/TtsService.h"
 #include "ui/Theme.h"
 
 #include <QVBoxLayout>
@@ -53,9 +54,17 @@ ChatPage::ChatPage(ApiClient* api, QWidget* parent)
     titles->addWidget(m_titleLabel);
     titles->addWidget(m_subLabel);
 
+    m_speaker = new QPushButton("🔊");
+    m_speaker->setObjectName("MicBtn");
+    m_speaker->setCheckable(true);
+    m_speaker->setChecked(true);
+    m_speaker->setCursor(Qt::PointingHandCursor);
+    m_speaker->setToolTip(tr("Tutor voice on/off"));
+
     hl->addWidget(m_avatarHolder);
     hl->addLayout(titles);
     hl->addStretch(1);
+    hl->addWidget(m_speaker);
 
     // ---- Transcript ----------------------------------------------------
     m_scroll = new QScrollArea;
@@ -130,6 +139,15 @@ ChatPage::ChatPage(ApiClient* api, QWidget* parent)
     });
     connect(m_asr, &AsrService::failed, this, [this](const QString& e) {
         emit statusMessage(e);
+    });
+
+    // ---- TTS (tutor voice) ---------------------------------------------
+    m_tts = new TtsService(this);
+    m_speaker->setVisible(m_tts->isAvailable());
+    connect(m_speaker, &QPushButton::toggled, this, [this](bool on) {
+        m_autoSpeak = on;
+        m_speaker->setText(on ? "🔊" : "🔇");
+        if (!on) m_tts->stop();
     });
 
     setSending(true);
@@ -282,7 +300,7 @@ void ChatPage::startNewChat()
                 }
                 const Session s = Session::fromJson(sdata.toObject());
                 // Re-fetch so the tutor's seeded opening message is shown.
-                renderSession(s.id, persona.name, Theme::personaAccent(persona.name));
+                renderSession(s.id, persona.name, Theme::personaAccent(persona.name), /*speakLast=*/true);
             });
     });
 }
@@ -305,7 +323,7 @@ void ChatPage::startScenario(const QString& scenarioId, const QString& title)
                     return;
                 }
                 const Session s = Session::fromJson(sdata.toObject());
-                renderSession(s.id, persona.name, Theme::personaAccent(persona.name));
+                renderSession(s.id, persona.name, Theme::personaAccent(persona.name), /*speakLast=*/true);
             });
     });
 }
@@ -316,10 +334,10 @@ void ChatPage::openSession(const QString& id)
 }
 
 void ChatPage::renderSession(const QString& id, const QString& preferredName,
-                             const QColor& preferredAccent)
+                             const QColor& preferredAccent, bool speakLast)
 {
     emit statusMessage(tr("Loading conversation…"));
-    m_api->getSession(id, [this, preferredName, preferredAccent](
+    m_api->getSession(id, [this, preferredName, preferredAccent, speakLast](
                               bool ok, const QJsonValue& data, const QString& err) {
         if (!ok || !data.isObject()) {
             QMessageBox::critical(this, tr("Cannot open"),
@@ -338,11 +356,16 @@ void ChatPage::renderSession(const QString& id, const QString& preferredName,
         setHeader(name, accent, active ? tr("AI Tutor · Online") : tr("Past conversation"));
         addDatePill(active ? tr("Today") : tr("Past conversation"));
 
+        QString lastAssistant;
         for (const QJsonValue& mv : o.value("messages").toArray()) {
             const Message m = Message::fromJson(mv.toObject());
             appendBubble(m.role, m.content);
+            if (m.role == QLatin1String("assistant")) lastAssistant = m.content;
         }
         setSending(!active);     // read-only when the session is finished
+        // Speak the tutor's opening line when (re)entering an active session.
+        if (speakLast && active && m_autoSpeak && m_tts && !lastAssistant.isEmpty())
+            m_tts->speak(lastAssistant);
         emit statusMessage(active ? tr("Your turn — reply to %1").arg(name)
                                   : tr("This conversation has ended"));
         if (active) m_input->setFocus();
@@ -369,8 +392,10 @@ void ChatPage::onSend()
                 return;
             }
             const QJsonObject o = data.toObject();
-            appendBubble("assistant",
-                Message::fromJson(o.value("assistantMessage").toObject()).content);
+            const QString reply =
+                Message::fromJson(o.value("assistantMessage").toObject()).content;
+            appendBubble("assistant", reply);
+            if (m_autoSpeak && m_tts) m_tts->speak(reply);   // tutor speaks
             emit statusMessage(tr("Turn %1").arg(o.value("turnCount").toInt()));
             m_input->setFocus();
         });

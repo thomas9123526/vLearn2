@@ -17,6 +17,7 @@ SOURCES += \
     src/config/AppConfig.cpp \
     src/ui/Theme.cpp \
     src/asr/AsrService.cpp \
+    src/asr/TtsService.cpp \
     src/api/ApiClient.cpp \
     src/auth/LoginDialog.cpp \
     src/home/HomePage.cpp \
@@ -34,6 +35,7 @@ HEADERS += \
     src/ui/Theme.h \
     src/ui/ClickableFrame.h \
     src/asr/AsrService.h \
+    src/asr/TtsService.h \
     src/api/ApiClient.h \
     src/auth/LoginDialog.h \
     src/home/HomePage.h \
