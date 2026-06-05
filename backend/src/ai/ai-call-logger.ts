@@ -14,11 +14,10 @@
 const W = 80;       // total outer width  ║ ... ║
 const IW = W - 4;  // inner content width (after "║  " and before "  ║")
 
-/** Set AI_RAW_LOG=true in .env to emit a raw JSON dump after every pretty box. */
-const RAW_LOG = process.env['AI_RAW_LOG'] === 'true';
-
+/** Set AI_RAW_LOG=true in .env to emit a raw JSON dump after every pretty box.
+ *  Read lazily inside the function — module-level eval runs before dotenv loads. */
 function rawLog(label: string, data: unknown): void {
-  if (!RAW_LOG) return;
+  if (process.env['AI_RAW_LOG'] !== 'true') return;
   const sep = '─'.repeat(W - 2);
   console.log(`\n┌${sep}┐`);
   console.log(`│  RAW LOG ▼  ${label.padEnd(W - 16)}│`);
