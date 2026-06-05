@@ -33,6 +33,11 @@ struct Palette {
 
 const Palette& palette();
 
+// Active theme switching. Themes: apricot | sage | iris | obsidian.
+void    setTheme(const QString& name);   // re-applies QSS + QPalette live
+QString currentTheme();
+bool    isDark();
+
 // Font family names resolved after loading the bundled TTFs (falls back to
 // Georgia / sans-serif / monospace if a face fails to load).
 QString fontDisplay();   // Lora     — headings, hero

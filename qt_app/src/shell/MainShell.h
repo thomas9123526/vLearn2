@@ -26,6 +26,9 @@ class MainShell : public QMainWindow {
 public:
     explicit MainShell(ApiClient* api, QWidget* parent = nullptr);
 
+signals:
+    void themeChangeRequested(const QString& slug);
+
 private:
     void addNav(const QString& text, int pageIndex);
     void showPage(int index);

@@ -20,6 +20,7 @@ public:
 
 signals:
     void signOutRequested();
+    void themeChanged(const QString& slug);   // apply live (shell rebuilds)
 
 private:
     QWidget*        sectionHeader(const QString& text);

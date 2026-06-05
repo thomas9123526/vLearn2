@@ -12,10 +12,67 @@ static QString g_display = "Georgia";
 static QString g_ui      = "sans-serif";
 static QString g_mono    = "monospace";
 
-const Palette& palette()
+static void applyStyle(QApplication& app);   // fwd
+
+static Palette s_apricot, s_sage, s_iris, s_obsidian, s_current;
+static QString s_name = "obsidian";
+static QApplication* s_app = nullptr;
+static bool s_built = false;
+
+const Palette& palette() { return s_current; }
+QString currentTheme()   { return s_name; }
+bool    isDark()         { return s_name == QLatin1String("obsidian"); }
+
+static QColor mix(const QColor& a, const QColor& b, double t)
 {
-    static const Palette p;
+    return QColor(int(a.red()   + (b.red()   - a.red())   * t),
+                  int(a.green() + (b.green() - a.green()) * t),
+                  int(a.blue()  + (b.blue()  - a.blue())  * t));
+}
+
+// Build a full Palette from the 12 core tokens (app_tokens.dart); derive the
+// surfaceDeep / inkFaint / accentSoft helpers.
+static Palette buildPalette(const char* primary, const char* primaryDark,
+                            const char* accent, const char* bg, const char* surface,
+                            const char* surfaceVariant, const char* onSurface,
+                            const char* onSurfaceMuted, const char* outline,
+                            const char* success, const char* warning, const char* error)
+{
+    Palette p;
+    p.bg = QColor(bg); p.surface = QColor(surface); p.surfaceAlt = QColor(surfaceVariant);
+    p.ink = QColor(onSurface); p.inkSoft = QColor(onSurfaceMuted); p.border = QColor(outline);
+    p.accent = QColor(primary); p.accent2 = QColor(accent); p.accentInk = QColor(primaryDark);
+    p.good = QColor(success); p.warn = QColor(warning); p.bad = QColor(error);
+    p.surfaceDeep = mix(p.surfaceAlt, p.ink, 0.12);
+    p.inkFaint    = mix(p.inkSoft, p.bg, 0.35);
+    p.accentSoft  = mix(p.accent, p.surface, 0.80);
     return p;
+}
+
+static void buildPalettes()
+{
+    if (s_built) return; s_built = true;
+    s_apricot  = buildPalette("#FF6B47","#E54D2A","#FFB997","#FFF8F4","#FFFFFF","#FFEFE5","#1B1B1F","#6B6B72","#E8E0D9","#5DBE9C","#FFB44C","#E5484D");
+    s_sage     = buildPalette("#5DBE9C","#3FA37D","#A8E6CF","#F4FAF7","#FFFFFF","#E3F1EB","#1B1F1D","#626B66","#D9E8E1","#5DBE9C","#FFB44C","#E5484D");
+    s_iris     = buildPalette("#7C6BE6","#5B4ECF","#C9B6FF","#F6F5FF","#FFFFFF","#EFEAFF","#1B1A24","#6B6878","#E2DEEF","#5DBE9C","#FFB44C","#E5484D");
+    s_obsidian = buildPalette("#4F4C7E","#2C2A4A","#9D99C7","#121120","#1E1C2E","#26243A","#EFEEF5","#A8A6B8","#38364E","#5DBE9C","#FFB44C","#FF7177");
+    s_current  = s_obsidian;
+}
+
+static const Palette& paletteByName(const QString& n)
+{
+    if (n == QLatin1String("apricot")) return s_apricot;
+    if (n == QLatin1String("sage"))    return s_sage;
+    if (n == QLatin1String("iris"))    return s_iris;
+    return s_obsidian;
+}
+
+void setTheme(const QString& name)
+{
+    buildPalettes();
+    s_name = name;
+    s_current = paletteByName(name);
+    if (s_app) applyStyle(*s_app);
 }
 
 QString fontDisplay() { return g_display; }
@@ -71,11 +128,18 @@ void install(QApplication& app)
     QFont base(g_ui, 10);
     app.setFont(base);
 
+    s_app = &app;
+    setTheme(s_name);   // builds palettes + applies QSS/QPalette
+}
+
+// Re-applies the active palette to the whole application (QPalette + global
+// stylesheet). Runs on startup and on every theme change.
+static void applyStyle(QApplication& app)
+{
     const Palette& p = palette();
 
-    // Fusion + a dark palette so that EVERY widget (including unstyled scroll
-    // viewports, popups, combo dropdowns, message boxes) renders dark — the
-    // stylesheet alone left some surfaces on the light default palette.
+    // Fusion + the active palette so EVERY widget (incl. unstyled scroll
+    // viewports, popups, dropdowns, message boxes) renders themed.
     app.setStyle(QStyleFactory::create("Fusion"));
     QPalette pal;
     pal.setColor(QPalette::Window,          p.bg);

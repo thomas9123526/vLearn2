@@ -194,9 +194,9 @@ void SettingsPage::pickTheme()
     static const QStringList names{"Apricot", "Sage", "Iris", "Obsidian"};
     static const QStringList slugs{"apricot", "sage", "iris", "obsidian"};
     pickFromList(m_themeValue, tr("Theme"), names, [this](int i) {
-        patchProfile({{"activeTheme", slugs.at(qBound(0, i, 3))}});
-        QMessageBox::information(this, tr("Theme"),
-            tr("Saved. Restart the app to apply the new theme."));
+        const QString slug = slugs.at(qBound(0, i, 3));
+        patchProfile({{"activeTheme", slug}});
+        emit themeChanged(slug);     // applied live by the shell
     });
 }
 
@@ -241,6 +241,10 @@ void SettingsPage::setProfile(const UserProfile& p)
     if (!p.activeTheme.isEmpty()) {
         QString t = p.activeTheme; t[0] = t[0].toUpper();
         m_themeValue->setText(p.activeTheme == "obsidian" ? tr("Obsidian (dark)") : t);
+        // Apply the user's saved theme on first load (no re-persist). The shell
+        // rebuild makes current==saved, so this won't re-fire.
+        if (p.activeTheme != Theme::currentTheme())
+            emit themeChanged(p.activeTheme);
     }
     if (!p.uiLanguage.isEmpty())
         m_langValue->setText(p.uiLanguage == "ko" ? "한국어"

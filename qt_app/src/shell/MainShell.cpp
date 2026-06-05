@@ -140,6 +140,7 @@ MainShell::MainShell(ApiClient* api, QWidget* parent)
         m_chat->openSession(id);
     });
     connect(m_settings, &SettingsPage::signOutRequested, this, &QWidget::close);
+    connect(m_settings, &SettingsPage::themeChanged, this, &MainShell::themeChangeRequested);
 
     // Start on Home.
     static_cast<QPushButton*>(m_navGroup->button(PageHome))->setChecked(true);
