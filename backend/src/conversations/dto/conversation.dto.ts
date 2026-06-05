@@ -60,6 +60,15 @@ export class EndSessionDto {
   @IsOptional()
   @IsIn(['completed', 'abandoned'])
   status?: 'completed' | 'abandoned';
+
+  /** On-device STT pronunciation score converted to 0–100. Omitted when the
+   *  STT engine does not support pronunciation scoring (e.g. sherpa-onnx). */
+  @ApiProperty({ required: false, minimum: 0, maximum: 100 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  pronunciationScore?: number;
 }
 
 export class MessageDto {

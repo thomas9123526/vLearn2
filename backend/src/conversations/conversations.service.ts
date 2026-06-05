@@ -371,7 +371,9 @@ export class ConversationsService {
     await this.sessions.save(session);
 
     // Fire-and-forget AI evaluation — does not block the response
-    this.triggerEvaluation(session.id).catch((err: Error) =>
+    this.triggerEvaluation(session.id, {
+      pronunciationScore: dto.pronunciationScore ?? null,
+    }).catch((err: Error) =>
       this.logger.warn(`Background evaluation failed for ${session.id}: ${err.message}`),
     );
 
@@ -410,7 +412,10 @@ export class ConversationsService {
 
   // ─── Private: AI evaluation ──────────────────────────────
 
-  private async triggerEvaluation(sessionId: string): Promise<void> {
+  private async triggerEvaluation(
+    sessionId: string,
+    sttData: { pronunciationScore: number | null } = { pronunciationScore: null },
+  ): Promise<void> {
     const session = await this.sessions.findOne({ where: { id: sessionId } });
     if (!session) return;
 
@@ -451,6 +456,7 @@ export class ConversationsService {
 
     const fields = {
       session_id:            sessionId,
+      pronunciation_score:   sttData.pronunciationScore,
       fluency_score:         toHundred(s.fluency),
       grammar_score:         toHundred(s.accuracy),
       vocabulary_score:      toHundred(s.vocabulary),

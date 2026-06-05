@@ -185,10 +185,19 @@ class ConversationsApi {
   Future<Map<String, dynamic>> endSession(
     String sessionId, {
     String status = 'completed',
+    /// Average pronunciation score (0.0–1.0) aggregated from per-turn STT
+    /// results. Null when the STT engine does not support pronunciation scoring
+    /// (e.g. current sherpa-onnx). Backend stores null in that case.
+    double? pronunciationScore,
   }) async {
+    final body = <String, dynamic>{'status': status};
+    if (pronunciationScore != null) {
+      // Convert 0.0–1.0 → 0–100 to match the backend's smallint scale.
+      body['pronunciationScore'] = (pronunciationScore * 100).round().clamp(0, 100);
+    }
     final res = await _dio.post<Map<String, dynamic>>(
       '/conversations/sessions/$sessionId/end',
-      data: {'status': status},
+      data: body,
     );
     return res.data!;
   }

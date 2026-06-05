@@ -61,6 +61,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   bool _sending = false;
   bool _ending = false;
 
+  /// Collects the per-turn pronunciation score (0.0–1.0) reported by the STT
+  /// engine. Null entries mean the engine produced no score for that turn
+  /// (e.g. current sherpa-onnx). Sent to the backend when the session ends.
+  final List<double?> _turnPronunciationScores = [];
+
+  void _addSttScore(double? score) => _turnPronunciationScores.add(score);
+
   /// Number of messages last rendered — used to detect when a new turn
   /// (the user's own bubble or the AI's reply) lands so we can scroll
   /// the chat to the bottom.
@@ -165,7 +172,18 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     if (_ending) return;
     setState(() => _ending = true);
     try {
-      await ref.read(conversationsApiProvider).endSession(widget.sessionId);
+      // Compute average pronunciation score from turns where the engine
+      // provided a value. If all entries are null (sherpa-onnx or no turns),
+      // passes null so the backend stores null rather than a bogus 0.
+      final validScores = _turnPronunciationScores.whereType<double>().toList();
+      final avgPronunciation = validScores.isEmpty
+          ? null
+          : validScores.reduce((a, b) => a + b) / validScores.length;
+
+      await ref.read(conversationsApiProvider).endSession(
+            widget.sessionId,
+            pronunciationScore: avgPronunciation,
+          );
       if (mounted) {
         context.pushReplacement(AppRoute.report(widget.sessionId));
       }
@@ -327,6 +345,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                     : null,
                 onEnd: _end,
                 ending: _ending,
+                onSttScore: _addSttScore,
               );
             }
             return _ChatModeBody(
@@ -342,6 +361,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               readOnly: readOnly,
               status: d.session.status,
               personaId: d.session.personaId,
+              onSttScore: _addSttScore,
             );
           },
         ),
@@ -367,6 +387,7 @@ class _ChatModeBody extends ConsumerStatefulWidget {
     this.readOnly = false,
     this.status,
     required this.personaId,
+    this.onSttScore,
   });
 
   final ScrollController scroll;
@@ -387,6 +408,7 @@ class _ChatModeBody extends ConsumerStatefulWidget {
   /// from the history screen.
   final bool readOnly;
   final String? status;
+  final void Function(double?)? onSttScore;
 
   @override
   ConsumerState<_ChatModeBody> createState() => _ChatModeBodyState();
@@ -506,6 +528,9 @@ class _ChatModeBodyState extends ConsumerState<_ChatModeBody> {
       final result = await stt.transcribe(capture.pcm, language: 'en');
       final text = result.text.trim();
       if (text.isEmpty || !mounted) return;
+
+      // Report pronunciation score to parent accumulator (null when unsupported).
+      widget.onSttScore?.call(result.pronunciationScore);
 
       final guard = ref.read(contentGuardProvider);
       final guardResult = guard.check(text);
@@ -859,6 +884,7 @@ class _TutorModeWrapper extends ConsumerWidget {
     this.onSwitchToChat,
     required this.onEnd,
     required this.ending,
+    this.onSttScore,
   });
 
   final String sessionId;
@@ -870,6 +896,7 @@ class _TutorModeWrapper extends ConsumerWidget {
   final VoidCallback? onSwitchToChat;
   final VoidCallback onEnd;
   final bool ending;
+  final void Function(double?)? onSttScore;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -898,6 +925,7 @@ class _TutorModeWrapper extends ConsumerWidget {
           onSwitchToChat: onSwitchToChat,
           onEnd: onEnd,
           ending: ending,
+          onSttScore: onSttScore,
         );
       },
     );

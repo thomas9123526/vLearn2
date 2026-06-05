@@ -25,6 +25,7 @@ class TutorModeView extends ConsumerStatefulWidget {
     this.onSwitchToChat,
     required this.onEnd,
     required this.ending,
+    this.onSttScore,
     super.key,
   });
 
@@ -37,6 +38,9 @@ class TutorModeView extends ConsumerStatefulWidget {
   final VoidCallback? onSwitchToChat;
   final VoidCallback onEnd;
   final bool ending;
+  /// Called after each STT transcription with the engine's pronunciation score
+  /// (0.0–1.0), or null when the engine doesn't support pronunciation scoring.
+  final void Function(double?)? onSttScore;
 
   @override
   ConsumerState<TutorModeView> createState() => _TutorModeViewState();
@@ -250,6 +254,9 @@ class _TutorModeViewState extends ConsumerState<TutorModeView>
         debugPrint('[stt] empty result — not sending');
         return;
       }
+      // Report pronunciation score to the parent accumulator (null when engine
+      // doesn't support it — parent treats null as "no data" for this turn).
+      widget.onSttScore?.call(result.pronunciationScore);
       // Sends the turn upstream and awaits the AI reply — keeps us
       // in `thinking` mood for the whole round-trip.
       await widget.onSendText(text);

@@ -196,6 +196,7 @@ class SherpaOnnxSttService extends SpeechToTextService {
           text: normalized,
           confidence: 1.0,
           audioDuration: Duration(milliseconds: (durationSeconds * 1000).round()),
+          // pronunciationScore intentionally null: sherpa-onnx is transcription-only
         );
       } else if (_offline != null) {
         final stream = _offline!.createStream();
@@ -211,6 +212,7 @@ class SherpaOnnxSttService extends SpeechToTextService {
           confidence: 1.0,
           audioDuration: Duration(milliseconds: (durationSeconds * 1000).round()),
           detectedLanguage: result.lang.isEmpty ? null : result.lang,
+          // pronunciationScore intentionally null: sherpa-onnx is transcription-only
         );
       }
       throw SttUnavailableException('No recognizer was constructed.');

@@ -13,11 +13,16 @@ class SttResult {
     required this.confidence,
     required this.audioDuration,
     this.detectedLanguage,
+    this.pronunciationScore,
   });
   final String text;
   final double confidence;
   final Duration audioDuration;
   final String? detectedLanguage;
+  /// Overall pronunciation quality 0.0–1.0 produced by engines that support
+  /// GOP (Goodness of Pronunciation) scoring. null when the engine does not
+  /// provide this — callers must treat null as "no data", not as a zero score.
+  final double? pronunciationScore;
 }
 
 class SttCapabilities {
@@ -26,11 +31,15 @@ class SttCapabilities {
     required this.supportsLanguageDetection,
     required this.supportedLanguages,
     required this.onDevice,
+    this.supportsPronunciationScoring = false,
   });
   final bool supportsStreaming;
   final bool supportsLanguageDetection;
   final List<String> supportedLanguages;
   final bool onDevice;
+  /// True when the engine returns a meaningful [SttResult.pronunciationScore].
+  /// False for engines that only transcribe (e.g. current sherpa-onnx setup).
+  final bool supportsPronunciationScoring;
 }
 
 class TtsCapabilities {
