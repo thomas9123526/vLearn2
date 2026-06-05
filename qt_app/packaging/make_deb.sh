@@ -16,6 +16,7 @@
 #   /usr/bin/vlearn-chat                      the binary (stripped)
 #   /etc/vlearn/app_config.json               backend endpoint (a conffile)
 #   /usr/share/applications/vlearn.desktop    launcher entry
+#   /usr/share/icons/hicolor/*/apps/vlearn-chat.{png,svg}   app icon
 #
 # The app reads the endpoint from /etc/vlearn/app_config.json (or a per-user
 # ~/.config/vlearn/app_config.json). Edit that file on the target to point at
@@ -57,6 +58,15 @@ install -Dm644 "$APP_DIR/app_config.json"     "$ROOT/etc/vlearn/app_config.json"
 install -Dm644 "$HERE/vlearn.desktop"         "$ROOT/usr/share/applications/vlearn.desktop"
 install -Dm644 "$APP_DIR/README.md"           "$ROOT/usr/share/doc/$PKG/README.md"
 
+# App icon — scalable SVG + hicolor PNG sizes (named to match the .desktop Icon=).
+install -Dm644 "$HERE/icons/vlearn-chat.svg" \
+        "$ROOT/usr/share/icons/hicolor/scalable/apps/vlearn-chat.svg"
+for sz in 16 24 32 48 64 128 256 512; do
+    png="$HERE/icons/vlearn-chat-$sz.png"
+    [ -f "$png" ] && install -Dm644 "$png" \
+        "$ROOT/usr/share/icons/hicolor/${sz}x${sz}/apps/vlearn-chat.png"
+done
+
 INSTALLED_KB=$(du -ks "$ROOT" | cut -f1)
 
 # ---- 3. control metadata ---------------------------------------------------
@@ -84,6 +94,9 @@ cat > "$ROOT/DEBIAN/postinst" <<'EOF'
 set -e
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database -q /usr/share/applications || true
+fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
 fi
 EOF
 cp "$ROOT/DEBIAN/postinst" "$ROOT/DEBIAN/postrm"

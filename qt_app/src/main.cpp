@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <QPointer>
+#include <QIcon>
 #include <functional>
 
 #include "config/AppConfig.h"
@@ -25,6 +26,8 @@ int main(int argc, char** argv)
     QApplication app(argc, argv);
     QApplication::setOrganizationName("vlearn");
     QApplication::setApplicationName("FreeTalk");
+    QApplication::setWindowIcon(QIcon(":/icons/app.png"));
+    QApplication::setDesktopFileName("vlearn");   // links the window to vlearn.desktop
 
     // FreeTalk look: load fonts + apply the active theme; install i18n.
     Theme::install(app);

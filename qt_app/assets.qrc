@@ -8,4 +8,7 @@
         <file alias="PlayfairDisplay.ttf">assets/fonts/PlayfairDisplay.ttf</file>
         <file alias="SourceSerif4.ttf">assets/fonts/SourceSerif4.ttf</file>
     </qresource>
+    <qresource prefix="/icons">
+        <file alias="app.png">assets/icons/app.png</file>
+    </qresource>
 </RCC>
