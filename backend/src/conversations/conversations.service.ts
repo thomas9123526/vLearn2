@@ -435,10 +435,19 @@ export class ConversationsService {
     if (!result) return;
 
     const s = result.scores;
-    const toHundred = (v: number) => Math.round(Math.max(1, Math.min(5, v)) * 20);
-    const avgHundred = Math.round(
-      ((s.fluency + s.accuracy + s.vocabulary + s.interaction + s.topic_adherence) / 5) * 20,
-    );
+    if (!s || typeof s !== 'object') {
+      this.logger.warn(`Evaluation for ${sessionId}: scores object missing, skipping DB write`);
+      return;
+    }
+
+    // toHundred: 1-5 → 0-100. Score of 0 means "not recognised" — stored as null.
+    const toHundred = (v: number): number | null => (v === 0 ? null : Math.round(Math.max(1, Math.min(5, v)) * 20));
+    const validScores = [s.fluency, s.accuracy, s.vocabulary, s.interaction, s.topic_adherence]
+      .map(toHundred)
+      .filter((v): v is number => v !== null);
+    const avgHundred = validScores.length > 0
+      ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length)
+      : null;
 
     const fields = {
       session_id:            sessionId,
@@ -447,7 +456,7 @@ export class ConversationsService {
       vocabulary_score:      toHundred(s.vocabulary),
       engagement_score:      toHundred(s.interaction),
       topic_adherence_score: toHundred(s.topic_adherence),
-      overall_score:         avgHundred,
+      overall_score:         avgHundred ?? null,
       cefr_estimate:         result.overall_cefr_estimate,
       strengths:             result.strengths,
       improvements:          result.specific_feedback.filter((f) => f.issue && f.issue !== 'None').map((f) => f.issue).slice(0, 5),

@@ -280,27 +280,97 @@ ${transcript}`;
         content:      text,
       });
 
-      // Strip <think>...</think> chain-of-thought, then extract the JSON object.
-      // Any prose BETWEEN </think> and the opening "{" is the session feedback
-      // paragraph the model emits before the structured output.
-      const afterThink = text.includes('</think>')
-        ? text.slice(text.indexOf('</think>') + 8).trim()
-        : text.trim();
-      const jsonStart = afterThink.indexOf('{');
-      const jsonEnd = afterThink.lastIndexOf('}');
-      if (jsonStart === -1 || jsonEnd === -1) {
-        this.logger.warn('evaluateSession: no JSON found in AI response');
-        return null;
-      }
-      const sessionFeedback = jsonStart > 0
-        ? afterThink.slice(0, jsonStart).trim()
-        : '';
-      const parsed = JSON.parse(afterThink.slice(jsonStart, jsonEnd + 1));
-      return { ...parsed, session_feedback: sessionFeedback } as EvaluationResult;
+      return this.parseEvaluationText(text);
     } catch (e) {
       this.logger.warn(`evaluateSession failed: ${(e as Error).message}`);
       return null;
     }
+  }
+
+  /**
+   * Parses raw AI text into EvaluationResult.
+   *
+   * Handles all known Qwen3/llama output variations:
+   *   • <think>…</think> prefix
+   *   • Prose paragraph before the JSON block (becomes session_feedback)
+   *   • Markdown code fence  ```json … ```
+   *   • Field-name aliases (e.g. "grammar" instead of "accuracy")
+   *   • Extra text after the closing brace
+   *   • Missing optional fields (strengths, specific_feedback, etc.)
+   *
+   * Returns null only when no valid JSON object is found or required
+   * score fields are entirely absent.
+   */
+  private parseEvaluationText(text: string): EvaluationResult | null {
+    // 1. Strip <think>…</think>
+    const afterThink = text.includes('</think>')
+      ? text.slice(text.indexOf('</think>') + 8).trim()
+      : text.trim();
+
+    // 2. Locate JSON boundaries
+    const jsonStart = afterThink.indexOf('{');
+    const jsonEnd   = afterThink.lastIndexOf('}');
+    if (jsonStart === -1 || jsonEnd === -1) {
+      this.logger.warn('evaluateSession: no JSON object found in AI response');
+      return null;
+    }
+
+    // 3. Prose before '{' becomes session_feedback
+    const sessionFeedback = jsonStart > 0
+      ? afterThink.slice(0, jsonStart).trim()
+      : '';
+
+    // 4. Extract JSON string; strip markdown code fences if present
+    let jsonStr = afterThink.slice(jsonStart, jsonEnd + 1);
+    jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+
+    // 5. Parse — if it fails, log the raw snippet for debugging
+    let raw: Record<string, unknown>;
+    try {
+      raw = JSON.parse(jsonStr) as Record<string, unknown>;
+    } catch (e) {
+      this.logger.warn(
+        `evaluateSession: JSON.parse failed — ${(e as Error).message}. ` +
+        `Snippet: ${jsonStr.slice(0, 200)}`,
+      );
+      return null;
+    }
+
+    // 6. Normalise score object — handle field-name aliases
+    const rawScores = (raw['scores'] ?? raw['score'] ?? {}) as Record<string, unknown>;
+    const scores: EvaluationScores = {
+      fluency:        this.toScore(rawScores['fluency']        ?? rawScores['fluency_score']),
+      accuracy:       this.toScore(rawScores['accuracy']       ?? rawScores['grammar'] ?? rawScores['grammar_score']),
+      vocabulary:     this.toScore(rawScores['vocabulary']     ?? rawScores['vocabulary_score']),
+      interaction:    this.toScore(rawScores['interaction']    ?? rawScores['engagement'] ?? rawScores['engagement_score']),
+      topic_adherence:this.toScore(rawScores['topic_adherence']?? rawScores['topic_adherence_score'] ?? rawScores['topic']),
+    };
+
+    // 7. Require at least one valid score — if all are 0 the model likely
+    //    used an unrecognised schema; warn but still return what we have.
+    const scoreValues = Object.values(scores);
+    if (scoreValues.every((v) => v === 0)) {
+      this.logger.warn(
+        'evaluateSession: all scores resolved to 0 — model may have used ' +
+        `an unrecognised field schema. Raw scores: ${JSON.stringify(rawScores)}`,
+      );
+    }
+
+    return {
+      session_feedback:      sessionFeedback,
+      overall_cefr_estimate: (raw['overall_cefr_estimate'] as string | undefined) ?? '',
+      scores,
+      specific_feedback:     Array.isArray(raw['specific_feedback']) ? raw['specific_feedback'] as SpecificFeedbackItem[] : [],
+      strengths:             Array.isArray(raw['strengths'])          ? raw['strengths'] as string[] : [],
+      suggested_practice:    (raw['suggested_practice'] as string | undefined) ?? '',
+    };
+  }
+
+  /** Clamps any value to 1–5. Non-numeric input → 0 (sentinel for "missing"). */
+  private toScore(v: unknown): number {
+    const n = Number(v);
+    if (!isFinite(n) || n === 0) return 0;
+    return Math.round(Math.max(1, Math.min(5, n)));
   }
 
   private fallbackSuggestion(history: ChatMessage[]): string {
