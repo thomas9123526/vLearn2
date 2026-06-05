@@ -20,6 +20,7 @@ SOURCES += \
     src/auth/LoginDialog.cpp \
     src/home/HomePage.cpp \
     src/scenarios/ScenariosPage.cpp \
+    src/scenarios/ScenarioBriefPage.cpp \
     src/progress/ProgressPage.cpp \
     src/settings/SettingsPage.cpp \
     src/chat/ChatPage.cpp \
@@ -35,6 +36,7 @@ HEADERS += \
     src/auth/LoginDialog.h \
     src/home/HomePage.h \
     src/scenarios/ScenariosPage.h \
+    src/scenarios/ScenarioBriefPage.h \
     src/progress/ProgressPage.h \
     src/settings/SettingsPage.h \
     src/chat/ChatPage.h \

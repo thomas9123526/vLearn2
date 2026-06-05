@@ -2,6 +2,7 @@
 #include "api/ApiClient.h"
 #include "home/HomePage.h"
 #include "scenarios/ScenariosPage.h"
+#include "scenarios/ScenarioBriefPage.h"
 #include "progress/ProgressPage.h"
 #include "chat/HistoryPage.h"
 #include "chat/ChatPage.h"
@@ -20,7 +21,7 @@
 #include <QStatusBar>
 #include <QJsonObject>
 
-enum { PageHome = 0, PageScenarios, PageHistory, PageProgress, PageSettings, PageChat };
+enum { PageHome = 0, PageScenarios, PageHistory, PageProgress, PageSettings, PageChat, PageBrief };
 
 MainShell::MainShell(ApiClient* api, QWidget* parent)
     : QMainWindow(parent)
@@ -32,6 +33,7 @@ MainShell::MainShell(ApiClient* api, QWidget* parent)
     // ---- Pages ---------------------------------------------------------
     m_home      = new HomePage(m_api);
     m_scenarios = new ScenariosPage(m_api);
+    m_brief     = new ScenarioBriefPage(m_api);
     m_history   = new HistoryPage(m_api);
     m_progress  = new ProgressPage(m_api);
     m_settings  = new SettingsPage(m_api);
@@ -44,6 +46,7 @@ MainShell::MainShell(ApiClient* api, QWidget* parent)
     m_stack->addWidget(m_progress);   // 3
     m_stack->addWidget(m_settings);   // 4
     m_stack->addWidget(m_chat);       // 5 (not in nav)
+    m_stack->addWidget(m_brief);      // 6 (not in nav)
 
     // ---- Sidebar -------------------------------------------------------
     auto* sidebar = new QFrame;
@@ -117,12 +120,21 @@ MainShell::MainShell(ApiClient* api, QWidget* parent)
     connect(m_chat, &ChatPage::statusMessage, this, [this](const QString& t) {
         statusBar()->showMessage(t);
     });
-    auto startScenario = [this](const QString& id, const QString& title) {
+    // Scenario tapped → show the brief (detail) screen first.
+    auto openBrief = [this](const QString& id, const QString&) {
+        m_brief->load(id);
+        showPage(PageBrief);
+    };
+    connect(m_home,      &HomePage::scenarioActivated,      this, openBrief);
+    connect(m_scenarios, &ScenariosPage::scenarioActivated, this, openBrief);
+    // Brief → start the conversation (→ chat shows the tutor's opening line).
+    connect(m_brief, &ScenarioBriefPage::startRequested, this, [this](const QString& id, const QString& title) {
         showPage(PageChat);
         m_chat->startScenario(id, title);
-    };
-    connect(m_home,      &HomePage::scenarioActivated,      this, startScenario);
-    connect(m_scenarios, &ScenariosPage::scenarioActivated, this, startScenario);
+    });
+    connect(m_brief, &ScenarioBriefPage::backRequested, this, [this]() {
+        showPage(PageScenarios);
+    });
     connect(m_history,   &HistoryPage::openRequested, this, [this](const QString& id) {
         showPage(PageChat);
         m_chat->openSession(id);

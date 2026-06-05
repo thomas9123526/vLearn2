@@ -112,6 +112,11 @@ void ApiClient::listScenarios(Callback cb)
     request("GET", "/scenarios", nullptr, std::move(cb), /*auth=*/true);
 }
 
+void ApiClient::getScenario(const QString& idOrSlug, Callback cb)
+{
+    request("GET", "/scenarios/" + idOrSlug, nullptr, std::move(cb), /*auth=*/true);
+}
+
 void ApiClient::listTeachers(Callback cb)
 {
     request("GET", "/teachers", nullptr, std::move(cb), /*auth=*/true);

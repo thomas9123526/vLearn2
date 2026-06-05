@@ -6,6 +6,7 @@
 class ApiClient;
 class HomePage;
 class ScenariosPage;
+class ScenarioBriefPage;
 class ProgressPage;
 class HistoryPage;
 class SettingsPage;
@@ -37,9 +38,10 @@ private:
     QStackedWidget* m_stack;
     QButtonGroup*   m_navGroup;
 
-    HomePage*      m_home;
-    ScenariosPage* m_scenarios;
-    ProgressPage*  m_progress;
+    HomePage*          m_home;
+    ScenariosPage*     m_scenarios;
+    ScenarioBriefPage* m_brief;
+    ProgressPage*      m_progress;
     HistoryPage*   m_history;
     SettingsPage*  m_settings;
     ChatPage*      m_chat;

@@ -36,6 +36,7 @@ public:
     void getProfile(Callback cb);     // GET /users/profile
     void getProgress(Callback cb);    // GET /progress
     void listScenarios(Callback cb);  // GET /scenarios
+    void getScenario(const QString& idOrSlug, Callback cb);  // GET /scenarios/:id
 
     // Personas (needed to start a session)
     void listTeachers(Callback cb);

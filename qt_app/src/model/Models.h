@@ -1,9 +1,11 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 #include <QDateTime>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QJsonArray>
 
 // I18nTextDto {en,ko,zh} or a plain string → pick a readable string (prefer en).
 inline QString localized(const QJsonValue& v)
@@ -113,6 +115,12 @@ struct Scenario {
     int     estimatedMinutes = 0;
     int     xpReward = 0;
     int     cefrLevel = 0;
+    // Detail-only (GET /scenarios/:id): i18n role text + objectives/phrases.
+    QString     sceneDescription;
+    QString     userRole;
+    QString     tutorRole;
+    QStringList objectives;
+    QStringList keyPhrases;
 
     static Scenario fromJson(const QJsonObject& o) {
         Scenario s;
@@ -127,6 +135,19 @@ struct Scenario {
                                  o.value("xp_reward").toInt());
         s.cefrLevel        = o.value("cefrLevel").toInt(
                                  o.value("cefr_level").toInt());
+
+        // Detail fields (present on GET /scenarios/:id).
+        s.sceneDescription = localized(o.value("scene_description"));
+        s.userRole         = localized(o.value("user_role"));
+        s.tutorRole        = localized(o.value("tutor_role"));
+        for (const QJsonValue& v : o.value("objectives").toArray()) {
+            const QString t = localized(v);          // {en,ko,zh}
+            if (!t.isEmpty()) s.objectives << t;
+        }
+        for (const QJsonValue& v : o.value("key_phrases").toArray()) {
+            const QString p = v.toObject().value("phrase").toString();
+            if (!p.isEmpty()) s.keyPhrases << p;
+        }
         return s;
     }
 };
