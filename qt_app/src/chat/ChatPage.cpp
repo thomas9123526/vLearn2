@@ -116,6 +116,12 @@ void ChatPage::setHeader(const QString& name, const QColor& accent, const QStrin
 
 void ChatPage::clearTranscript()
 {
+    // The clear loop deletes every row (incl. a pending typing row); make sure
+    // we don't keep dangling pointers / a running timer.
+    if (m_typingTimer) m_typingTimer->stop();
+    m_typingRow = nullptr;
+    m_typingBubble = nullptr;
+
     QLayoutItem* item;
     while ((item = m_msgLayout->takeAt(0)) != nullptr) {
         if (item->widget()) item->widget()->deleteLater();
@@ -156,6 +162,40 @@ void ChatPage::appendBubble(const QString& role, const QString& content)
 
     m_msgLayout->insertLayout(m_msgLayout->count() - 1, rowWrapper(bubble, mine));
     scrollToBottom();
+}
+
+void ChatPage::showTyping()
+{
+    if (m_typingRow) return;
+    m_typingBubble = new QLabel("•");
+    m_typingBubble->setObjectName("BubbleTutor");
+    m_typingBubble->setMinimumWidth(54);
+    m_typingRow = new QWidget;
+    m_typingRow->setLayout(rowWrapper(m_typingBubble, /*alignRight=*/false));
+    m_msgLayout->insertWidget(m_msgLayout->count() - 1, m_typingRow);
+    scrollToBottom();
+
+    if (!m_typingTimer) {
+        m_typingTimer = new QTimer(this);
+        connect(m_typingTimer, &QTimer::timeout, this, [this]() {
+            m_typingPhase = (m_typingPhase + 1) % 3;
+            static const char* dots[] = {"•", "• •", "• • •"};
+            if (m_typingBubble) m_typingBubble->setText(dots[m_typingPhase]);
+        });
+    }
+    m_typingPhase = 0;
+    m_typingTimer->start(350);
+}
+
+void ChatPage::hideTyping()
+{
+    if (m_typingTimer) m_typingTimer->stop();
+    if (m_typingRow) {
+        m_msgLayout->removeWidget(m_typingRow);
+        m_typingRow->deleteLater();
+        m_typingRow = nullptr;
+        m_typingBubble = nullptr;
+    }
 }
 
 void ChatPage::scrollToBottom()
@@ -282,10 +322,12 @@ void ChatPage::onSend()
     appendBubble("user", text);
     m_input->clear();
     setSending(true);
+    showTyping();
     emit statusMessage(tr("Tutor is typing…"));
 
     m_api->sendMessage(m_sessionId, text,
         [this](bool ok, const QJsonValue& data, const QString& err) {
+            hideTyping();
             setSending(false);
             if (!ok || !data.isObject()) {
                 emit statusMessage(tr("Send failed: %1").arg(err));

@@ -9,6 +9,7 @@ class QScrollArea;
 class QLineEdit;
 class QPushButton;
 class QLabel;
+class QTimer;
 
 // FreeTalk-styled chat screen (header + transcript of bubbles + quick replies
 // + rounded input bar). Lives inside MainShell's stacked content area.
@@ -36,6 +37,8 @@ private:
     void  clearTranscript();
     void  addDatePill(const QString& text);
     void  appendBubble(const QString& role, const QString& content);
+    void  showTyping();   // animated "tutor is typing…" bubble during the request
+    void  hideTyping();
     void  setSending(bool sending);
     void  scrollToBottom();
 
@@ -55,4 +58,10 @@ private:
     // input
     QLineEdit*   m_input;
     QPushButton* m_send;
+
+    // typing indicator
+    QWidget* m_typingRow   = nullptr;
+    QLabel*  m_typingBubble = nullptr;
+    QTimer*  m_typingTimer = nullptr;
+    int      m_typingPhase = 0;
 };
