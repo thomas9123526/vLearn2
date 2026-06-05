@@ -37,6 +37,7 @@ public:
     void updateProfile(const QJsonObject& patch, Callback cb);  // PATCH /users/profile
     void getProgress(Callback cb);    // GET /progress
     void listScenarios(Callback cb);  // GET /scenarios
+    void listNews(Callback cb);       // GET /news -> { items: [...] }
     void getScenario(const QString& idOrSlug, Callback cb);  // GET /scenarios/:id
 
     // Personas (needed to start a session)

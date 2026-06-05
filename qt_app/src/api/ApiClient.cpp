@@ -122,6 +122,11 @@ void ApiClient::getScenario(const QString& idOrSlug, Callback cb)
     request("GET", "/scenarios/" + idOrSlug, nullptr, std::move(cb), /*auth=*/true);
 }
 
+void ApiClient::listNews(Callback cb)
+{
+    request("GET", "/news?page=1&limit=10", nullptr, std::move(cb), /*auth=*/true);
+}
+
 void ApiClient::listTeachers(Callback cb)
 {
     request("GET", "/teachers", nullptr, std::move(cb), /*auth=*/true);

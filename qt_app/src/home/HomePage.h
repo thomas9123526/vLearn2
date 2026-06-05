@@ -7,6 +7,7 @@ class ApiClient;
 class QLabel;
 class QProgressBar;
 class QHBoxLayout;
+class QFrame;
 
 // Dashboard home: greeting, streak/XP hero card, Sessions/Minutes/Topics
 // stats, and a Recommended-scenarios strip. Mirrors the Flutter home screen.
@@ -25,9 +26,13 @@ private:
     void applyProfile(const UserProfile& p);
     void applyProgress(const ProgressSummary& p);
     void applyScenarios(const QVector<Scenario>& list);
+    void applyNews(const QString& title, const QString& summary);
 
     ApiClient*    m_api;
     QLabel*       m_greeting;
+    QFrame*       m_newsCard;
+    QLabel*       m_newsTitle;
+    QLabel*       m_newsSummary;
     QLabel*       m_streakLabel;
     QLabel*       m_xpLabel;
     QLabel*       m_levelHint;

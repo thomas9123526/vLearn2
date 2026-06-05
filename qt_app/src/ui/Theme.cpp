@@ -331,9 +331,15 @@ static void applyStyle(QApplication& app)
         #StatCard {
             background: %surface%; border: 1px solid %border%; border-radius: 16px;
         }
-        #StatNum  { font-size: 26px; font-weight: 700; color: %ink%; }
-        #StatLbl  { color: %inkSoft%; font-size: 12px; }
-        #StatIcon { color: %accent2%; font-size: 18px; }
+        #StatNum  { font-size: 28px; font-weight: 700; color: %ink%; }
+        #StatLbl  { color: %inkSoft%; font-size: 13px; }
+        #StatIcon { color: %accent2%; font-size: 20px; }
+
+        /* ---- Home: news card ---- */
+        #NewsCard  { background: %surface%; border: 1px solid %border%; border-radius: 16px; }
+        #NewsTitle { font-size: 15px; font-weight: 700; color: %ink%; }
+
+        #HeroBig { font-size: 24px; }
 
         /* ---- Scenario cards ---- */
         #ScenarioCard {

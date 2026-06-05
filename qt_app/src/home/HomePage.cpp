@@ -26,9 +26,10 @@ static QFrame* makeStatCard(const QString& iconText, QLabel*& numOut, const QStr
 {
     auto* card = new QFrame;
     card->setObjectName("StatCard");
+    card->setAttribute(Qt::WA_StyledBackground, true);   // paint QSS bg/border
     auto* v = new QVBoxLayout(card);
-    v->setContentsMargins(16, 16, 16, 16);
-    v->setSpacing(4);
+    v->setContentsMargins(16, 20, 16, 20);
+    v->setSpacing(6);
     auto* icon = new QLabel(iconText); icon->setObjectName("StatIcon");
     icon->setAlignment(Qt::AlignHCenter);
     numOut = new QLabel("0");          numOut->setObjectName("StatNum");
@@ -54,9 +55,11 @@ HomePage::HomePage(ApiClient* api, QWidget* parent)
     // Hero streak/XP card ------------------------------------------------
     auto* hero = new QFrame;
     hero->setObjectName("HeroCard");
+    hero->setAttribute(Qt::WA_StyledBackground, true);   // paint the gradient
+    hero->setMinimumHeight(96);
     auto* hv = new QVBoxLayout(hero);
-    hv->setContentsMargins(20, 16, 20, 16);
-    hv->setSpacing(10);
+    hv->setContentsMargins(24, 20, 24, 20);
+    hv->setSpacing(12);
 
     auto* heroTop = new QHBoxLayout;
     m_streakLabel = new QLabel("🔥  0 day streak"); m_streakLabel->setObjectName("HeroBig");
@@ -76,12 +79,25 @@ HomePage::HomePage(ApiClient* api, QWidget* parent)
     hv->addWidget(m_xpBar);
     hv->addWidget(m_levelHint);
 
-    // Stat cards ---------------------------------------------------------
+    // News card ----------------------------------------------------------
+    m_newsCard = new QFrame;
+    m_newsCard->setObjectName("NewsCard");
+    m_newsCard->setAttribute(Qt::WA_StyledBackground, true);
+    auto* nv = new QVBoxLayout(m_newsCard);
+    nv->setContentsMargins(18, 16, 18, 16);
+    nv->setSpacing(4);
+    m_newsTitle = new QLabel; m_newsTitle->setObjectName("NewsTitle"); m_newsTitle->setWordWrap(true);
+    m_newsSummary = new QLabel; m_newsSummary->setObjectName("Sub"); m_newsSummary->setWordWrap(true);
+    nv->addWidget(m_newsTitle);
+    nv->addWidget(m_newsSummary);
+    m_newsCard->hide();   // shown when a news item arrives
+
+    // Stat cards (full width row) ----------------------------------------
     auto* statsRow = new QHBoxLayout;
-    statsRow->setSpacing(12);
-    statsRow->addWidget(makeStatCard("💬", m_statSessions, tr("Sessions")));
-    statsRow->addWidget(makeStatCard("⏱", m_statMinutes, tr("Minutes")));
-    statsRow->addWidget(makeStatCard("🗺", m_statTopics, tr("Topics")));
+    statsRow->setSpacing(14);
+    statsRow->addWidget(makeStatCard("💬", m_statSessions, tr("Sessions")), 1);
+    statsRow->addWidget(makeStatCard("⏱", m_statMinutes, tr("Minutes")), 1);
+    statsRow->addWidget(makeStatCard("🗺", m_statTopics, tr("Topics")), 1);
 
     // Recommended scenarios ---------------------------------------------
     auto* recHead = new QLabel(tr("Recommended scenarios"));
@@ -90,7 +106,7 @@ HomePage::HomePage(ApiClient* api, QWidget* parent)
 
     auto* recScroll = new QScrollArea;
     recScroll->setWidgetResizable(true);
-    recScroll->setFixedHeight(170);
+    recScroll->setFixedHeight(184);
     recScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     recScroll->setFrameShape(QFrame::NoFrame);
     auto* recCanvas = new QWidget;
@@ -108,6 +124,7 @@ HomePage::HomePage(ApiClient* api, QWidget* parent)
     col->addWidget(m_greeting);
     col->addWidget(sub);
     col->addWidget(hero);
+    col->addWidget(m_newsCard);
     col->addLayout(statsRow);
     col->addSpacing(4);
     col->addWidget(recHead);
@@ -157,9 +174,9 @@ void HomePage::applyScenarios(const QVector<Scenario>& list)
         auto* card = new ClickableFrame;
         card->setObjectName("ScenarioCard");
         card->setCursor(Qt::PointingHandCursor);
-        card->setFixedWidth(220);
+        card->setFixedSize(240, 150);
         auto* v = new QVBoxLayout(card);
-        v->setContentsMargins(14, 14, 14, 14);
+        v->setContentsMargins(16, 16, 16, 16);
         v->setSpacing(8);
 
         auto* chip = new QLabel(s.category.isEmpty() ? tr("chat") : s.category);
@@ -187,8 +204,25 @@ void HomePage::applyScenarios(const QVector<Scenario>& list)
     }
 }
 
+void HomePage::applyNews(const QString& title, const QString& summary)
+{
+    if (title.isEmpty()) { m_newsCard->hide(); return; }
+    m_newsTitle->setText(title);
+    m_newsSummary->setText(summary);
+    m_newsSummary->setVisible(!summary.isEmpty());
+    m_newsCard->show();
+}
+
 void HomePage::refresh()
 {
+    m_api->listNews([this](bool ok, const QJsonValue& d, const QString&) {
+        if (!ok) return;
+        QJsonArray items = d.isObject() ? d.toObject().value("items").toArray()
+                                        : d.toArray();
+        if (items.isEmpty()) { applyNews(QString(), QString()); return; }
+        const QJsonObject n = items.first().toObject();
+        applyNews(localized(n.value("title")), localized(n.value("summary")));
+    });
     m_api->getProfile([this](bool ok, const QJsonValue& d, const QString&) {
         if (ok && d.isObject()) {
             const UserProfile p = UserProfile::fromJson(d.toObject());

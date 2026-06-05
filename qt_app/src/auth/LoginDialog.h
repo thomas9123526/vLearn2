@@ -6,6 +6,7 @@ class ApiClient;
 class QLineEdit;
 class QPushButton;
 class QLabel;
+class QCheckBox;
 
 // Simple sign-in dialog: cidUsername + password → POST /auth/signin.
 // On success the dialog accept()s and ApiClient holds the JWT.
@@ -25,4 +26,5 @@ private:
     QLineEdit*   m_password;
     QPushButton* m_signIn;
     QLabel*      m_error;
+    QCheckBox*   m_remember;
 };
