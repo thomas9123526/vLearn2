@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Virtual Foreign Language System — One-command installer
+# Tested on Ubuntu 22.04 / 24.04
+#
+# Usage:
+#   sudo bash deploy/install.sh
+# =============================================================================
+set -euo pipefail
+
+# ── Colors ────────────────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
+
+DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$DEPLOY_DIR")"
+
+# ── Logging helpers ───────────────────────────────────────────────────────────
+info()    { echo -e "${CYAN}[INFO]${RESET}  $*"; }
+ok()      { echo -e "${GREEN}[ OK ]${RESET}  $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
+die()     { echo -e "${RED}[FAIL]${RESET}  $*" >&2; exit 1; }
+
+prompt() {
+  # prompt VAR_NAME "Question text" [default]
+  local _var="$1" _msg="$2" _default="${3:-}" _val
+  if [[ -n "$_default" ]]; then
+    read -rp "$(echo -e "${BOLD}${_msg}${RESET} [${_default}]: ")" _val
+    printf -v "$_var" '%s' "${_val:-$_default}"
+  else
+    read -rp "$(echo -e "${BOLD}${_msg}${RESET}: ")" _val
+    printf -v "$_var" '%s' "$_val"
+  fi
+}
+
+prompt_secret() {
+  local _var="$1" _msg="$2" _val
+  read -rsp "$(echo -e "${BOLD}${_msg}${RESET} (hidden, Enter to skip): ")" _val
+  echo
+  printf -v "$_var" '%s' "$_val"
+}
+
+gen_secret() {
+  # gen_secret LENGTH — random URL-safe string
+  openssl rand -base64 64 | tr -d '/+=' | head -c "$1"
+}
+
+# ── Preflight ─────────────────────────────────────────────────────────────────
+[[ $EUID -eq 0 ]] || die "Please run as root: sudo bash deploy/install.sh"
+
+if [[ ! -f "$ROOT_DIR/backend/package.json" ]]; then
+  die "Cannot find backend/. Make sure you run this script from inside the vLearn2 repository."
+fi
+
+# ── Banner ────────────────────────────────────────────────────────────────────
+echo -e "
+${CYAN}╔══════════════════════════════════════════════════════════════╗
+║      Virtual Foreign Language System — Setup Installer       ║
+╚══════════════════════════════════════════════════════════════╝${RESET}
+  This script will install Docker, build all services, and start
+  the system on this server.
+"
+
+# ── Install Docker ────────────────────────────────────────────────────────────
+if ! command -v docker &>/dev/null; then
+  info "Docker not found — installing..."
+  apt-get update -qq
+  curl -fsSL https://get.docker.com | sh
+  systemctl enable --now docker
+  ok "Docker installed: $(docker --version)"
+else
+  ok "Docker already present: $(docker --version)"
+fi
+
+if ! docker compose version &>/dev/null 2>&1; then
+  info "Docker Compose plugin not found — installing..."
+  apt-get install -y -qq docker-compose-plugin
+  ok "Docker Compose installed."
+else
+  ok "Docker Compose: $(docker compose version --short 2>/dev/null || docker compose version)"
+fi
+
+# ── Interactive configuration ─────────────────────────────────────────────────
+echo -e "\n${BOLD}━━━ Server Configuration ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}\n"
+
+SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
+prompt SERVER_HOST \
+  "Server IP address or domain name (Flutter app will connect here)" \
+  "${SERVER_IP}"
+
+[[ -n "$SERVER_HOST" ]] || die "Server host cannot be empty."
+
+echo -e "\n${BOLD}━━━ AI Configuration ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}\n"
+echo -e "  The system uses a built-in AI mock by default (no key needed)."
+echo -e "  Providing an Anthropic API key enables real AI responses when the"
+echo -e "  mock has no pre-canned answer.\n"
+prompt_secret ANTHROPIC_KEY "Anthropic API key"
+
+# ── Generate secrets ──────────────────────────────────────────────────────────
+info "Generating secure random secrets..."
+DB_PASSWORD="$(gen_secret 24)"
+DB_ENCRYPTION_KEY="$(gen_secret 32 | head -c 32)"
+JWT_ACCESS_SECRET="$(gen_secret 48)"
+JWT_REFRESH_SECRET="$(gen_secret 48)"
+
+# ── Determine AI mode ─────────────────────────────────────────────────────────
+if [[ -n "$ANTHROPIC_KEY" ]]; then
+  AI_PROVIDER_LINE="AI_PROVIDER=anthropic"
+  AI_KEY_LINE="ANTHROPIC_API_KEY=${ANTHROPIC_KEY}"
+  AI_CHAT_MODEL="claude-sonnet-4-6"
+  AI_ANALYSIS_MODEL="claude-haiku-4-5-20251001"
+  MOCK_KEY_LINE="MOCK_ANTHROPIC_API_KEY=${ANTHROPIC_KEY}"
+  info "Real Anthropic API will be used (mock active as fallback)."
+else
+  AI_PROVIDER_LINE="AI_PROVIDER=openai-compatible"
+  AI_KEY_LINE="OPENAI_BASE_URL=http://ai-mock:8081/v1
+OPENAI_API_KEY=not-needed"
+  AI_CHAT_MODEL="Qwen3.5-9B-mock"
+  AI_ANALYSIS_MODEL="Qwen3.5-9B-mock"
+  MOCK_KEY_LINE="# MOCK_ANTHROPIC_API_KEY= (not set)"
+  warn "No Anthropic key — using built-in mock for all AI responses."
+fi
+
+# ── Write .env ────────────────────────────────────────────────────────────────
+ENV_FILE="$DEPLOY_DIR/.env"
+
+cat > "$ENV_FILE" <<EOF
+# Virtual Foreign Language System — generated by install.sh
+# $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# ⚠ DO NOT share or commit this file — it contains secrets.
+
+NODE_ENV=production
+PORT=3000
+PUBLIC_BASE_URL=http://${SERVER_HOST}
+CORS_ORIGINS=http://${SERVER_HOST}
+
+DB_HOST=postgres
+DB_PORT=5432
+DB_NAME=vlearn2
+DB_USER=vlearn2
+DB_PASSWORD=${DB_PASSWORD}
+
+JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+JWT_ACCESS_EXPIRES=15m
+JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+JWT_REFRESH_EXPIRES=7d
+
+${AI_PROVIDER_LINE}
+${AI_KEY_LINE}
+AI_CHAT_MODEL=${AI_CHAT_MODEL}
+AI_ANALYSIS_MODEL=${AI_ANALYSIS_MODEL}
+AI_TIMEOUT_MS=60000
+
+MOCK_MODEL_NAME=Qwen3.5-9B-mock
+${MOCK_KEY_LINE}
+
+DB_FIELD_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY}
+GZIP_ENABLED=true
+GZIP_THRESHOLD_BYTES=102400
+THROTTLE_TTL_SECONDS=60
+THROTTLE_LIMIT=120
+MAX_AI_MESSAGES_PER_DAY=100
+EOF
+
+chmod 600 "$ENV_FILE"
+ok ".env written (permissions: 600)"
+
+# ── Build & start ─────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}━━━ Building containers ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}\n"
+info "This may take 3–5 minutes on first run..."
+cd "$DEPLOY_DIR"
+docker compose up -d --build
+
+# ── Health check ──────────────────────────────────────────────────────────────
+info "Waiting for backend to become healthy..."
+TRIES=0
+until curl -sf "http://localhost/health" &>/dev/null || [[ $TRIES -ge 40 ]]; do
+  sleep 3
+  ((TRIES++))
+done
+
+if curl -sf "http://localhost/health" &>/dev/null; then
+  ok "Backend is healthy."
+else
+  warn "Backend health check timed out. Check logs with:"
+  warn "  bash $DEPLOY_DIR/manage.sh logs backend"
+fi
+
+# ── Done ──────────────────────────────────────────────────────────────────────
+echo -e "
+${GREEN}╔══════════════════════════════════════════════════════════════╗
+║                  Setup complete!                             ║
+╚══════════════════════════════════════════════════════════════╝${RESET}
+
+  API base URL  : ${CYAN}http://${SERVER_HOST}${RESET}
+  Health check  : ${CYAN}http://${SERVER_HOST}/health${RESET}
+
+  Point your Flutter app to:
+    ${BOLD}BASE_URL = http://${SERVER_HOST}${RESET}
+
+  Useful commands:
+    ${BOLD}bash ${DEPLOY_DIR}/manage.sh status${RESET}         — container status
+    ${BOLD}bash ${DEPLOY_DIR}/manage.sh logs${RESET}           — tail all logs
+    ${BOLD}bash ${DEPLOY_DIR}/manage.sh logs backend${RESET}   — backend logs only
+    ${BOLD}bash ${DEPLOY_DIR}/manage.sh stop${RESET}           — stop everything
+    ${BOLD}bash ${DEPLOY_DIR}/manage.sh update${RESET}         — pull + rebuild + restart
+    ${BOLD}bash ${DEPLOY_DIR}/manage.sh backup${RESET}         — dump the database
+"
