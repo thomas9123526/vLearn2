@@ -208,9 +208,10 @@ void install(QApplication& app)
 
         /* ---- Scenario cards ---- */
         #ScenarioCard {
-            background: %surface%; border: 1px solid %border%; border-radius: 16px;
+            background: %surface%; border: 1px solid rgba(157,153,199,0.35);
+            border-radius: 16px;
         }
-        #ScenarioCard:hover { border: 1px solid %accent2%; }
+        #ScenarioCard:hover { border: 1px solid %accent2%; background: %surfaceAlt%; }
         #ScenarioTitle { font-size: 15px; font-weight: 600; color: %ink%; }
         #ScenarioMeta  { color: %inkSoft%; font-family: '%mono%'; font-size: 11px; }
         QLabel#CatChip {

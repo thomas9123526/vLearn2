@@ -34,6 +34,7 @@ public:
 
     // Profile / dashboard data
     void getProfile(Callback cb);     // GET /users/profile
+    void updateProfile(const QJsonObject& patch, Callback cb);  // PATCH /users/profile
     void getProgress(Callback cb);    // GET /progress
     void listScenarios(Callback cb);  // GET /scenarios
     void getScenario(const QString& idOrSlug, Callback cb);  // GET /scenarios/:id

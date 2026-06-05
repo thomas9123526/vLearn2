@@ -102,6 +102,11 @@ void ApiClient::getProfile(Callback cb)
     request("GET", "/users/profile", nullptr, std::move(cb), /*auth=*/true);
 }
 
+void ApiClient::updateProfile(const QJsonObject& patch, Callback cb)
+{
+    request("PATCH", "/users/profile", &patch, std::move(cb), /*auth=*/true);
+}
+
 void ApiClient::getProgress(Callback cb)
 {
     request("GET", "/progress", nullptr, std::move(cb), /*auth=*/true);

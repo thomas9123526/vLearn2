@@ -86,8 +86,11 @@ struct Session {
 // GET /users/profile (UserProfileDto)
 struct UserProfile {
     QString displayName;
+    QString email;
     QString avatarEmoji;
     QString activePersonaId;
+    QString uiLanguage;
+    QString activeTheme;
     int     currentLevel = 1;
     int     xpTotal      = 0;
     int     streakDays   = 0;
@@ -97,8 +100,11 @@ struct UserProfile {
     static UserProfile fromJson(const QJsonObject& o) {
         UserProfile u;
         u.displayName     = o.value("displayName").toString();
+        u.email           = o.value("email").toString();
         u.avatarEmoji     = o.value("avatarEmoji").toString();
         u.activePersonaId = o.value("activePersonaId").toString();
+        u.uiLanguage      = o.value("uiLanguage").toString();
+        u.activeTheme     = o.value("activeTheme").toString();
         u.currentLevel    = o.value("currentLevel").toInt(1);
         u.xpTotal         = o.value("xpTotal").toInt();
         u.streakDays      = o.value("streakDays").toInt();
