@@ -29,6 +29,10 @@ private slots:
 
 private:
     void  setHeader(const QString& name, const QColor& accent, const QString& sub);
+    // GET /sessions/:id → render header + all messages (incl. the tutor's
+    // seeded opening line). Used by every entry path.
+    void  renderSession(const QString& id, const QString& preferredName,
+                        const QColor& preferredAccent);
     void  clearTranscript();
     void  addDatePill(const QString& text);
     void  appendBubble(const QString& role, const QString& content);

@@ -206,14 +206,8 @@ void ChatPage::startNewChat()
                     return;
                 }
                 const Session s = Session::fromJson(sdata.toObject());
-                m_sessionId = s.id;
-                clearTranscript();
-                setHeader(persona.name, Theme::personaAccent(persona.name),
-                          tr("AI Tutor · Online"));
-                addDatePill(tr("New conversation"));
-                setSending(false);
-                emit statusMessage(tr("Connected. Say hello!"));
-                m_input->setFocus();
+                // Re-fetch so the tutor's seeded opening message is shown.
+                renderSession(s.id, persona.name, Theme::personaAccent(persona.name));
             });
     });
 }
@@ -236,22 +230,22 @@ void ChatPage::startScenario(const QString& scenarioId, const QString& title)
                     return;
                 }
                 const Session s = Session::fromJson(sdata.toObject());
-                m_sessionId = s.id;
-                clearTranscript();
-                setHeader(persona.name, Theme::personaAccent(persona.name),
-                          tr("AI Tutor · Online"));
-                addDatePill(title.isEmpty() ? tr("New conversation") : title);
-                setSending(false);
-                emit statusMessage(tr("Connected. Say hello!"));
-                m_input->setFocus();
+                renderSession(s.id, persona.name, Theme::personaAccent(persona.name));
             });
     });
 }
 
 void ChatPage::openSession(const QString& id)
 {
+    renderSession(id, QString(), QColor());
+}
+
+void ChatPage::renderSession(const QString& id, const QString& preferredName,
+                             const QColor& preferredAccent)
+{
     emit statusMessage(tr("Loading conversation…"));
-    m_api->getSession(id, [this, id](bool ok, const QJsonValue& data, const QString& err) {
+    m_api->getSession(id, [this, preferredName, preferredAccent](
+                              bool ok, const QJsonValue& data, const QString& err) {
         if (!ok || !data.isObject()) {
             QMessageBox::critical(this, tr("Cannot open"),
                 tr("Failed to load conversation: %1").arg(err));
@@ -260,21 +254,23 @@ void ChatPage::openSession(const QString& id)
         const QJsonObject o = data.toObject();
         const Session s = Session::fromJson(o);
         m_sessionId = s.id;
+        const bool active = (s.status == QLatin1String("active"));
 
+        const QString name = preferredName.isEmpty() ? tr("Tutor") : preferredName;
+        const QColor accent = preferredAccent.isValid() ? preferredAccent
+                                                        : Theme::personaAccent(s.personaId);
         clearTranscript();
-        setHeader(tr("Tutor"), Theme::personaAccent(s.personaId),
-                  s.status == "active" ? tr("AI Tutor · Online")
-                                       : tr("Past conversation"));
-        addDatePill(s.status == "active" ? tr("Conversation") : tr("Past conversation"));
+        setHeader(name, accent, active ? tr("AI Tutor · Online") : tr("Past conversation"));
+        addDatePill(active ? tr("Today") : tr("Past conversation"));
 
         for (const QJsonValue& mv : o.value("messages").toArray()) {
             const Message m = Message::fromJson(mv.toObject());
             appendBubble(m.role, m.content);
         }
-        // Read-only when the session is finished.
-        setSending(s.status != "active");
-        emit statusMessage(s.status == "active" ? tr("Continue the conversation")
-                                                : tr("This conversation has ended"));
+        setSending(!active);     // read-only when the session is finished
+        emit statusMessage(active ? tr("Your turn — reply to %1").arg(name)
+                                  : tr("This conversation has ended"));
+        if (active) m_input->setFocus();
     });
 }
 
