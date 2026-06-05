@@ -33,6 +33,13 @@ async function bootstrap() {
   });
   const config = app.get(ConfigService);
 
+  // ─── Log level ─────────────────────────────────────────────
+  // LOG_ENABLE=false → only error + warn reach the console.
+  // Default (unset or true) → all levels (log / warn / error / debug / verbose).
+  if (config.get<string>('LOG_ENABLE') === 'false') {
+    app.useLogger(['error', 'warn']);
+  }
+
   // ─── Security headers ──────────────────────────────────────
   // CSP's `upgrade-insecure-requests` directive (Helmet default) forces the
   // browser to refetch every subresource over HTTPS. Without a TLS cert on

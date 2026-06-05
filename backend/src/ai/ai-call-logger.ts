@@ -14,6 +14,12 @@
 const W = 80;       // total outer width  ║ ... ║
 const IW = W - 4;  // inner content width (after "║  " and before "  ║")
 
+/** Returns true when AI call logging is enabled (LOG_ENABLE != 'false').
+ *  Read lazily — module-level eval runs before dotenv loads. */
+function logsEnabled(): boolean {
+  return process.env['LOG_ENABLE'] !== 'false';
+}
+
 /** Set AI_RAW_LOG=true in .env to emit a raw JSON dump after every pretty box.
  *  Read lazily inside the function — module-level eval runs before dotenv loads. */
 function rawLog(label: string, data: unknown): void {
@@ -68,6 +74,7 @@ export class AiCallLogger {
     systemPrompt: string;
     history: Array<{ role: string; content: string }>;
   }): void {
+    if (!logsEnabled()) return;
     const userCount  = opts.history.filter(m => m.role === 'user').length;
     const asstCount  = opts.history.filter(m => m.role === 'assistant').length;
 
@@ -138,6 +145,7 @@ export class AiCallLogger {
     cachedTokens?: number;
     content: string;
   }): void {
+    if (!logsEnabled()) return;
     const cached = opts.cachedTokens != null ? ` / cached=${opts.cachedTokens}` : '';
     const lines: string[] = [
       top(),
@@ -178,6 +186,7 @@ export class AiCallLogger {
     messageCount: number;
     cacheEnabled?: boolean;
   }): void {
+    if (!logsEnabled()) return;
     const lines: string[] = [
       top(),
       ...rows(`  [${opts.provider}]  ►  ${opts.callType.toUpperCase()} REQUEST`),
@@ -217,6 +226,7 @@ export class AiCallLogger {
     cachedTokens?: number;
     content: string;
   }): void {
+    if (!logsEnabled()) return;
     const cached = opts.cachedTokens != null ? ` / cached=${opts.cachedTokens}` : '';
     const lines: string[] = [
       top(),
