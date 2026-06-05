@@ -1,0 +1,14 @@
+<RCC>
+    <qresource prefix="/fonts">
+        <file alias="Lora.ttf">assets/fonts/Lora.ttf</file>
+        <file alias="Inter.ttf">assets/fonts/Inter.ttf</file>
+        <file alias="JetBrainsMono.ttf">assets/fonts/JetBrainsMono.ttf</file>
+        <file alias="Quicksand.ttf">assets/fonts/Quicksand.ttf</file>
+        <file alias="Nunito.ttf">assets/fonts/Nunito.ttf</file>
+        <file alias="PlayfairDisplay.ttf">assets/fonts/PlayfairDisplay.ttf</file>
+        <file alias="SourceSerif4.ttf">assets/fonts/SourceSerif4.ttf</file>
+    </qresource>
+    <qresource prefix="/icons">
+        <file alias="app.png">assets/icons/app.png</file>
+    </qresource>
+</RCC>

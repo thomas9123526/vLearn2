@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Virtual Foreign Language
+GenericName=English speaking practice
+Comment=FreeTalk — practice English with an AI tutor
+Exec=vlearn-chat
+Icon=vlearn-chat
+Terminal=false
+Categories=Education;Languages;
