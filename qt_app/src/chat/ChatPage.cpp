@@ -3,6 +3,7 @@
 #include "asr/AsrService.h"
 #include "asr/TtsService.h"
 #include "ui/Theme.h"
+#include "util/TextClean.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -359,8 +360,10 @@ void ChatPage::renderSession(const QString& id, const QString& preferredName,
         QString lastAssistant;
         for (const QJsonValue& mv : o.value("messages").toArray()) {
             const Message m = Message::fromJson(mv.toObject());
-            appendBubble(m.role, m.content);
-            if (m.role == QLatin1String("assistant")) lastAssistant = m.content;
+            const bool tutor = (m.role == QLatin1String("assistant"));
+            const QString content = tutor ? sanitizeReply(m.content) : m.content;
+            appendBubble(m.role, content);
+            if (tutor) lastAssistant = content;
         }
         setSending(!active);     // read-only when the session is finished
         // Speak the tutor's opening line when (re)entering an active session.
@@ -392,8 +395,8 @@ void ChatPage::onSend()
                 return;
             }
             const QJsonObject o = data.toObject();
-            const QString reply =
-                Message::fromJson(o.value("assistantMessage").toObject()).content;
+            const QString reply = sanitizeReply(
+                Message::fromJson(o.value("assistantMessage").toObject()).content);
             appendBubble("assistant", reply);
             if (m_autoSpeak && m_tts) m_tts->speak(reply);   // tutor speaks
             emit statusMessage(tr("Turn %1").arg(o.value("turnCount").toInt()));

@@ -34,6 +34,7 @@ HEADERS += \
     src/config/AppConfig.h \
     src/ui/Theme.h \
     src/ui/ClickableFrame.h \
+    src/util/TextClean.h \
     src/asr/AsrService.h \
     src/asr/TtsService.h \
     src/api/ApiClient.h \
