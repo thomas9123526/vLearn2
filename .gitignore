@@ -139,3 +139,6 @@ admin_panel/.playwright/
 
 # Test result artifacts
 test-results/
+# Qt Creator shadow-build directories (Debug/Release/any kit)
+build-qt_app-Desktop_*/
+build-*-Desktop_*/
