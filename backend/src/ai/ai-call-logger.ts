@@ -14,6 +14,19 @@
 const W = 80;       // total outer width  ║ ... ║
 const IW = W - 4;  // inner content width (after "║  " and before "  ║")
 
+/** Set AI_RAW_LOG=true in .env to emit a raw JSON dump after every pretty box. */
+const RAW_LOG = process.env['AI_RAW_LOG'] === 'true';
+
+function rawLog(label: string, data: unknown): void {
+  if (!RAW_LOG) return;
+  const sep = '─'.repeat(W - 2);
+  console.log(`\n┌${sep}┐`);
+  console.log(`│  RAW LOG ▼  ${label.padEnd(W - 16)}│`);
+  console.log(`├${sep}┤`);
+  console.log(JSON.stringify(data, null, 2));
+  console.log(`└${sep}┘`);
+}
+
 function top():     string { return `╔${'═'.repeat(W - 2)}╗`; }
 function bottom():  string { return `╚${'═'.repeat(W - 2)}╝`; }
 function thick():   string { return `╠${'═'.repeat(W - 2)}╣`; }
@@ -104,6 +117,14 @@ export class AiCallLogger {
 
     lines.push(bottom());
     console.log('\n' + lines.join('\n'));
+    rawLog(`REQUEST · ${opts.callType}`, {
+      callType:     opts.callType,
+      timestamp:    opts.timestamp,
+      promptSource: opts.promptSource,
+      variables:    opts.variables,
+      systemPrompt: opts.systemPrompt,
+      history:      opts.history,
+    });
   }
 
   /**
@@ -132,6 +153,15 @@ export class AiCallLogger {
       bottom(),
     ];
     console.log('\n' + lines.join('\n'));
+    rawLog(`RESPONSE · ${opts.callType}`, {
+      callType:    opts.callType,
+      latencyMs:   opts.latencyMs,
+      modelUsed:   opts.modelUsed,
+      inputTokens: opts.inputTokens,
+      outputTokens:opts.outputTokens,
+      cachedTokens:opts.cachedTokens ?? null,
+      content:     opts.content,
+    });
   }
 
   /**
@@ -162,6 +192,17 @@ export class AiCallLogger {
       bottom(),
     ];
     console.log('\n' + lines.join('\n'));
+    rawLog(`PROVIDER REQUEST · ${opts.provider} · ${opts.callType}`, {
+      provider:     opts.provider,
+      callType:     opts.callType,
+      endpoint:     opts.endpoint,
+      model:        opts.model,
+      maxTokens:    opts.maxTokens,
+      temperature:  opts.temperature ?? null,
+      systemLength: opts.systemLength,
+      messageCount: opts.messageCount,
+      cacheEnabled: opts.cacheEnabled ?? false,
+    });
   }
 
   /**
@@ -191,5 +232,15 @@ export class AiCallLogger {
       bottom(),
     ];
     console.log('\n' + lines.join('\n'));
+    rawLog(`PROVIDER RESPONSE · ${opts.provider} · ${opts.callType}`, {
+      provider:     opts.provider,
+      callType:     opts.callType,
+      latencyMs:    opts.latencyMs,
+      modelUsed:    opts.modelUsed,
+      inputTokens:  opts.inputTokens,
+      outputTokens: opts.outputTokens,
+      cachedTokens: opts.cachedTokens ?? null,
+      content:      opts.content,
+    });
   }
 }
