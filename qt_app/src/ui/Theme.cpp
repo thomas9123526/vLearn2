@@ -170,6 +170,13 @@ void install(QApplication& app)
         }
         QPushButton#SendBtn:hover    { background: %accentInk%; }
         QPushButton#SendBtn:disabled { background: %inkFaint%; }
+        QPushButton#MicBtn {
+            background: %surfaceAlt%; color: %ink%; border: none; border-radius: 22px;
+            min-width: 44px; min-height: 44px; font-size: 16px;
+        }
+        QPushButton#MicBtn:hover    { background: %surfaceDeep%; }
+        QPushButton#MicBtn:disabled { color: %inkFaint%; }
+        QPushButton#MicBtn[rec="true"] { background: %bad%; color: white; }
         QScrollArea, #Transcript { background: %bg%; border: none; }
         QStatusBar { color: %inkSoft%; }
         QListWidget { background: %surface%; border: 1px solid %border%; border-radius: 14px; }

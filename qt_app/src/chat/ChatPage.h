@@ -10,6 +10,7 @@ class QLineEdit;
 class QPushButton;
 class QLabel;
 class QTimer;
+class AsrService;
 
 // FreeTalk-styled chat screen (header + transcript of bubbles + quick replies
 // + rounded input bar). Lives inside MainShell's stacked content area.
@@ -58,6 +59,8 @@ private:
     // input
     QLineEdit*   m_input;
     QPushButton* m_send;
+    QPushButton* m_mic = nullptr;   // ASR push-to-talk (hidden if unavailable)
+    AsrService*  m_asr = nullptr;
 
     // typing indicator
     QWidget* m_typingRow   = nullptr;

@@ -1,5 +1,6 @@
 #include "chat/ChatPage.h"
 #include "api/ApiClient.h"
+#include "asr/AsrService.h"
 #include "ui/Theme.h"
 
 #include <QVBoxLayout>
@@ -13,6 +14,7 @@
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QTimer>
+#include <QStyle>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QVector>
@@ -76,11 +78,16 @@ ChatPage::ChatPage(ApiClient* api, QWidget* parent)
     il->setContentsMargins(12, 10, 12, 10);
     il->setSpacing(10);
 
+    m_mic = new QPushButton("🎤");
+    m_mic->setObjectName("MicBtn");
+    m_mic->setCursor(Qt::PointingHandCursor);
+    m_mic->setToolTip(tr("Hold a conversation by voice — tap to record, tap again to stop"));
     m_input = new QLineEdit;
     m_input->setPlaceholderText(tr("Type a message…"));
     m_send = new QPushButton("➤");
     m_send->setObjectName("SendBtn");
     m_send->setCursor(Qt::PointingHandCursor);
+    il->addWidget(m_mic);
     il->addWidget(m_input, 1);
     il->addWidget(m_send);
 
@@ -98,6 +105,32 @@ ChatPage::ChatPage(ApiClient* api, QWidget* parent)
 
     connect(m_send,  &QPushButton::clicked,     this, &ChatPage::onSend);
     connect(m_input, &QLineEdit::returnPressed, this, &ChatPage::onSend);
+
+    // ---- ASR (offline, push-to-talk) -----------------------------------
+    m_asr = new AsrService(this);
+    m_mic->setVisible(m_asr->isAvailable());
+    connect(m_mic, &QPushButton::clicked, this, [this]() {
+        if (m_asr->isRecording())      m_asr->stopAndTranscribe();
+        else if (!m_asr->isBusy())     m_asr->startRecording();
+    });
+    connect(m_asr, &AsrService::stateChanged, this, [this]() {
+        const bool rec = m_asr->isRecording();
+        m_mic->setText(rec ? "■" : "🎤");
+        m_mic->setProperty("rec", rec);
+        m_mic->style()->unpolish(m_mic);
+        m_mic->style()->polish(m_mic);
+        if (rec)                  emit statusMessage(tr("Recording… tap ■ to stop"));
+        else if (m_asr->isBusy()) emit statusMessage(tr("Transcribing…"));
+    });
+    connect(m_asr, &AsrService::transcribed, this, [this](const QString& t) {
+        const QString cur = m_input->text();
+        m_input->setText(cur.isEmpty() ? t : cur + ' ' + t);
+        m_input->setFocus();
+        emit statusMessage(tr("Transcribed — edit, then send"));
+    });
+    connect(m_asr, &AsrService::failed, this, [this](const QString& e) {
+        emit statusMessage(e);
+    });
 
     setSending(true);
 }
@@ -211,6 +244,8 @@ void ChatPage::setSending(bool sending)
 {
     m_send->setEnabled(!sending);
     m_input->setEnabled(!sending);
+    if (m_mic)
+        m_mic->setEnabled(!sending && m_asr && m_asr->isAvailable());
 }
 
 void ChatPage::startNewChat()

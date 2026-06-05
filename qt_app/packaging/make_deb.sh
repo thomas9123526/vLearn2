@@ -69,7 +69,7 @@ Priority: optional
 Architecture: $ARCH
 Maintainer: vLearn2 <noreply@vlearn2.local>
 Installed-Size: $INSTALLED_KB
-Depends: libc6, libstdc++6, libqt5core5a (>= 5.12), libqt5gui5 (>= 5.12), libqt5widgets5 (>= 5.12), libqt5network5 (>= 5.12)
+Depends: libc6, libstdc++6, alsa-utils, libqt5core5a (>= 5.12), libqt5gui5 (>= 5.12), libqt5widgets5 (>= 5.12), libqt5network5 (>= 5.12)
 Description: Virtual Foreign Language - FreeTalk English speaking client
  Native Qt desktop client for the vLearn2 / FreeTalk English-learning platform.
  Connects to the backend configured in /etc/vlearn/app_config.json.
